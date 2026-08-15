@@ -24,7 +24,7 @@ function MatchRow({ m, teams, t }) {
       <div className="px-3 shrink-0 text-center" style={{ minWidth: 58 }}>
         {showScore
           ? <span className="font-mono" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
-          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "\u2014"}</span>}
+          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "—"}</span>}
       </div>
       <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
         <Crest short={a.short} color={a.color} size={24} ring={t.divider} />
@@ -41,7 +41,7 @@ function Group({ c, teams, t }) {
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 px-4 py-3" style={{ background: t.groupHead }}>
         <span style={{ fontSize: 16 }}>{c.flag}</span>
         <span style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{c.name}</span>
-        {c.sub && <span style={{ color: t.dim, fontSize: 13 }}>\u00b7 {c.sub}</span>}
+        {c.sub && <span style={{ color: t.dim, fontSize: 13 }}>· {c.sub}</span>}
         <span className="ml-auto">{open ? <ChevronUp size={18} color={t.dim} /> : <ChevronDown size={18} color={t.dim} />}</span>
       </button>
       {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} />)}
@@ -64,7 +64,7 @@ export default function MatchesHome() {
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 56 }}>
         <span style={{ color: t.text, fontSize: 21, fontWeight: 800, letterSpacing: -0.5 }}>
-          <span style={{ color: t.accent }}>\u26a1</span>Touchline
+          <span style={{ color: t.accent }}>⚡</span>Touchline
         </span>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-full overflow-hidden" style={{ background: t.pill, border: `1px solid ${t.pillBorder}`, height: 34 }}>
@@ -74,7 +74,7 @@ export default function MatchesHome() {
             </button>
             <div style={{ width: 1, height: 20, background: t.pillBorder }} />
             <button onClick={toggle} className="flex items-center justify-center px-3 h-full" style={{ color: t.text }}>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{mode === "dark" ? "\u263E" : "\u2600"}</span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{mode === "dark" ? "☾" : "☀"}</span>
             </button>
           </div>
           <Link href="/admin" className="flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
@@ -89,7 +89,7 @@ export default function MatchesHome() {
         ))}
       </div>
 
-      {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading\u2026</div>}
+      {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading…</div>}
       {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>

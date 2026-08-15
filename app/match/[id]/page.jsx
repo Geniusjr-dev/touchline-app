@@ -1,5 +1,6 @@
 import MatchCentre from "@/components/MatchCentre";
 export const dynamic = "force-dynamic";
-export default function Page({ params }) {
-  return <MatchCentre id={params.id} />;
+export default async function Page({ params }) {
+  const { id } = await params;
+  return <MatchCentre id={id} />;
 }

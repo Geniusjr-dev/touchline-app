@@ -3,12 +3,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { getMatch } from "@/lib/db";
+import { formatMatchClock, getMatch } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
 const TABS_PRE = ["Preview", "H2H"];
-const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Stats", "Table", "H2H"];
+const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
 
 function goalsBySide(events, side) {
   return (events || []).filter((e) => e.type === "goal" && e.side === side).length;
@@ -19,11 +19,14 @@ export default function MatchCentre({ id }) {
   const router = useRouter();
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const load = () => getMatch(id).then((r) => { if (alive) setState(r); });
     load();
+    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
+    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
     let ch;
     if (supabase) {
       ch = supabase.channel("m-" + id)
@@ -31,7 +34,7 @@ export default function MatchCentre({ id }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
         .subscribe();
     }
-    return () => { alive = false; if (ch) supabase.removeChannel(ch); };
+    return () => { alive = false; window.clearTimeout(firstTick); window.clearInterval(ticker); if (ch) supabase.removeChannel(ch); };
   }, [id]);
 
   const loadingStyle = { background: t.bg, minHeight: "100vh", color: t.dim, display: "flex", alignItems: "center", justifyContent: "center" };
@@ -41,7 +44,7 @@ export default function MatchCentre({ id }) {
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
-  const live = m.status === "live" || m.status === "ht";
+  const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
   const tabs = started ? TABS_LIVE : TABS_PRE;
@@ -72,7 +75,7 @@ export default function MatchCentre({ id }) {
             {live
               ? <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
                   <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
-                  {m.status === "ht" ? "Half time" : `${m.min}′`}
+                  {m.status === "ht" ? `Half time · ${formatMatchClock(m, now)}` : m.status === "et_ht" ? `Extra-time break · ${formatMatchClock(m, now)}` : `${m.status === "et_live" ? "ET " : ""}${formatMatchClock(m, now)}`}
                 </span>
               : <span style={{ color: t.dim, fontSize: 12, fontWeight: 700 }}>Full time</span>}
           </div>
@@ -92,9 +95,9 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <StatsTab t={t} h={h} a={a} />}
+      {activeTab === "Stats" && <Empty t={t} title="Match stats" note="No verified match statistics have been recorded yet." />}
       {activeTab === "Lineup" && <Empty t={t} title="Line-ups" note="Managers submit line-ups before kick-off. They will appear here once confirmed." />}
-      {activeTab === "Table" && <TableTab t={t} m={m} />}
+      {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
       <BottomNav t={t} active="Matches" />
@@ -201,8 +204,8 @@ function Ev({ e, t }) {
       </span>;
   const body = (align) => {
     if (e.type === "sub") return <div style={{ textAlign: align }}>
-      <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.on}</div>
-      <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.off}</div>
+      <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.player}</div>
+      <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.assist}</div>
     </div>;
     if (e.type === "goal") return <div style={{ textAlign: align }}>
       <div style={{ fontSize: 14 }}><span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span><RunScore score={e.score} scored={e.scored} t={t} /></div>
@@ -223,7 +226,7 @@ function Commentary({ t, d, h, a }) {
     if (e.type === "goal") return { m: e.min, text: `GOAL! ${e.player} scores${e.assist ? `, set up by ${e.assist}` : ""}. It's ${e.score}.` };
     if (e.type === "yellow") return { m: e.min, text: `Yellow card shown to ${e.player}.` };
     if (e.type === "red") return { m: e.min, text: `Red card! ${e.player} is sent off.` };
-    if (e.type === "sub") return { m: e.min, text: `Substitution: ${e.on} replaces ${e.off}.` };
+    if (e.type === "sub") return { m: e.min, text: `Substitution: ${e.player} replaces ${e.assist}.` };
     return { m: e.min, text: "" };
   });
   return <Card t={t} style={{ paddingTop: 6, paddingBottom: 8 }}>
@@ -236,53 +239,9 @@ function Commentary({ t, d, h, a }) {
   </Card>;
 }
 
-// ---------- Stats ----------
-function StatsTab({ t, h, a }) {
-  const rows = [
-    { name: "Total shots", hv: "9", av: "6", hn: 9, an: 6 },
-    { name: "Shots on target", hv: "5", av: "2", hn: 5, an: 2 },
-    { name: "Corners", hv: "6", av: "3", hn: 6, an: 3 },
-    { name: "Fouls", hv: "8", av: "11", hn: 8, an: 11 },
-    { name: "Offsides", hv: "2", av: "3", hn: 2, an: 3 },
-    { name: "Yellow cards", hv: "0", av: "1", hn: 0, an: 1 },
-  ];
-  return (
-    <Card t={t} style={{ paddingBottom: 6 }}>
-      <div className="text-center pt-4 pb-1" style={{ color: t.text, fontSize: 17, fontWeight: 800 }}>Top stats</div>
-      <div className="px-4 pt-3 pb-4">
-        <div className="text-center mb-2" style={{ color: t.dim, fontSize: 13 }}>Ball possession</div>
-        <div className="flex items-center rounded-full overflow-hidden" style={{ height: 28 }}>
-          <div className="flex items-center pl-3" style={{ width: "58%", background: h.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>58%</span></div>
-          <div className="flex items-center justify-end pr-3" style={{ width: "42%", background: a.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>42%</span></div>
-        </div>
-      </div>
-      {rows.map((s, i) => {
-        const hl = s.hn > s.an, al = s.an > s.hn;
-        return <div key={i}>
-          <div className="flex items-center py-2.5 px-4">
-            <div style={{ width: 90 }} className="flex justify-start">{hl ? <span className="rounded-full px-2.5 py-1" style={{ background: h.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.hv}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.hv}</span>}</div>
-            <div className="flex-1 text-center" style={{ color: t.dim, fontSize: 13 }}>{s.name}</div>
-            <div style={{ width: 90 }} className="flex justify-end">{al ? <span className="rounded-full px-2.5 py-1" style={{ background: a.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.av}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.av}</span>}</div>
-          </div>
-          {i < rows.length - 1 && <div style={{ height: 1, background: t.divider, marginLeft: 16, marginRight: 16 }} />}
-        </div>;
-      })}
-    </Card>
-  );
-}
-
 // ---------- Table ----------
-const GROUP = [
-  { s: "BUY", name: "Buya Stars", color: "#18A558", pl: 7, w: 5, d: 1, l: 1, gf: 14, ga: 6, pts: 16, form: ["W", "W", "D", "W", "L"] },
-  { s: "KAB", name: "Kabonwule FC", color: "#2563EB", pl: 7, w: 4, d: 2, l: 1, gf: 12, ga: 7, pts: 14, form: ["W", "D", "W", "W", "L"] },
-  { s: "BBU", name: "Banda-Buya United", color: "#DC2626", pl: 7, w: 4, d: 1, l: 2, gf: 11, ga: 8, pts: 13, form: ["L", "W", "W", "D", "W"] },
-  { s: "KAT", name: "Katiejeli Kotoko", color: "#7C3AED", pl: 7, w: 3, d: 2, l: 2, gf: 10, ga: 9, pts: 11, form: ["D", "L", "W", "W", "D"] },
-  { s: "KPW", name: "Kpandai Warriors", color: "#EA580C", pl: 7, w: 2, d: 3, l: 2, gf: 9, ga: 9, pts: 9, form: ["D", "W", "D", "L", "L"] },
-  { s: "NKA", name: "Nkanchina United", color: "#0891B2", pl: 7, w: 2, d: 2, l: 3, gf: 8, ga: 11, pts: 8, form: ["L", "D", "L", "W", "D"] },
-  { s: "KIT", name: "Kitare FC", color: "#DB2777", pl: 7, w: 1, d: 2, l: 4, gf: 6, ga: 12, pts: 5, form: ["L", "L", "D", "L", "W"] },
-  { s: "BLA", name: "Bladjai Stars", color: "#CA8A04", pl: 7, w: 0, d: 3, l: 4, gf: 5, ga: 13, pts: 3, form: ["L", "D", "L", "L", "D"] },
-];
-function TableTab({ t, m }) {
+function TableTab({ t, m, rows }) {
+  if (!rows.length) return <Empty t={t} title="Competition table" note="The table will appear when this competition has fixtures." />;
   const hi = [m.home, m.away];
   return (
     <>
@@ -295,15 +254,15 @@ function TableTab({ t, m }) {
           <span style={{ width: 92, textAlign: "right", paddingRight: 4 }}>Form</span>
         </div>
         <div style={{ height: 1, background: t.divider }} />
-        {GROUP.map((tm, i) => {
-          const gd = tm.gf - tm.ga; const on = hi.includes(tm.s); const q = i < 4;
-          return <div key={tm.s} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
+        {rows.map((tm, i) => {
+          const gd = tm.gf - tm.ga; const on = hi.includes(tm.id); const q = i < Math.min(4, rows.length);
+          return <div key={tm.id} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
             <div className="flex items-center" style={{ width: 22 }}>
               <span style={{ width: 3, height: 22, borderRadius: 2, background: q ? t.accent : "transparent", marginRight: 5 }} />
               <span style={{ color: t.dim, fontSize: 13, fontWeight: 600 }}>{i + 1}</span>
             </div>
             <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
-              <Crest short={tm.s} color={tm.color} size={22} ring={t.divider} />
+              <Crest short={tm.short} color={tm.color} size={22} ring={t.divider} />
               <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>{tm.name}</span>
             </div>
             <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.pl}</span>
@@ -327,11 +286,6 @@ function TableTab({ t, m }) {
 }
 
 // ---------- H2H ----------
-function H2H({ t, h, a }) {
-  return <Card t={t} style={{ padding: "40px 16px" }}>
-    <div className="text-center">
-      <div style={{ color: t.text, fontSize: 15, fontWeight: 700, marginBottom: 4 }}>First meeting</div>
-      <div style={{ color: t.dim, fontSize: 13 }}>{h.name} and {a.name} have not met before in the tournament. Head-to-head records build as they play.</div>
-    </div>
-  </Card>;
+function H2H() {
+  return null;
 }

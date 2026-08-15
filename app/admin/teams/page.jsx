@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listTeams, addTeam, listPlayers, addPlayer, deletePlayer } from "@/lib/db";
+import { useAuth } from "@/components/AuthProvider";
 
 const COLORS = ["#18A558", "#2563EB", "#DC2626", "#7C3AED", "#EA580C", "#0891B2", "#DB2777", "#CA8A04"];
 
 export default function Teams() {
+  const { activeOrganizationId } = useAuth();
   const [teams, setTeams] = useState([]);
   const [name, setName] = useState("");
   const [short, setShort] = useState("");
@@ -13,14 +15,14 @@ export default function Teams() {
   const [err, setErr] = useState("");
   const [openTeam, setOpenTeam] = useState(null);
 
-  const load = () => listTeams().then(setTeams).catch(() => {});
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => listTeams(activeOrganizationId).then(setTeams).catch(() => {}), [activeOrganizationId]);
+  useEffect(() => { if (activeOrganizationId) load(); }, [activeOrganizationId, load]);
 
   async function submit(e) {
     e.preventDefault();
     if (!name.trim() || !short.trim()) return;
     setBusy(true); setErr("");
-    const { error } = await addTeam(name.trim(), short.trim().toUpperCase().slice(0, 4), color);
+    const { error } = await addTeam(activeOrganizationId, name.trim(), short.trim().toUpperCase().slice(0, 4), color);
     setBusy(false);
     if (error) { setErr(error.message); return; }
     setName(""); setShort(""); load();
@@ -67,8 +69,8 @@ function Squad({ teamId }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [pos, setPos] = useState("");
-  const load = () => listPlayers(teamId).then(setPlayers).catch(() => {});
-  useEffect(() => { load(); }, [teamId]);
+  const load = useCallback(() => listPlayers(teamId).then(setPlayers).catch(() => {}), [teamId]);
+  useEffect(() => { load(); }, [load]);
   async function add(e) {
     e.preventDefault();
     if (!name.trim()) return;

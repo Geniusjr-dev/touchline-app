@@ -4,19 +4,20 @@ import Link from "next/link";
 import { Menu, ChevronUp, ChevronDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { getHome } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 
 const DAYS = ["Thu 25", "Fri 26", "Today", "Tomorrow", "Sun 29", "Mon 30"];
 const ACTIVE_DAY = 2;
 
-function MatchRow({ m, teams, t }) {
+function MatchRow({ m, teams, t, now }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
   const showScore = m.status !== "scheduled";
   return (
     <Link href={`/match/${m.id}`} className="flex items-center px-3 active:opacity-70"
       style={{ minHeight: 60, borderTop: `1px solid ${t.divider}`, textDecoration: "none" }}>
-      <div style={{ width: 46 }} className="flex justify-center">{showScore ? <StatusChip m={m} t={t} /> : <span />}</div>
+      <div style={{ width: 54 }} className="flex justify-center">{showScore ? <StatusChip m={m} t={t} now={now} /> : <span />}</div>
       <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
         <span className="truncate text-right" style={{ color: t.text, fontSize: 14.5, fontWeight: 500 }}>{h.name}</span>
         <Crest short={h.short} color={h.color} size={24} ring={t.divider} />
@@ -34,7 +35,7 @@ function MatchRow({ m, teams, t }) {
   );
 }
 
-function Group({ c, teams, t }) {
+function Group({ c, teams, t, now }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
@@ -44,7 +45,7 @@ function Group({ c, teams, t }) {
         {c.sub && <span style={{ color: t.dim, fontSize: 13 }}>· {c.sub}</span>}
         <span className="ml-auto">{open ? <ChevronUp size={18} color={t.dim} /> : <ChevronDown size={18} color={t.dim} />}</span>
       </button>
-      {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} />)}
+      {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} now={now} />)}
     </div>
   );
 }
@@ -53,11 +54,31 @@ export default function MatchesHome() {
   const { t, mode, toggle } = useTheme();
   const [liveOnly, setLiveOnly] = useState(false);
   const [data, setData] = useState(null);
+  const [now, setNow] = useState(0);
 
-  useEffect(() => { getHome().then(setData); }, []);
+  useEffect(() => {
+    let alive = true;
+    const load = () => getHome().then((next) => { if (alive) setData(next); }).catch(() => {});
+    load();
+    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
+    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
+    let channel;
+    if (supabase) {
+      channel = supabase.channel("touchline-home")
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, load)
+        .subscribe();
+    }
+    return () => {
+      alive = false;
+      window.clearTimeout(firstTick);
+      window.clearInterval(ticker);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   const comps = !data ? [] : (liveOnly
-    ? data.competitions.map((c) => ({ ...c, matches: c.matches.filter((m) => m.status === "live" || m.status === "ht") })).filter((c) => c.matches.length)
+    ? data.competitions.map((c) => ({ ...c, matches: c.matches.filter((m) => ["live", "ht", "et_live", "et_ht"].includes(m.status)) })).filter((c) => c.matches.length)
     : data.competitions);
 
   return (
@@ -90,7 +111,7 @@ export default function MatchesHome() {
       </div>
 
       {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading…</div>}
-      {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} />)}
+      {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
           No matches yet. Open the menu to add teams and matches in the admin area.

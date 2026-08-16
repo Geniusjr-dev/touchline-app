@@ -4,6 +4,13 @@ import Link from "next/link";
 import { listTeams, listCompetitions, listMatches, listScorers, listMatchScorers, replaceMatchScorer, addCompetition, createMatch } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function Matches() {
   const { user, role, activeOrganizationId } = useAuth();
   const [teams, setTeams] = useState([]);
@@ -14,6 +21,7 @@ export default function Matches() {
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
   const [comp, setComp] = useState("");
+  const [matchDate, setMatchDate] = useState(() => localDateKey());
   const [kickoff, setKickoff] = useState("");
   const [newComp, setNewComp] = useState("");
   const [newSub, setNewSub] = useState("");
@@ -57,7 +65,8 @@ export default function Matches() {
     e.preventDefault();
     setErr("");
     if (!home || !away || home === away) return setErr("Pick two different teams.");
-    const { error } = await createMatch(activeOrganizationId, comp || null, home, away, kickoff.trim() || null);
+    if (!matchDate) return setErr("Choose the match date.");
+    const { error } = await createMatch(activeOrganizationId, comp || null, home, away, kickoff.trim() || null, matchDate);
     if (error) return setErr(error.message);
     setHome(""); setAway(""); setKickoff(""); load();
   }
@@ -94,7 +103,8 @@ export default function Matches() {
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </Field>
-          <Field label="Kick-off label (e.g. 16:00)"><input value={kickoff} onChange={(e) => setKickoff(e.target.value)} style={inp} /></Field>
+          <Field label="Match date"><input type="date" required value={matchDate} onChange={(e) => setMatchDate(e.target.value)} style={inp} /></Field>
+          <Field label="Kick-off time (e.g. 16:00)"><input value={kickoff} onChange={(e) => setKickoff(e.target.value)} placeholder="16:00" style={inp} /></Field>
           <button type="submit" style={btn}>Create match</button>
           {err && <div style={{ color: "#F04444", fontSize: 13, marginTop: 8 }}>{err}</div>}
         </form>
@@ -129,7 +139,7 @@ export default function Matches() {
         {matches.map((m) => (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: "1px solid #26282B", flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: statusColor(m.status), width: 64 }}>{m.status}</span>
-            <span style={{ flex: 1, minWidth: 200, fontSize: 14 }}>{m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.name || teamName(m.away_id)}</span>
+            <span style={{ flex: 1, minWidth: 200, fontSize: 14 }}><span style={{ color: "#8E939B", fontSize: 12 }}>{m.match_date} · </span>{m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.name || teamName(m.away_id)}</span>
             {role === "admin" && (
               <select value={assignments[m.id]?.[0] || ""} onChange={(e) => assignScorer(m.id, e.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 190, padding: "7px 9px", fontSize: 12 }}>
                 <option value="">No scorer assigned</option>

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Menu, ChevronUp, ChevronDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
@@ -7,8 +7,28 @@ import { getHome } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 
-const DAYS = ["Thu 25", "Fri 26", "Today", "Tomorrow", "Sun 29", "Mon 30"];
-const ACTIVE_DAY = 2;
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addLocalDays(date, amount) {
+  const next = new Date(date);
+  next.setHours(12, 0, 0, 0);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function dateLabel(date, offset) {
+  if (offset === -1) return "Yesterday";
+  if (offset === 0) return "Today";
+  if (offset === 1) return "Tomorrow";
+  const weekday = date.toLocaleDateString(undefined, { weekday: "short" });
+  const month = date.toLocaleDateString(undefined, { month: "short" });
+  return `${weekday} ${month} ${date.getDate()}`;
+}
 
 function MatchRow({ m, teams, t, now }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
@@ -55,6 +75,20 @@ export default function MatchesHome() {
   const [liveOnly, setLiveOnly] = useState(false);
   const [data, setData] = useState(null);
   const [now, setNow] = useState(0);
+  const dateStripRef = useRef(null);
+  const todayButtonRef = useRef(null);
+  const todayKey = now ? localDateKey(new Date(now)) : "";
+  const [selectedDateOverride, setSelectedDateOverride] = useState(null);
+  const selectedDate = selectedDateOverride || todayKey;
+  const dateWindow = useMemo(() => {
+    if (!todayKey) return [];
+    const today = new Date(`${todayKey}T12:00:00`);
+    return Array.from({ length: 13 }, (_, index) => {
+      const offset = index - 6;
+      const date = addLocalDays(today, offset);
+      return { key: localDateKey(date), label: dateLabel(date, offset), offset };
+    });
+  }, [todayKey]);
 
   useEffect(() => {
     let alive = true;
@@ -77,9 +111,25 @@ export default function MatchesHome() {
     };
   }, []);
 
-  const comps = !data ? [] : (liveOnly
-    ? data.competitions.map((c) => ({ ...c, matches: c.matches.filter((m) => ["live", "ht", "et_live", "et_ht"].includes(m.status)) })).filter((c) => c.matches.length)
-    : data.competitions);
+  useEffect(() => {
+    if (!todayKey) return undefined;
+    const centreToday = window.setTimeout(() => {
+      todayButtonRef.current?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+    }, 0);
+    return () => window.clearTimeout(centreToday);
+  }, [todayKey]);
+
+  const comps = !data ? [] : data.competitions
+    .map((competition) => ({
+      ...competition,
+      matches: competition.matches.filter((match) => {
+        const onSelectedDate = (match.date || todayKey) === selectedDate;
+        const passesLiveFilter = !liveOnly || ["live", "ht", "et_live", "et_ht"].includes(match.status);
+        return onSelectedDate && passesLiveFilter;
+      }),
+    }))
+    .filter((competition) => competition.matches.length);
+  const selectedLabel = dateWindow.find((day) => day.key === selectedDate)?.label || selectedDate;
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
@@ -104,17 +154,32 @@ export default function MatchesHome() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar sticky z-20" style={{ background: t.bg, height: 46, top: 56 }}>
-        {DAYS.map((d, i) => (
-          <button key={d} className="shrink-0" style={{ color: i === ACTIVE_DAY ? t.text : t.faint, fontSize: i === ACTIVE_DAY ? 16 : 15, fontWeight: i === ACTIVE_DAY ? 800 : 600, whiteSpace: "nowrap" }}>{d}</button>
-        ))}
+      <div
+        ref={dateStripRef}
+        className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar sticky z-20"
+        style={{ background: t.bg, height: 46, top: 56, scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
+        aria-label="Match dates"
+      >
+        {dateWindow.map((day) => {
+          const active = day.key === selectedDate;
+          return <button
+            key={day.key}
+            ref={day.offset === 0 ? todayButtonRef : null}
+            onClick={() => setSelectedDateOverride(day.offset === 0 ? null : day.key)}
+            aria-pressed={active}
+            className="shrink-0"
+            style={{ color: active ? t.text : t.faint, fontSize: active ? 16 : 15, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", scrollSnapAlign: "center" }}
+          >
+            {day.label}
+          </button>;
+        })}
       </div>
 
       {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading…</div>}
       {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
-          No matches yet. Open the menu to add teams and matches in the admin area.
+          {liveOnly ? `No live matches on ${selectedLabel}.` : `No matches scheduled for ${selectedLabel}.`}
         </div>
       )}
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { getMatch, getStandings, clockSeconds, fmtClock } from "@/lib/db";
+import { getMatch, formatMatchClock } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
@@ -43,15 +43,14 @@ export default function MatchCentre({ id }) {
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
-  const live = m.status === "live" || m.status === "ht";
+  const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
-  const showTable = m.format === "league" || m.format === "tournament";
+  const showTable = d && d.tableMeta ? d.tableMeta.hasTable : false;
   const baseTabs = started ? TABS_LIVE : TABS_PRE;
   const tabs = showTable ? baseTabs : baseTabs.filter((x) => x !== "Table");
   const activeTab = (tab && tabs.includes(tab)) ? tab : (started ? "Facts" : "Preview");
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
-  const liveSecs = (m.status === "live") ? clockSeconds(m) : (m.elapsed_seconds || 0);
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
@@ -77,7 +76,7 @@ export default function MatchCentre({ id }) {
             {live
               ? <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
                   <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
-                  {m.status === "ht" ? "Half time" : <span style={{ fontFamily: "ui-monospace, monospace" }}>{fmtClock(liveSecs)}</span>}
+                  {(m.status === "ht" || m.status === "et_ht") ? "Half time" : <span style={{ fontFamily: "ui-monospace, monospace", fontVariantNumeric: "tabular-nums" }}>{formatMatchClock(m)}</span>}
                 </span>
               : <span style={{ color: t.dim, fontSize: 12, fontWeight: 700 }}>Full time</span>}
           </div>
@@ -99,7 +98,7 @@ export default function MatchCentre({ id }) {
       {activeTab === "Commentary" && <Commentary t={t} d={d} h={h} a={a} />}
       {activeTab === "Stats" && <StatsTab t={t} h={h} a={a} />}
       {activeTab === "Lineup" && <Empty t={t} title="Line-ups" note="Managers submit line-ups before kick-off. They will appear here once confirmed." />}
-      {activeTab === "Table" && <TableTab t={t} m={m} />}
+      {activeTab === "Table" && <TableTab t={t} m={m} detail={d} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
       <BottomNav t={t} active="Matches" />
@@ -286,16 +285,15 @@ function StatsTab({ t, h, a }) {
 }
 
 // ---------- Table ----------
-function TableTab({ t, m }) {
-  const [data, setData] = useState(null);
-  useEffect(() => { let a = true; getStandings(m.competition_id).then((r) => a && setData(r || { rows: [] })); return () => { a = false; }; }, [m.competition_id]);
-  if (!data) return <Empty t={t} title="Table" note="Loading standings…" />;
-  if (!data.rows || data.rows.length === 0) return <Empty t={t} title="Table" note="Standings will appear once matches are played." />;
+function TableTab({ t, m, detail }) {
+  const rows = detail?.table || [];
+  const meta = detail?.tableMeta || {};
+  if (!meta.hasTable || rows.length === 0) return <Empty t={t} title="Table" note="Standings will appear once matches are played." />;
   const hi = [m.home, m.away];
-  const isTournament = data.format === "tournament";
+  const isTournament = meta.format === "tournament";
   return (
     <>
-      {(data.name || data.sub) && <div className="px-4 pt-3 pb-1" style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{data.name}{data.sub ? ` · ${data.sub}` : ""}</div>}
+      {(meta.competitionName || meta.groupLabel) && <div className="px-4 pt-3 pb-1" style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{meta.competitionName}{meta.groupLabel ? ` · ${meta.groupLabel}` : ""}</div>}
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
         <div className="flex items-center px-3 py-2" style={{ color: t.dim, fontSize: 11, fontWeight: 700 }}>
           <span style={{ width: 22 }} /><span className="flex-1 pl-1">Team</span>
@@ -304,8 +302,8 @@ function TableTab({ t, m }) {
           <span style={{ width: 34, textAlign: "center" }}>GD</span><span style={{ width: 32, textAlign: "center" }}>PTS</span>
         </div>
         <div style={{ height: 1, background: t.divider }} />
-        {data.rows.map((tm, i) => {
-          const on = hi.includes(tm.id); const q = isTournament && i < 2;
+        {rows.map((tm, i) => {
+          const on = hi.includes(tm.id); const q = isTournament && i < 2; const gd = tm.gf - tm.ga;
           return <div key={tm.id} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
             <div className="flex items-center" style={{ width: 22 }}>
               <span style={{ width: 3, height: 22, borderRadius: 2, background: q ? t.accent : "transparent", marginRight: 5 }} />
@@ -315,12 +313,12 @@ function TableTab({ t, m }) {
               <Crest short={tm.short} color={tm.color} size={22} ring={t.divider} />
               <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>{tm.name}</span>
             </div>
-            <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.P}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.W}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.D}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.L}</span>
-            <span style={{ width: 34, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.GD > 0 ? "+" + tm.GD : tm.GD}</span>
-            <span style={{ width: 32, textAlign: "center", color: t.text, fontSize: 14, fontWeight: 800 }}>{tm.PTS}</span>
+            <span className="tnum" style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.pl}</span>
+            <span className="tnum" style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.w}</span>
+            <span className="tnum" style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.d}</span>
+            <span className="tnum" style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.l}</span>
+            <span className="tnum" style={{ width: 34, textAlign: "center", color: t.dim, fontSize: 13 }}>{gd > 0 ? "+" + gd : gd}</span>
+            <span className="tnum" style={{ width: 32, textAlign: "center", color: t.text, fontSize: 14, fontWeight: 800 }}>{tm.pts}</span>
           </div>;
         })}
       </div>

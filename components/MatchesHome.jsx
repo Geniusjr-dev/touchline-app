@@ -93,7 +93,7 @@ export default function MatchesHome() {
       {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
-          {liveOnly ? "No live matches right now." : "No matches scheduled for this date."}
+          No matches yet. Open the menu to add teams and matches in the admin area.
         </div>
       )}
 

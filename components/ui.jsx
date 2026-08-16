@@ -1,4 +1,5 @@
 "use client";
+import { liveMinute } from "@/lib/db";
 import { Search, Newspaper, Trophy, Star } from "lucide-react";
 
 export function Crest({ short, color, size = 26, ring }) {
@@ -47,7 +48,7 @@ export function BottomNav({ t, active = "Matches" }) {
 export function StatusChip({ m, t }) {
   if (m.status === "live") return (
     <span className="inline-flex items-center gap-1 font-mono" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
-      <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />{m.min}′
+      <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />{liveMinute(m)}′
     </span>
   );
   if (m.status === "ht") return <span className="font-mono" style={{ color: t.yellow, fontSize: 11, fontWeight: 800 }}>HT</span>;

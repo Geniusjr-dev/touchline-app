@@ -1,17 +1,22 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown, Trophy } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { getMatch, getStandings, clockSeconds, fmtClock } from "@/lib/db";
+import { announcedStoppageMinutes, formatMatchClock, getMatch } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
-const TABS_PRE = ["Preview", "Table", "H2H"];
-const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
+const TABS_PRE = ["Preview", "H2H"];
+const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Stats", "H2H"];
 
 function goalsBySide(events, side) {
   return (events || []).filter((e) => e.type === "goal" && e.side === side).length;
+}
+
+function hasKnownScorer(player) {
+  const name = player?.trim().toLowerCase();
+  return Boolean(name && name !== "unknown scorer" && name !== "unknown player");
 }
 
 export default function MatchCentre({ id }) {
@@ -19,21 +24,23 @@ export default function MatchCentre({ id }) {
   const router = useRouter();
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
-  const [, setTick] = useState(0);
-  useEffect(() => { const i = setInterval(() => setTick((x) => x + 1), 1000); return () => clearInterval(i); }, []);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     let alive = true;
     const load = () => getMatch(id).then((r) => { if (alive) setState(r); });
     load();
+    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
+    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
     let ch;
     if (supabase) {
       ch = supabase.channel("m-" + id)
         .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, load)
         .subscribe();
     }
-    return () => { alive = false; if (ch) supabase.removeChannel(ch); };
+    return () => { alive = false; window.clearTimeout(firstTick); window.clearInterval(ticker); if (ch) supabase.removeChannel(ch); };
   }, [id]);
 
   const loadingStyle = { background: t.bg, minHeight: "100vh", color: t.dim, display: "flex", alignItems: "center", justifyContent: "center" };
@@ -43,15 +50,14 @@ export default function MatchCentre({ id }) {
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
-  const live = m.status === "live" || m.status === "ht";
+  const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
-  const showTable = m.format === "league" || m.format === "tournament";
-  const baseTabs = started ? TABS_LIVE : TABS_PRE;
-  const tabs = showTable ? baseTabs : baseTabs.filter((x) => x !== "Table");
-  const activeTab = (tab && tabs.includes(tab)) ? tab : (started ? "Facts" : "Preview");
+  const hasTable = started && ["league", "tournament"].includes(m.competitionType) && d?.tableMeta?.hasTable !== false;
+  const tabs = started ? (hasTable ? [...TABS_LIVE.slice(0, 3), "Table", ...TABS_LIVE.slice(3)] : TABS_LIVE) : TABS_PRE;
+  const activeTab = tab && tabs.includes(tab) ? tab : (started ? "Facts" : "Preview");
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
-  const liveSecs = (m.status === "live") ? clockSeconds(m) : (m.elapsed_seconds || 0);
+  const announcedStoppage = announcedStoppageMinutes(m);
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
@@ -77,7 +83,7 @@ export default function MatchCentre({ id }) {
             {live
               ? <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
                   <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
-                  {m.status === "ht" ? "Half time" : <span style={{ fontFamily: "ui-monospace, monospace" }}>{fmtClock(liveSecs)}</span>}
+                  {m.status === "ht" ? `Half time · ${formatMatchClock(m, now)}` : m.status === "et_ht" ? `Extra-time break · ${formatMatchClock(m, now)}` : `${m.status === "et_live" ? "ET " : ""}${formatMatchClock(m, now)}${announcedStoppage ? ` · +${announcedStoppage} added` : ""}`}
                 </span>
               : <span style={{ color: t.dim, fontSize: 12, fontWeight: 700 }}>Full time</span>}
           </div>
@@ -96,10 +102,10 @@ export default function MatchCentre({ id }) {
 
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
-      {activeTab === "Commentary" && <Commentary t={t} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <StatsTab t={t} h={h} a={a} />}
+      {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
+      {activeTab === "Stats" && <Empty t={t} title="Match stats" note="No verified match statistics have been recorded yet." />}
       {activeTab === "Lineup" && <Empty t={t} title="Line-ups" note="Managers submit line-ups before kick-off. They will appear here once confirmed." />}
-      {activeTab === "Table" && <TableTab t={t} m={m} />}
+      {activeTab === "Table" && hasTable && <TableTab t={t} m={m} rows={d?.table || []} meta={d?.tableMeta} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
       <BottomNav t={t} active="Matches" />
@@ -121,13 +127,6 @@ function Empty({ t, title, note }) {
 function FactsPreview({ t, m, h, a, d, started }) {
   return (
     <div>
-      {d && d.info && (d.info.referee || d.info.venue) && (
-        <Card t={t}>
-          {d.info.venue && <div className="px-4 py-3 flex items-center gap-3"><MapPin size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14 }}>{d.info.venue}</span></div>}
-          {d.info.venue && d.info.referee && <div style={{ height: 1, background: t.divider }} />}
-          {d.info.referee && <div className="px-4 py-3 flex items-center gap-3"><Disc3 size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14 }}>Referee {d.info.referee}</span></div>}
-        </Card>
-      )}
       {d && d.venue && d.details && (
         <>
           <Card t={t}>
@@ -213,15 +212,16 @@ function Ev({ e, t }) {
       </span>;
   const body = (align) => {
     if (e.type === "sub") return <div style={{ textAlign: align }}>
-      <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.on}</div>
-      <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.off}</div>
+      <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.player}</div>
+      <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.assist}</div>
     </div>;
-    if (e.type === "goal") return <div style={{ textAlign: align }}>
-      <div style={{ fontSize: 14 }}><span style={{ color: t.text, fontWeight: 700 }}>{e.player || "Goal"} </span>
-        {(e.isPenalty || e.isOwnGoal) && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700 }}>{e.isPenalty ? "(pen) " : ""}{e.isOwnGoal ? "(og) " : ""}</span>}
-        <RunScore score={e.score} scored={e.scored} t={t} /></div>
-      {e.assist && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
-    </div>;
+    if (e.type === "goal") {
+      const knownScorer = hasKnownScorer(e.player);
+      return <div style={{ textAlign: align }}>
+        <div style={{ fontSize: 14 }}>{knownScorer && <span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span>}<RunScore score={e.score} scored={e.scored} t={t} /></div>
+        {knownScorer && e.assist && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
+      </div>;
+    }
     return <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>;
   };
   const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{e.min}</span></div>;
@@ -230,16 +230,93 @@ function Ev({ e, t }) {
 }
 
 // ---------- Commentary (from events) ----------
-function Commentary({ t, d, h, a }) {
+function rawEventSeconds(event) {
+  const elapsed = event.elapsedSeconds == null ? Number.NaN : Number(event.elapsedSeconds);
+  if (Number.isFinite(elapsed)) return elapsed;
+  const minute = Number(event.displayMinute ?? event.m ?? 0);
+  return Number.isFinite(minute) ? minute * 60 : 0;
+}
+
+function eventSortSeconds(event, match) {
+  const duration = Number(match?.matchDurationMinutes || 90);
+  const displayedMinute = Number(event.displayMinute ?? event.m ?? 0);
+  const period = Number(event.period || (displayedMinute > duration / 2 ? 2 : 1));
+  return period * 100000 + rawEventSeconds(event);
+}
+
+function goalCommentary(event, match, home, away) {
+  const [homeScore = "0", awayScore = "0"] = (event.score || "0 - 0").split(" - ").map((score) => score.trim());
+  const scoringTeam = event.side === "away" ? away : home;
+  const concedingTeam = event.side === "away" ? home : away;
+  const scoringTeamScore = Number(event.side === "away" ? awayScore : homeScore);
+  const concedingTeamScore = Number(event.side === "away" ? homeScore : awayScore);
+  const scoreline = `${scoringTeam.name} ${scoringTeamScore}, ${concedingTeam.name} ${concedingTeamScore}.`;
+  const scorer = hasKnownScorer(event.player) ? ` Scored by: ${event.player}.` : "";
+  const duration = Number(match.matchDurationMinutes || 90);
+  const extraTime = Number(match.extraTimeMinutes || 30);
+  const displayedMinute = Number(event.displayMinute || Math.max(1, Math.ceil(rawEventSeconds(event) / 60)));
+  const period = Number(event.period || (displayedMinute > duration / 2 ? 2 : 1));
+  const lateInRegulation = period === 2 && displayedMinute >= Math.max(duration - 10, duration / 2 + 1);
+  const lateInExtraTime = period === 4 && displayedMinute >= duration + Math.max(extraTime - 5, 1);
+  const late = lateInRegulation || lateInExtraTime;
+  const equaliser = scoringTeamScore === concedingTeamScore;
+  const takesLead = scoringTeamScore > concedingTeamScore && scoringTeamScore - 1 <= concedingTeamScore;
+  const friendly = match.competitionType === "friendly"
+    || /friend(?:ly|lies)|exhibition|warm[ -]?up/i.test(match.compName || "");
+  const inAddedTime = String(event.min || "").includes("+");
+  const moment = inAddedTime ? "deep into stoppage time" : "in the dying moments";
+
+  if (late && equaliser) {
+    return friendly
+      ? `GOALLLLLL! ${scoringTeam.name} find a late equaliser. ${scoreline}${scorer}`
+      : `GOALLLLLLLLLLLLLL! Late drama! ${scoringTeam.name} draw level ${moment}! ${scoreline}${scorer}`;
+  }
+  if (late && takesLead) {
+    return friendly
+      ? `GOALLLLLL! A late goal puts ${scoringTeam.name} in front. ${scoreline}${scorer}`
+      : `GOALLLLLLLLLLLLLL! Incredible late drama! ${scoringTeam.name} take the lead ${moment}. Could this be the winner? ${scoreline}${scorer}`;
+  }
+  return `GOAL! ${scoreline}${scorer}`;
+}
+
+function commentaryMilestones(match) {
+  const duration = Number(match.matchDurationMinutes || 90);
+  const extraTime = Number(match.extraTimeMinutes || 30);
+  const half = duration / 2;
+  const currentPeriod = Number(match.current_period || 1);
+  const lines = [{ sort: 100000, m: "1'", text: "First half begins." }];
+  const addStoppage = (minutes, endMinute, period, periodName) => {
+    if (minutes > 0) lines.push({
+      sort: period * 100000 + endMinute * 60,
+      m: `${endMinute}'`,
+      text: `A minimum of ${minutes} minute${minutes === 1 ? "" : "s"} will be added at the end of ${periodName}.`,
+    });
+  };
+
+  addStoppage(Number(match.first_half_stoppage_minutes || 0), half, 1, "the first half");
+  if (currentPeriod >= 2) lines.push({ sort: 200000 + half * 60 + 1, m: `${half + 1}'`, text: "Second half begins." });
+  addStoppage(Number(match.second_half_stoppage_minutes || 0), duration, 2, "the second half");
+  if (currentPeriod >= 3) lines.push({ sort: 300000 + duration * 60 + 1, m: `${duration + 1}'`, text: "First half of extra time begins." });
+  addStoppage(Number(match.extra_time_first_half_stoppage_minutes || 0), duration + extraTime / 2, 3, "the first half of extra time");
+  if (currentPeriod >= 4) lines.push({ sort: 400000 + (duration + extraTime / 2) * 60 + 1, m: `${duration + extraTime / 2 + 1}'`, text: "Second half of extra time begins." });
+  addStoppage(Number(match.extra_time_second_half_stoppage_minutes || 0), duration + extraTime, 4, "the second half of extra time");
+  return lines;
+}
+
+function Commentary({ t, m, d, h, a }) {
   if (!d) return <Empty t={t} title="Commentary" note="Commentary is generated from match events as they are recorded." />;
-  const lines = [...d.events].sort((x, y) => y.m - x.m).map((e) => {
-    if (e.type === "half") return { m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
-    if (e.type === "goal") return { m: e.min, text: `GOAL!${e.isPenalty ? " (Penalty)" : ""}${e.isOwnGoal ? " (Own goal)" : ""} ${e.player || ""}${e.player ? " scores" : ""}${e.assist ? `, set up by ${e.assist}` : ""}. It's ${e.score}.` };
-    if (e.type === "yellow") return { m: e.min, text: `Yellow card shown to ${e.player}.` };
-    if (e.type === "red") return { m: e.min, text: `Red card! ${e.player} is sent off.` };
-    if (e.type === "sub") return { m: e.min, text: `Substitution: ${e.on} replaces ${e.off}.` };
-    return { m: e.min, text: "" };
+  const eventLines = [...d.events].map((e) => {
+    const sort = eventSortSeconds(e, m);
+    if (e.type === "half") return { sort, m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
+    if (e.type === "goal") return { sort, m: e.min, text: goalCommentary(e, m, h, a) };
+    if (e.type === "yellow") return { sort, m: e.min, text: `Yellow card shown to ${e.player}.` };
+    if (e.type === "red") return { sort, m: e.min, text: `Red card! ${e.player} is sent off.` };
+    if (e.type === "sub") return { sort, m: e.min, text: `Substitution: ${e.player} replaces ${e.assist}.` };
+    return { sort, m: e.min, text: "" };
   });
+  const lines = [...eventLines, ...commentaryMilestones(m)]
+    .filter((line) => line.text)
+    .sort((x, y) => y.sort - x.sort);
   return <Card t={t} style={{ paddingTop: 6, paddingBottom: 8 }}>
     {lines.map((l, i) => (
       <div key={i} className="flex gap-3 px-4 py-3" style={{ borderTop: i ? `1px solid ${t.divider}` : "none" }}>
@@ -250,95 +327,62 @@ function Commentary({ t, d, h, a }) {
   </Card>;
 }
 
-// ---------- Stats ----------
-function StatsTab({ t, h, a }) {
-  const rows = [
-    { name: "Total shots", hv: "9", av: "6", hn: 9, an: 6 },
-    { name: "Shots on target", hv: "5", av: "2", hn: 5, an: 2 },
-    { name: "Corners", hv: "6", av: "3", hn: 6, an: 3 },
-    { name: "Fouls", hv: "8", av: "11", hn: 8, an: 11 },
-    { name: "Offsides", hv: "2", av: "3", hn: 2, an: 3 },
-    { name: "Yellow cards", hv: "0", av: "1", hn: 0, an: 1 },
-  ];
-  return (
-    <Card t={t} style={{ paddingBottom: 6 }}>
-      <div className="text-center pt-4 pb-1" style={{ color: t.text, fontSize: 17, fontWeight: 800 }}>Top stats</div>
-      <div className="px-4 pt-3 pb-4">
-        <div className="text-center mb-2" style={{ color: t.dim, fontSize: 13 }}>Ball possession</div>
-        <div className="flex items-center rounded-full overflow-hidden" style={{ height: 28 }}>
-          <div className="flex items-center pl-3" style={{ width: "58%", background: h.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>58%</span></div>
-          <div className="flex items-center justify-end pr-3" style={{ width: "42%", background: a.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>42%</span></div>
-        </div>
-      </div>
-      {rows.map((s, i) => {
-        const hl = s.hn > s.an, al = s.an > s.hn;
-        return <div key={i}>
-          <div className="flex items-center py-2.5 px-4">
-            <div style={{ width: 90 }} className="flex justify-start">{hl ? <span className="rounded-full px-2.5 py-1" style={{ background: h.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.hv}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.hv}</span>}</div>
-            <div className="flex-1 text-center" style={{ color: t.dim, fontSize: 13 }}>{s.name}</div>
-            <div style={{ width: 90 }} className="flex justify-end">{al ? <span className="rounded-full px-2.5 py-1" style={{ background: a.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.av}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.av}</span>}</div>
-          </div>
-          {i < rows.length - 1 && <div style={{ height: 1, background: t.divider, marginLeft: 16, marginRight: 16 }} />}
-        </div>;
-      })}
-    </Card>
-  );
-}
-
 // ---------- Table ----------
-function TableTab({ t, m }) {
-  const [data, setData] = useState(null);
-  useEffect(() => { let a = true; getStandings(m.competition_id).then((r) => a && setData(r || { rows: [] })); return () => { a = false; }; }, [m.competition_id]);
-  if (!data) return <Empty t={t} title="Table" note="Loading standings…" />;
-  if (!data.rows || data.rows.length === 0) return <Empty t={t} title="Table" note="Standings will appear once matches are played." />;
+function TableTab({ t, m, rows, meta }) {
+  const [view, setView] = useState("full");
+  if (!rows.length) return <Empty t={t} title="Competition table" note="The table will appear when this competition has fixtures." />;
   const hi = [m.home, m.away];
-  const isTournament = data.format === "tournament";
+  const tournament = meta?.format === "tournament";
   return (
     <>
-      {(data.name || data.sub) && <div className="px-4 pt-3 pb-1" style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{data.name}{data.sub ? ` · ${data.sub}` : ""}</div>}
+      <div className="mx-2 mt-2 flex items-center gap-2">
+        <div className="flex flex-1 rounded-full p-1" style={{ background: t.card }}>
+          {["short", "full", "form"].map((option) => <button key={option} onClick={() => setView(option)} className="flex-1 rounded-full py-2" style={{ color: view === option ? t.accent : t.text, background: view === option ? t.chip : "transparent", fontSize: 12, fontWeight: 800, textTransform: "capitalize" }}>{option}</button>)}
+        </div>
+        <span className="rounded-full px-3 py-3" style={{ background: t.card, color: t.text, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{tournament ? meta?.groupLabel : "Overall"}</span>
+      </div>
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-        <div className="flex items-center px-3 py-2" style={{ color: t.dim, fontSize: 11, fontWeight: 700 }}>
-          <span style={{ width: 22 }} /><span className="flex-1 pl-1">Team</span>
-          <span style={{ width: 22, textAlign: "center" }}>PL</span><span style={{ width: 20, textAlign: "center" }}>W</span>
-          <span style={{ width: 20, textAlign: "center" }}>D</span><span style={{ width: 20, textAlign: "center" }}>L</span>
-          <span style={{ width: 34, textAlign: "center" }}>GD</span><span style={{ width: 32, textAlign: "center" }}>PTS</span>
+        <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: `1px solid ${t.divider}` }}>
+          <Trophy size={18} color={t.text} />
+          <span style={{ color: t.text, fontSize: 15, fontWeight: 800 }}>{meta?.competitionName || "Competition"}</span>
+        </div>
+        <div className="flex items-center px-3 py-3" style={{ color: t.text, fontSize: 10.5, fontWeight: 800 }}>
+          <span style={{ width: 22 }} /><span className="flex-1 pl-1">{tournament ? (meta?.groupLabel || "Group") : "Team"}</span>
+          <span style={{ width: 22, textAlign: "center" }}>PL</span>
+          {view === "full" && <><span style={{ width: 18, textAlign: "center" }}>W</span><span style={{ width: 18, textAlign: "center" }}>D</span><span style={{ width: 18, textAlign: "center" }}>L</span><span style={{ width: 40, textAlign: "center" }}>+/-</span></>}
+          {view !== "form" && <span style={{ width: 30, textAlign: "center" }}>GD</span>}
+          <span style={{ width: view === "form" ? 92 : 30, textAlign: "right", paddingRight: 4 }}>{view === "form" ? "FORM" : "PTS"}</span>
         </div>
         <div style={{ height: 1, background: t.divider }} />
-        {data.rows.map((tm, i) => {
-          const on = hi.includes(tm.id); const q = isTournament && i < 2;
-          return <div key={tm.id} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
+        {rows.map((tm, i) => {
+          const gd = tm.gf - tm.ga; const on = hi.includes(tm.id);
+          const barColor = tournament ? (i < 2 ? t.accent : i === 2 ? t.yellow : "transparent") : (i < Math.min(4, rows.length) ? t.accent : "transparent");
+          return <div key={tm.id} className="relative flex items-center px-3 py-3" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
+            <span className="absolute left-0 top-1 bottom-1" style={{ width: 3, borderRadius: 3, background: barColor }} />
             <div className="flex items-center" style={{ width: 22 }}>
-              <span style={{ width: 3, height: 22, borderRadius: 2, background: q ? t.accent : "transparent", marginRight: 5 }} />
               <span style={{ color: t.dim, fontSize: 13, fontWeight: 600 }}>{i + 1}</span>
             </div>
-            <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
+            <div className="flex-1 flex items-center gap-1.5 min-w-0 pl-1">
               <Crest short={tm.short} color={tm.color} size={22} ring={t.divider} />
               <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>{tm.name}</span>
             </div>
-            <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.P}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.W}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.D}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.L}</span>
-            <span style={{ width: 34, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.GD > 0 ? "+" + tm.GD : tm.GD}</span>
-            <span style={{ width: 32, textAlign: "center", color: t.text, fontSize: 14, fontWeight: 800 }}>{tm.PTS}</span>
+            <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.pl}</span>
+            {view === "full" && <><span style={{ width: 18, textAlign: "center", color: t.dim, fontSize: 12 }}>{tm.w}</span><span style={{ width: 18, textAlign: "center", color: t.dim, fontSize: 12 }}>{tm.d}</span><span style={{ width: 18, textAlign: "center", color: t.dim, fontSize: 12 }}>{tm.l}</span><span style={{ width: 40, textAlign: "center", color: t.dim, fontSize: 12 }}>{tm.gf}-{tm.ga}</span></>}
+            {view !== "form" && <span style={{ width: 30, textAlign: "center", color: t.dim, fontSize: 12 }}>{gd > 0 ? "+" + gd : gd}</span>}
+            {view === "form" ? <span style={{ width: 92 }} className="flex gap-1 justify-end">{tm.form.slice(-5).map((result, key) => <span key={key} className="inline-flex items-center justify-center rounded-full" style={{ width: 16, height: 16, background: result === "W" ? t.win : result === "D" ? t.drawPill : t.loss, color: "#fff", fontSize: 9, fontWeight: 800 }}>{result}</span>)}</span> : <span style={{ width: 30, textAlign: "right", paddingRight: 4, color: t.text, fontSize: 14, fontWeight: 800 }}>{tm.pts}</span>}
           </div>;
         })}
       </div>
-      {isTournament && (
-        <div className="flex items-center gap-2 px-4 py-2">
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
-          <span style={{ color: t.dim, fontSize: 12 }}>Advances to the knockout stage</span>
-        </div>
-      )}
+      <div className="flex items-center gap-2 px-4 py-2">
+        <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
+        <span style={{ color: t.dim, fontSize: 12 }}>{tournament ? "Advances from the group" : "Qualification places"}</span>
+        {tournament && <><span style={{ width: 10, height: 10, borderRadius: 2, background: t.yellow, marginLeft: 8 }} /><span style={{ color: t.dim, fontSize: 12 }}>Possible qualification</span></>}
+      </div>
     </>
   );
 }
 
 // ---------- H2H ----------
-function H2H({ t, h, a }) {
-  return <Card t={t} style={{ padding: "40px 16px" }}>
-    <div className="text-center">
-      <div style={{ color: t.dim, fontSize: 14 }}>No previous meetings recorded.</div>
-    </div>
-  </Card>;
+function H2H() {
+  return null;
 }

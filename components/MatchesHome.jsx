@@ -34,22 +34,45 @@ function MatchRow({ m, teams, t, now }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
   const showScore = m.status !== "scheduled";
+  const teamNameStyle = {
+    color: t.text,
+    fontSize: "clamp(12.5px, 3.5vw, 14px)",
+    fontWeight: 500,
+    lineHeight: 1.16,
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+    overflow: "hidden",
+    overflowWrap: "break-word",
+  };
   return (
-    <Link href={`/match/${m.id}`} className="flex items-center px-3 active:opacity-70"
-      style={{ minHeight: 60, borderTop: `1px solid ${t.divider}`, textDecoration: "none" }}>
-      <div style={{ width: 54 }} className="flex justify-center">{showScore ? <StatusChip m={m} t={t} now={now} /> : <span />}</div>
-      <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
-        <span className="truncate text-right" style={{ color: t.text, fontSize: 14.5, fontWeight: 500 }}>{h.name}</span>
+    <Link
+      href={`/match/${m.id}`}
+      className="relative grid items-center gap-x-2 px-3 py-2 active:opacity-70"
+      style={{
+        gridTemplateColumns: "minmax(0, 1fr) 46px minmax(0, 1fr)",
+        minHeight: 68,
+        borderTop: `1px solid ${t.divider}`,
+        textDecoration: "none",
+      }}
+    >
+      {showScore && (
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex justify-center">
+          <StatusChip m={m} t={t} now={now} />
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-1.5 min-w-0">
+        <span className="min-w-0 text-right" style={teamNameStyle}>{h.name}</span>
         <Crest short={h.short} color={h.color} size={24} ring={t.divider} />
       </div>
-      <div className="px-3 shrink-0 text-center" style={{ minWidth: 58 }}>
+      <div className="shrink-0 text-center min-w-0">
         {showScore
           ? <span className="font-mono" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
           : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "—"}</span>}
       </div>
-      <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
+      <div className="flex items-center justify-start gap-1.5 min-w-0">
         <Crest short={a.short} color={a.color} size={24} ring={t.divider} />
-        <span className="truncate" style={{ color: t.text, fontSize: 14.5, fontWeight: 500 }}>{a.name}</span>
+        <span className="min-w-0 text-left" style={teamNameStyle}>{a.name}</span>
       </div>
     </Link>
   );

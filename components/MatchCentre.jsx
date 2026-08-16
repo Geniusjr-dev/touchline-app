@@ -14,6 +14,11 @@ function goalsBySide(events, side) {
   return (events || []).filter((e) => e.type === "goal" && e.side === side).length;
 }
 
+function hasKnownScorer(player) {
+  const name = player?.trim().toLowerCase();
+  return Boolean(name && name !== "unknown scorer" && name !== "unknown player");
+}
+
 export default function MatchCentre({ id }) {
   const { t } = useTheme();
   const router = useRouter();
@@ -207,10 +212,13 @@ function Ev({ e, t }) {
       <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.player}</div>
       <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.assist}</div>
     </div>;
-    if (e.type === "goal") return <div style={{ textAlign: align }}>
-      <div style={{ fontSize: 14 }}><span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span><RunScore score={e.score} scored={e.scored} t={t} /></div>
-      {e.assist && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
-    </div>;
+    if (e.type === "goal") {
+      const knownScorer = hasKnownScorer(e.player);
+      return <div style={{ textAlign: align }}>
+        <div style={{ fontSize: 14 }}>{knownScorer && <span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span>}<RunScore score={e.score} scored={e.scored} t={t} /></div>
+        {knownScorer && e.assist && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
+      </div>;
+    }
     return <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>;
   };
   const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{e.min}</span></div>;
@@ -223,7 +231,9 @@ function Commentary({ t, d, h, a }) {
   if (!d) return <Empty t={t} title="Commentary" note="Commentary is generated from match events as they are recorded." />;
   const lines = [...d.events].sort((x, y) => y.m - x.m).map((e) => {
     if (e.type === "half") return { m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
-    if (e.type === "goal") return { m: e.min, text: `GOAL! ${e.player} scores${e.assist ? `, set up by ${e.assist}` : ""}. It's ${e.score}.` };
+    if (e.type === "goal") return hasKnownScorer(e.player)
+      ? { m: e.min, text: `GOAL! ${e.player} scores${e.assist ? `, set up by ${e.assist}` : ""}. It's ${e.score}.` }
+      : { m: e.min, text: `GOAL! The score is now ${e.score}.` };
     if (e.type === "yellow") return { m: e.min, text: `Yellow card shown to ${e.player}.` };
     if (e.type === "red") return { m: e.min, text: `Red card! ${e.player} is sent off.` };
     if (e.type === "sub") return { m: e.min, text: `Substitution: ${e.player} replaces ${e.assist}.` };

@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   getMatchRaw, getEvents, listTeams, listPlayers,
   transitionMatchStatus, reopenMatch, setMatchStoppageTime, recordMatchEvent, deleteMatchEvent,
-  formatMatchClock, liveMinute,
+  formatMatchClock, liveMinute, getMatchStats, upsertMatchStats, STAT_DEFS,
 } from "@/lib/db";
 
 const PERIOD = { 0: "Not started", 1: "First half", 2: "Second half", 3: "Extra time first half", 4: "Extra time second half" };
@@ -120,6 +120,8 @@ export default function Scorer() {
         </div>
       )}
 
+      <StatsEditor matchId={id} home={home} away={away} />
+
       <div style={card}>
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
@@ -200,6 +202,41 @@ function SubForm({ squad, onCancel, onCommit }) {
     </div>
   );
 }
+function StatsEditor({ matchId, home, away }) {
+  const [values, setValues] = useState({ home: {}, away: {} });
+  const [saved, setSaved] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { getMatchStats(matchId).then((r) => { if (r) setValues({ home: r.home || {}, away: r.away || {} }); }).catch(() => {}); }, [matchId]);
+  function set(side, key, v) { setValues((cur) => ({ ...cur, [side]: { ...cur[side], [key]: v === "" ? undefined : Number(v) } })); }
+  async function save() {
+    setBusy(true); setSaved("");
+    const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && !Number.isNaN(v)));
+    const { error } = await upsertMatchStats(matchId, clean(values.home), clean(values.away));
+    setBusy(false); setSaved(error ? error.message : "Saved. It updates live on the public page.");
+  }
+  return (
+    <div style={card}>
+      <div style={label}>MATCH STATISTICS</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#8E939B", fontSize: 12 }}>
+        <span style={{ width: 64, textAlign: "center", fontWeight: 700, color: "#fff" }}>{home.short}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ width: 64, textAlign: "center", fontWeight: 700, color: "#fff" }}>{away.short}</span>
+      </div>
+      {STAT_DEFS.map((d) => (
+        <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
+          <input type="number" value={values.home[d.key] ?? ""} onChange={(e) => set("home", d.key, e.target.value)} style={{ ...finp, width: 64, textAlign: "center", fontVariantNumeric: "tabular-nums" }} />
+          <span style={{ flex: 1, textAlign: "center", fontSize: 13, color: "#8E939B" }}>{d.label}{d.pct ? " (%)" : ""}</span>
+          <input type="number" value={values.away[d.key] ?? ""} onChange={(e) => set("away", d.key, e.target.value)} style={{ ...finp, width: 64, textAlign: "center", fontVariantNumeric: "tabular-nums" }} />
+        </div>
+      ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+        <button disabled={busy} style={pill(false)} onClick={save}>{busy ? "Saving." : "Save stats"}</button>
+        {saved && <span style={{ color: /Saved/.test(saved) ? "#4FC263" : "#F04444", fontSize: 12 }}>{saved}</span>}
+      </div>
+    </div>
+  );
+}
+
 function Badge({ t, size = 44 }) { return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.34 }}>{t.short}</span>; }
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };
 const label = { color: "#8E939B", fontSize: 12, fontWeight: 700, marginBottom: 10 };

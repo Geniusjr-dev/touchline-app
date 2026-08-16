@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Menu, ChevronUp, ChevronDown, Calendar } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { getHome } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 
 function dateKey(d) {
@@ -78,7 +79,19 @@ export default function MatchesHome() {
   const activeRef = useRef(null);
   const stripRef = useRef(null);
 
-  useEffect(() => { getHome().then(setData); }, []);
+  useEffect(() => {
+    let alive = true;
+    const load = () => getHome().then((r) => { if (alive) setData(r); });
+    load();
+    let ch;
+    if (supabase) {
+      ch = supabase.channel("home")
+        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, load)
+        .subscribe();
+    }
+    return () => { alive = false; if (ch) supabase.removeChannel(ch); };
+  }, []);
   useEffect(() => {
     if (activeRef.current) { try { activeRef.current.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch (_) {} }
   }, [selected, data]);

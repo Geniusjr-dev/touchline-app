@@ -31,6 +31,7 @@ export default function MatchCentre({ id }) {
       ch = supabase.channel("m-" + id)
         .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_stats", filter: `match_id=eq.${id}` }, load)
         .subscribe();
     }
     return () => { alive = false; if (ch) supabase.removeChannel(ch); };
@@ -96,7 +97,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <StatsTab t={t} h={h} a={a} />}
+      {activeTab === "Stats" && <StatsTab t={t} h={h} a={a} detail={d} />}
       {activeTab === "Lineup" && <Empty t={t} title="Line-ups" note="Managers submit line-ups before kick-off. They will appear here once confirmed." />}
       {activeTab === "Table" && <TableTab t={t} m={m} detail={d} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
@@ -250,32 +251,45 @@ function Commentary({ t, d, h, a }) {
 }
 
 // ---------- Stats ----------
-function StatsTab({ t, h, a }) {
-  const rows = [
-    { name: "Total shots", hv: "9", av: "6", hn: 9, an: 6 },
-    { name: "Shots on target", hv: "5", av: "2", hn: 5, an: 2 },
-    { name: "Corners", hv: "6", av: "3", hn: 6, an: 3 },
-    { name: "Fouls", hv: "8", av: "11", hn: 8, an: 11 },
-    { name: "Offsides", hv: "2", av: "3", hn: 2, an: 3 },
-    { name: "Yellow cards", hv: "0", av: "1", hn: 0, an: 1 },
+function StatsTab({ t, h, a, detail }) {
+  const stats = detail?.stats;
+  if (!stats) return <Empty t={t} title="Stats" note="Match statistics will appear here once the scorer records them." />;
+  const num = (v) => (v == null || v === "" ? null : Number(v));
+  const hp = num(stats.home.possession), ap = num(stats.away.possession);
+  const hasPoss = hp != null || ap != null;
+  const homePoss = hp != null ? hp : (ap != null ? 100 - ap : 50);
+  const awayPoss = 100 - homePoss;
+  const defs = [
+    { key: "shots", label: "Total shots" },
+    { key: "shots_on_target", label: "Shots on target" },
+    { key: "corners", label: "Corners" },
+    { key: "fouls", label: "Fouls" },
+    { key: "offsides", label: "Offsides" },
+    { key: "yellow_cards", label: "Yellow cards" },
+    { key: "red_cards", label: "Red cards" },
   ];
+  const rows = defs.map((d) => ({ name: d.label, hn: num(stats.home[d.key]), an: num(stats.away[d.key]) }))
+    .filter((r) => r.hn != null || r.an != null);
   return (
     <Card t={t} style={{ paddingBottom: 6 }}>
       <div className="text-center pt-4 pb-1" style={{ color: t.text, fontSize: 17, fontWeight: 800 }}>Top stats</div>
-      <div className="px-4 pt-3 pb-4">
-        <div className="text-center mb-2" style={{ color: t.dim, fontSize: 13 }}>Ball possession</div>
-        <div className="flex items-center rounded-full overflow-hidden" style={{ height: 28 }}>
-          <div className="flex items-center pl-3" style={{ width: "58%", background: h.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>58%</span></div>
-          <div className="flex items-center justify-end pr-3" style={{ width: "42%", background: a.color, height: "100%" }}><span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>42%</span></div>
+      {hasPoss && (
+        <div className="px-4 pt-3 pb-4">
+          <div className="text-center mb-2" style={{ color: t.dim, fontSize: 13 }}>Ball possession</div>
+          <div className="flex items-center rounded-full overflow-hidden" style={{ height: 28 }}>
+            <div className="flex items-center pl-3" style={{ width: `${homePoss}%`, background: h.color, height: "100%" }}><span className="tnum" style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>{homePoss}%</span></div>
+            <div className="flex items-center justify-end pr-3" style={{ width: `${awayPoss}%`, background: a.color, height: "100%" }}><span className="tnum" style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>{awayPoss}%</span></div>
+          </div>
         </div>
-      </div>
+      )}
       {rows.map((s, i) => {
-        const hl = s.hn > s.an, al = s.an > s.hn;
+        const hl = s.hn != null && s.an != null && s.hn > s.an;
+        const al = s.hn != null && s.an != null && s.an > s.hn;
         return <div key={i}>
           <div className="flex items-center py-2.5 px-4">
-            <div style={{ width: 90 }} className="flex justify-start">{hl ? <span className="rounded-full px-2.5 py-1" style={{ background: h.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.hv}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.hv}</span>}</div>
+            <div style={{ width: 90 }} className="flex justify-start">{hl ? <span className="tnum rounded-full px-2.5 py-1" style={{ background: h.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.hn}</span> : <span className="tnum" style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.hn ?? "-"}</span>}</div>
             <div className="flex-1 text-center" style={{ color: t.dim, fontSize: 13 }}>{s.name}</div>
-            <div style={{ width: 90 }} className="flex justify-end">{al ? <span className="rounded-full px-2.5 py-1" style={{ background: a.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.av}</span> : <span style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.av}</span>}</div>
+            <div style={{ width: 90 }} className="flex justify-end">{al ? <span className="tnum rounded-full px-2.5 py-1" style={{ background: a.color, color: "#fff", fontSize: 14, fontWeight: 700 }}>{s.an}</span> : <span className="tnum" style={{ color: t.text, fontSize: 14, padding: "0 4px" }}>{s.an ?? "-"}</span>}</div>
           </div>
           {i < rows.length - 1 && <div style={{ height: 1, background: t.divider, marginLeft: 16, marginRight: 16 }} />}
         </div>;

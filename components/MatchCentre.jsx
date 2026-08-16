@@ -229,16 +229,26 @@ function Ev({ e, t }) {
 // ---------- Commentary (from events) ----------
 function Commentary({ t, d, h, a }) {
   if (!d) return <Empty t={t} title="Commentary" note="Commentary is generated from match events as they are recorded." />;
-  const lines = [...d.events].sort((x, y) => y.m - x.m).map((e) => {
+  const eventLines = [...d.events].sort((x, y) => y.m - x.m).map((e) => {
     if (e.type === "half") return { m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
-    if (e.type === "goal") return hasKnownScorer(e.player)
-      ? { m: e.min, text: `GOAL! ${e.player} scores${e.assist ? `, set up by ${e.assist}` : ""}. It's ${e.score}.` }
-      : { m: e.min, text: `GOAL! The score is now ${e.score}.` };
+    if (e.type === "goal") {
+      const [homeScore = "0", awayScore = "0"] = (e.score || "0 - 0").split(" - ");
+      const scoringTeam = e.side === "away" ? a : h;
+      const concedingTeam = e.side === "away" ? h : a;
+      const scoringTeamScore = e.side === "away" ? awayScore : homeScore;
+      const concedingTeamScore = e.side === "away" ? homeScore : awayScore;
+      const scorer = hasKnownScorer(e.player) ? ` Scored by: ${e.player}.` : "";
+      return {
+        m: e.min,
+        text: `GOAL! ${scoringTeam.name} ${scoringTeamScore}, ${concedingTeam.name} ${concedingTeamScore}.${scorer}`,
+      };
+    }
     if (e.type === "yellow") return { m: e.min, text: `Yellow card shown to ${e.player}.` };
     if (e.type === "red") return { m: e.min, text: `Red card! ${e.player} is sent off.` };
     if (e.type === "sub") return { m: e.min, text: `Substitution: ${e.player} replaces ${e.assist}.` };
     return { m: e.min, text: "" };
   });
+  const lines = [...eventLines, { m: "1'", text: "First half begins." }];
   return <Card t={t} style={{ paddingTop: 6, paddingBottom: 8 }}>
     {lines.map((l, i) => (
       <div key={i} className="flex gap-3 px-4 py-3" style={{ borderTop: i ? `1px solid ${t.divider}` : "none" }}>

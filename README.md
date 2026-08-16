@@ -1,46 +1,26 @@
 # Touchline
 
-Touchline is a general grassroots-football live-score platform with public fixtures, realtime match centres, competition tables and a protected admin/scorer workspace.
+Grassroots football live scores + admin scorer. Next.js (App Router) + Tailwind + Supabase.
 
-## Stack
+## Local dev
+    npm install
+    npm run dev            # http://localhost:3000
 
-- Next.js 16 App Router and React 19
-- Tailwind CSS
-- Supabase Postgres, Auth and Realtime
-- Vercel deployment
+Runs on built-in sample data until Supabase is configured.
 
-Node.js 20.9 or newer is required.
+## Connect Supabase (makes it real)
+1. Create a project at supabase.com.
+2. In the SQL Editor, paste and run `supabase/schema.sql`.
+3. Project Settings → API: copy the Project URL and the anon public key.
+4. Create `.env.local` from `.env.local.example` and paste both values.
+5. Create your first user: Authentication → Users → Add user (email + password).
+   Optionally set their role to `admin` in the `profiles` table.
+6. Restart `npm run dev`.
 
-## Local development
+On Vercel, add the same two env vars in Project → Settings → Environment Variables.
 
-```bash
-npm install
-npm run dev
-```
+## Using it
+- Public site: `/`  (matches home → tap a match → match centre)
+- Admin: `/admin`  (sign in, then Teams and Matches; open a match to score it live)
 
-The app uses built-in sample data when Supabase is not configured. Copy `.env.local.example` to `.env.local` and add only the public project URL and anon key to use the database.
-
-## Supabase setup
-
-- Brand-new project: run `supabase/schema.sql` once.
-- Existing Touchline project: do **not** rerun `schema.sql`. Run `supabase/001_match_integrity.sql` once.
-
-The migration backfills current data into a default organization, secures roles, creates scorer assignments, adds the second-based clock and installs atomic scoring functions.
-
-## Quality checks
-
-```bash
-npm run lint
-npm run build
-npm audit --omit=dev
-```
-
-## Main routes
-
-- `/`: public fixtures and live scores
-- `/match/[id]`: public match centre
-- `/admin`: protected dashboard
-- `/admin/teams`: admin-only team and squad management
-- `/admin/matches`: admin fixture/scorer management or a scorer's assigned matches
-
-See `DEPLOYMENT_MILESTONE_1.md` before applying this update to the existing Vercel deployment.
+Scores and events entered in the scorer appear on the public match page in realtime.

@@ -1,31 +1,30 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { listTeams, addTeam, listPlayers, addPlayer, deletePlayer } from "@/lib/db";
-import { useAuth } from "@/components/AuthProvider";
 
 const COLORS = ["#18A558", "#2563EB", "#DC2626", "#7C3AED", "#EA580C", "#0891B2", "#DB2777", "#CA8A04"];
 
 export default function Teams() {
-  const { activeOrganizationId } = useAuth();
   const [teams, setTeams] = useState([]);
   const [name, setName] = useState("");
   const [short, setShort] = useState("");
+  const [display, setDisplay] = useState("");
   const [color, setColor] = useState(COLORS[0]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [openTeam, setOpenTeam] = useState(null);
 
-  const load = useCallback(() => listTeams(activeOrganizationId).then(setTeams).catch(() => {}), [activeOrganizationId]);
-  useEffect(() => { if (activeOrganizationId) load(); }, [activeOrganizationId, load]);
+  const load = () => listTeams().then(setTeams).catch(() => {});
+  useEffect(() => { load(); }, []);
 
   async function submit(e) {
     e.preventDefault();
     if (!name.trim() || !short.trim()) return;
     setBusy(true); setErr("");
-    const { error } = await addTeam(activeOrganizationId, name.trim(), short.trim().toUpperCase().slice(0, 4), color);
+    const { error } = await addTeam(name.trim(), short.trim().toUpperCase().slice(0, 4), color, display.trim() || null);
     setBusy(false);
     if (error) { setErr(error.message); return; }
-    setName(""); setShort(""); load();
+    setName(""); setShort(""); setDisplay(""); load();
   }
 
   return (
@@ -36,6 +35,7 @@ export default function Teams() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
           <Field label="Team name"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Buya Stars" style={inp} /></Field>
           <Field label="Short (max 4)"><input value={short} onChange={(e) => setShort(e.target.value)} placeholder="BUY" style={{ ...inp, width: 90, textTransform: "uppercase" }} /></Field>
+          <Field label="Display name (optional)"><input value={display} onChange={(e) => setDisplay(e.target.value)} placeholder="shorter name for long titles" style={{ ...inp, width: 200 }} /></Field>
           <Field label="Colour">
             <div style={{ display: "flex", gap: 6 }}>
               {COLORS.map((c) => <button type="button" key={c} onClick={() => setColor(c)} style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: color === c ? "2px solid #fff" : "2px solid transparent", cursor: "pointer" }} />)}
@@ -69,8 +69,8 @@ function Squad({ teamId }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [pos, setPos] = useState("");
-  const load = useCallback(() => listPlayers(teamId).then(setPlayers).catch(() => {}), [teamId]);
-  useEffect(() => { load(); }, [load]);
+  const load = () => listPlayers(teamId).then(setPlayers).catch(() => {});
+  useEffect(() => { load(); }, [teamId]);
   async function add(e) {
     e.preventDefault();
     if (!name.trim()) return;

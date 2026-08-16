@@ -1,6 +1,5 @@
 "use client";
 import { Search, Newspaper, Trophy, Star } from "lucide-react";
-import { liveMinute } from "@/lib/db";
 
 export function Crest({ short, color, size = 26, ring }) {
   return (
@@ -28,28 +27,16 @@ export function BottomNav({ t, active = "Matches" }) {
     ["Following", <Star key="f" size={19} color={t.navText} />],
   ];
   return (
-    <div
-      className="fixed left-0 right-0 flex items-center gap-2 px-3 z-40 pointer-events-none"
-      style={{ maxWidth: 480, margin: "0 auto", bottom: "max(7px, env(safe-area-inset-bottom))" }}
-    >
-      <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 58, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
-        {items.map(([l, ic]) => {
-          const selected = active === l;
-          return (
-            <button
-              key={l}
-              className="flex-1 h-full flex flex-col items-center justify-center gap-1 rounded-full"
-              style={{ background: selected ? t.pill : "transparent" }}
-            >
-              {ic}
-              <span style={{ fontSize: 11, fontWeight: selected ? 750 : 600, color: selected ? t.accent : t.navText }}>{l}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 58, height: 58, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
-        <span className="flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: t.pill }}>
-          <Search size={23} color={t.text} />
+    <div className="fixed left-0 right-0 bottom-0 flex items-center px-3 z-40"
+      style={{ background: t.nav, height: 62, borderTop: `1px solid ${t.divider}`, maxWidth: 480, margin: "0 auto" }}>
+      {items.map(([l, ic]) => (
+        <button key={l} className="flex-1 flex flex-col items-center gap-1">
+          {ic}<span style={{ fontSize: 11, fontWeight: active === l ? 700 : 500, color: active === l ? t.accent : t.navText }}>{l}</span>
+        </button>
+      ))}
+      <div className="flex items-center justify-center" style={{ width: 54 }}>
+        <span className="flex items-center justify-center rounded-full" style={{ width: 42, height: 42, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <Search size={19} color={t.text} />
         </span>
       </div>
     </div>
@@ -57,26 +44,13 @@ export function BottomNav({ t, active = "Matches" }) {
 }
 
 // status chip on the far left of a match row
-export function StatusChip({ m, t, now }) {
-  const base = {
-    minWidth: 34,
-    height: 22,
-    padding: "0 7px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 800,
-    lineHeight: 1,
-    whiteSpace: "nowrap",
-  };
-  if (m.status === "live" || m.status === "et_live") return (
-    <span className="inline-flex items-center justify-center" style={{ ...base, color: "#07130B", background: t.green, fontSize: 12 }}>
-      {m.status === "et_live" ? "ET " : ""}{liveMinute(m, now)}
+export function StatusChip({ m, t }) {
+  if (m.status === "live") return (
+    <span className="inline-flex items-center gap-1 font-mono" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
+      <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />{m.min}′
     </span>
   );
-  if (m.status === "ht") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.yellow, background: t.chip }}>HT</span>;
-  if (m.status === "et_ht") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.yellow, background: t.chip }}>ET HT</span>;
-  if (m.status === "ft") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>FT</span>;
-  if (m.status === "postponed") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>PP</span>;
-  if (m.status === "cancelled") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>CANC</span>;
-  return null;
+  if (m.status === "ht") return <span className="font-mono" style={{ color: t.yellow, fontSize: 11, fontWeight: 800 }}>HT</span>;
+  if (m.status === "ft") return <span className="font-mono" style={{ color: t.dim, fontSize: 11, fontWeight: 800 }}>FT</span>;
+  return <span className="font-mono" style={{ color: t.dim, fontSize: 11, fontWeight: 600 }}>{m.time}</span>;
 }

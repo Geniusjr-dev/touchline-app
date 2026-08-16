@@ -18,6 +18,7 @@ export default function Matches() {
   const [newComp, setNewComp] = useState("");
   const [newSub, setNewSub] = useState("");
   const [duration, setDuration] = useState("90");
+  const [competitionType, setCompetitionType] = useState("tournament");
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
@@ -48,9 +49,9 @@ export default function Matches() {
   async function addComp(e) {
     e.preventDefault();
     if (!newComp.trim()) return;
-    const { error } = await addCompetition(activeOrganizationId, newComp.trim(), newSub.trim() || null, Number(duration));
+    const { error } = await addCompetition(activeOrganizationId, newComp.trim(), newSub.trim() || null, Number(duration), competitionType);
     if (error) return setErr(error.message);
-    setNewComp(""); setNewSub(""); setDuration("90"); load();
+    setNewComp(""); setNewSub(""); setDuration("90"); setCompetitionType("tournament"); load();
   }
   async function make(e) {
     e.preventDefault();
@@ -102,6 +103,12 @@ export default function Matches() {
           <div style={h3}>New competition</div>
           <Field label="Name"><input value={newComp} onChange={(e) => setNewComp(e.target.value)} placeholder="Ijon Memorial Championship" style={inp} /></Field>
           <Field label="Sub-label (optional)"><input value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Group A" style={inp} /></Field>
+          <Field label="Competition type">
+            <select value={competitionType} onChange={(e) => setCompetitionType(e.target.value)} style={inp}>
+              <option value="tournament">Tournament / league</option>
+              <option value="friendly">Friendly</option>
+            </select>
+          </Field>
           <Field label="Match duration">
             <select value={duration} onChange={(e) => setDuration(e.target.value)} style={inp}>
               <option value="60">60 minutes</option>

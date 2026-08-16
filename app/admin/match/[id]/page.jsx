@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import {
+  announcedStoppageMinutes,
   deleteMatchEvent,
   formatMatchClock,
   getEvents,
@@ -13,6 +14,7 @@ import {
   listTeams,
   recordMatchEvent,
   reopenMatch,
+  setMatchStoppageTime,
   transitionMatchStatus,
 } from "@/lib/db";
 
@@ -126,6 +128,10 @@ export default function Scorer() {
     await run(() => reopenMatch(id, reason));
   }
 
+  async function setStoppageTime(minutes) {
+    await run(() => setMatchStoppageTime(id, minutes));
+  }
+
   async function removeEvent(eventId) {
     await run(() => deleteMatchEvent(eventId));
   }
@@ -170,6 +176,34 @@ export default function Scorer() {
         {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>
 
+      {["live", "et_live"].includes(m.status) && (
+        <div style={card}>
+          <div style={label}>STOPPAGE TIME</div>
+          <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+            {periodName(m.current_period)} · {announcedStoppageMinutes(m) > 0 ? `+${announcedStoppageMinutes(m)} announced` : "none announced"}
+          </div>
+          <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>
+            Tap the minimum added time indicated by the referee. The clock will continue until you end the period.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 7 }}>
+            {Array.from({ length: 11 }, (_, minutes) => (
+              <button
+                key={minutes}
+                disabled={busy}
+                onClick={() => setStoppageTime(minutes)}
+                style={{
+                  ...stoppageButton,
+                  background: announcedStoppageMinutes(m) === minutes ? "#4FC263" : "#0E0F11",
+                  color: announcedStoppageMinutes(m) === minutes ? "#062" : "#fff",
+                }}
+              >
+                {minutes === 0 ? "None" : `+${minutes}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
         {[["home", home], ["away", away]].map(([side, team]) => (
           <div key={side} style={{ ...card, marginBottom: 0 }}>
@@ -197,7 +231,7 @@ export default function Scorer() {
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
         {[...events].sort(eventOrder).map((event) => (
-          <EventRow key={event.id} event={event} locked={!canCorrect} onRemove={removeEvent} />
+          <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} />
         ))}
       </div>
 
@@ -236,18 +270,39 @@ function clockStatus(match, now) {
   return "SCHEDULED";
 }
 
+function periodName(period) {
+  if (period === 1) return "First half";
+  if (period === 2) return "Second half";
+  if (period === 3) return "First half of extra time";
+  if (period === 4) return "Second half of extra time";
+  return "Current period";
+}
+
 function eventOrder(a, b) {
   const aSeconds = a.elapsed_seconds ?? (a.minute == null ? 0 : a.minute * 60);
   const bSeconds = b.elapsed_seconds ?? (b.minute == null ? 0 : b.minute * 60);
-  return aSeconds - bSeconds
+  return Number(a.period || 1) - Number(b.period || 1)
+    || aSeconds - bSeconds
     || new Date(a.created_at) - new Date(b.created_at);
 }
 
-function EventRow({ event, locked, onRemove }) {
+function scorerEventMinute(event, match) {
+  const duration = Number(match.competition?.match_duration_minutes || 90);
+  const extraTime = Number(match.competition?.extra_time_minutes || 30);
+  const period = Number(event.period || 1);
+  const minute = Number(event.display_minute ?? event.minute ?? 1);
+  const periodEnd = period === 1 ? duration / 2
+    : period === 2 ? duration
+    : period === 3 ? duration + extraTime / 2
+    : duration + extraTime;
+  return minute > periodEnd ? `${periodEnd}+${minute - periodEnd}′` : `${minute}′`;
+}
+
+function EventRow({ event, match, locked, onRemove }) {
   const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
-      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 34, fontSize: 13 }}>{event.display_minute ?? event.minute ?? 1}′</span>
+      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
       <span style={{ fontSize: 14 }}>{emoji}</span>
       {event.type === "sub" ? (
         <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
@@ -321,3 +376,4 @@ const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", di
 const flabel = { display: "block", color: "#8E939B", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
 const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
 const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
+const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };

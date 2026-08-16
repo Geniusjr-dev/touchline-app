@@ -43,7 +43,7 @@ export default function Login() {
           </button>
         </form>
         <div style={{ color: "#5B6069", fontSize: 12, marginTop: 16 }}>
-          Accounts are created by the admin in the Supabase dashboard (Authentication → Users).
+          Accounts are created by the admin in the Supabase dashboard (Authentication, then Users).
         </div>
       </div>
     </div>

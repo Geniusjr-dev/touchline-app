@@ -24,7 +24,7 @@ function MatchRow({ m, teams, t }) {
       <div className="px-3 shrink-0 text-center" style={{ minWidth: 58 }}>
         {showScore
           ? <span className="font-mono" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
-          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "—"}</span>}
+          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "&ndash;"}</span>}
       </div>
       <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
         <span className="shrink-0"><Crest short={a.short} color={a.color} size={24} ring={t.divider} /></span>

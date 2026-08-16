@@ -2,7 +2,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 
 export const metadata = {
-  title: "Touchline — grassroots live scores",
+  title: "Touchline, grassroots live scores",
   description: "Live scores, fixtures and tables for grassroots football tournaments.",
 };
 

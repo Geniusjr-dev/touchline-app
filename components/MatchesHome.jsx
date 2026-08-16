@@ -33,7 +33,8 @@ function dateLabel(date, offset) {
 function MatchRow({ m, teams, t, now }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
-  const showScore = m.status !== "scheduled";
+  const showScore = ["live", "ht", "ft", "et_live", "et_ht"].includes(m.status);
+  const showStatus = showScore || ["postponed", "cancelled"].includes(m.status);
   const teamNameStyle = {
     color: t.text,
     fontSize: "clamp(12.5px, 3.5vw, 14px)",
@@ -50,13 +51,13 @@ function MatchRow({ m, teams, t, now }) {
       href={`/match/${m.id}`}
       className="relative grid items-center gap-x-2 px-3 py-2 active:opacity-70"
       style={{
-        gridTemplateColumns: "minmax(0, 1fr) 46px minmax(0, 1fr)",
-        minHeight: 68,
+        gridTemplateColumns: "minmax(0, 1fr) 54px minmax(0, 1fr)",
+        minHeight: 72,
         borderTop: `1px solid ${t.divider}`,
         textDecoration: "none",
       }}
     >
-      {showScore && (
+      {showStatus && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 flex justify-center">
           <StatusChip m={m} t={t} now={now} />
         </div>
@@ -67,8 +68,8 @@ function MatchRow({ m, teams, t, now }) {
       </div>
       <div className="shrink-0 text-center min-w-0">
         {showScore
-          ? <span className="font-mono" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
-          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "—"}</span>}
+          ? <span style={{ color: t.text, fontSize: 15, fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
+          : <span style={{ color: t.dim, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "—"}</span>}
       </div>
       <div className="flex items-center justify-start gap-1.5 min-w-0">
         <Crest short={a.short} color={a.color} size={24} ring={t.divider} />
@@ -96,6 +97,7 @@ function Group({ c, teams, t, now }) {
 export default function MatchesHome() {
   const { t, mode, toggle } = useTheme();
   const [liveOnly, setLiveOnly] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [data, setData] = useState(null);
   const [now, setNow] = useState(0);
   const dateStripRef = useRef(null);
@@ -135,12 +137,18 @@ export default function MatchesHome() {
   }, []);
 
   useEffect(() => {
-    if (!todayKey) return undefined;
-    const centreToday = window.setTimeout(() => {
-      todayButtonRef.current?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+    if (!selectedDate) return undefined;
+    const centreSelectedDate = window.setTimeout(() => {
+      const selectedButton = dateStripRef.current?.querySelector(`[data-date="${selectedDate}"]`);
+      selectedButton?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
     }, 0);
-    return () => window.clearTimeout(centreToday);
-  }, [todayKey]);
+    return () => window.clearTimeout(centreSelectedDate);
+  }, [selectedDate]);
+
+  const selectDate = (dateKey) => {
+    setSelectedDateOverride(dateKey === todayKey ? null : dateKey);
+    setLiveOnly(false);
+  };
 
   const comps = !data ? [] : data.competitions
     .map((competition) => ({
@@ -160,20 +168,47 @@ export default function MatchesHome() {
         <span style={{ color: t.text, fontSize: 21, fontWeight: 800, letterSpacing: -0.5 }}>
           <span style={{ color: t.accent }}>⚡</span>Touchline
         </span>
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <div className="flex items-center rounded-full overflow-hidden" style={{ background: t.pill, border: `1px solid ${t.pillBorder}`, height: 34 }}>
             <button onClick={() => setLiveOnly((v) => !v)} className="flex items-center gap-1.5 px-3 h-full">
               <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: liveOnly ? t.red : t.dim }} />
               <span style={{ color: liveOnly ? t.text : t.dim, fontSize: 13, fontWeight: 700 }}>Live</span>
             </button>
             <div style={{ width: 1, height: 20, background: t.pillBorder }} />
-            <button onClick={toggle} className="flex items-center justify-center px-3 h-full" style={{ color: t.text }}>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{mode === "dark" ? "☾" : "☀"}</span>
-            </button>
+            <label className="relative flex items-center justify-center h-full cursor-pointer" style={{ width: 42, color: t.text }}>
+              <span className="relative inline-flex items-center justify-center rounded" style={{ width: 20, height: 19, border: `2px solid ${t.text}`, fontSize: 10, fontWeight: 800, lineHeight: 1 }}>
+                <span style={{ position: "absolute", left: -2, right: -2, top: 3, height: 2, background: t.text }} />
+                <span style={{ paddingTop: 4 }}>{selectedDate ? Number(selectedDate.slice(8, 10)) : ""}</span>
+              </span>
+              <input
+                type="date"
+                aria-label="Choose match date"
+                value={selectedDate}
+                min={dateWindow[0]?.key}
+                max={dateWindow[dateWindow.length - 1]?.key}
+                onChange={(event) => event.target.value && selectDate(event.target.value)}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 16 }}
+              />
+            </label>
           </div>
-          <Link href="/admin" className="flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <button
+            type="button"
+            aria-label="Open menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+            className="flex items-center justify-center rounded-full"
+            style={{ width: 34, height: 34, background: t.pill, border: `1px solid ${t.pillBorder}` }}
+          >
             <Menu size={18} color={t.text} />
-          </Link>
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-10 overflow-hidden rounded-xl z-50" style={{ minWidth: 142, background: t.card, border: `1px solid ${t.divider}`, boxShadow: "0 10px 28px rgba(0,0,0,0.34)" }}>
+              <Link href="/admin" className="block px-4 py-3" style={{ color: t.text, fontSize: 13, fontWeight: 700, borderBottom: `1px solid ${t.divider}` }}>Admin</Link>
+              <button type="button" onClick={() => { toggle(); setMenuOpen(false); }} className="w-full text-left px-4 py-3" style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>
+                {mode === "dark" ? "Light mode" : "Dark mode"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -188,7 +223,11 @@ export default function MatchesHome() {
           return <button
             key={day.key}
             ref={day.offset === 0 ? todayButtonRef : null}
-            onClick={() => setSelectedDateOverride(day.offset === 0 ? null : day.key)}
+            data-date={day.key}
+            onClick={(event) => {
+              selectDate(day.key);
+              event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            }}
             aria-pressed={active}
             className="shrink-0"
             style={{ color: active ? t.text : t.faint, fontSize: active ? 16 : 15, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", scrollSnapAlign: "center" }}

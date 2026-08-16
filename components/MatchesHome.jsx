@@ -1,13 +1,32 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, ChevronUp, ChevronDown } from "lucide-react";
+import { Menu, ChevronUp, ChevronDown, Calendar } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { getHome } from "@/lib/db";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 
-const DAYS = ["Thu 25", "Fri 26", "Today", "Tomorrow", "Sun 29", "Mon 30"];
-const ACTIVE_DAY = 2;
+function dateKey(d) {
+  const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0"); const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function buildDays(todayKey) {
+  const today = new Date(todayKey + "T00:00:00");
+  const list = [];
+  for (let i = -3; i <= 10; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    list.push(dateKey(d));
+  }
+  return list;
+}
+function dayLabel(key, todayKey) {
+  const d = new Date(key + "T00:00:00"); const today = new Date(todayKey + "T00:00:00");
+  const diff = Math.round((d - today) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === -1) return "Yesterday";
+  if (diff === 1) return "Tomorrow";
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
 
 function MatchRow({ m, teams, t }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
@@ -23,8 +42,8 @@ function MatchRow({ m, teams, t }) {
       </div>
       <div className="px-3 shrink-0 text-center" style={{ minWidth: 58 }}>
         {showScore
-          ? <span className="font-mono" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
-          : <span className="font-mono" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "&ndash;"}</span>}
+          ? <span className="tnum" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
+          : <span className="tnum" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "&ndash;"}</span>}
       </div>
       <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
         <span className="shrink-0"><Crest short={a.short} color={a.color} size={24} ring={t.divider} /></span>
@@ -53,12 +72,26 @@ export default function MatchesHome() {
   const { t, mode, toggle } = useTheme();
   const [liveOnly, setLiveOnly] = useState(false);
   const [data, setData] = useState(null);
+  const [todayKey] = useState(() => dateKey(new Date()));
+  const [selected, setSelected] = useState(() => dateKey(new Date()));
+  const dateInputRef = useRef(null);
+  const activeRef = useRef(null);
+  const stripRef = useRef(null);
 
   useEffect(() => { getHome().then(setData); }, []);
+  useEffect(() => {
+    if (activeRef.current) { try { activeRef.current.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch (_) {} }
+  }, [selected, data]);
 
-  const comps = !data ? [] : (liveOnly
-    ? data.competitions.map((c) => ({ ...c, matches: c.matches.filter((m) => m.status === "live" || m.status === "ht") })).filter((c) => c.matches.length)
-    : data.competitions);
+  const days = buildDays(todayKey);
+
+  // filter by selected day; matches with no date fall on Today
+  const dayFiltered = !data ? [] : data.competitions
+    .map((c) => ({ ...c, matches: c.matches.filter((m) => (m.date || todayKey) === selected) }))
+    .filter((c) => c.matches.length);
+  const comps = liveOnly
+    ? dayFiltered.map((c) => ({ ...c, matches: c.matches.filter((m) => ["live", "ht", "et_live", "et_ht"].includes(m.status)) })).filter((c) => c.matches.length)
+    : dayFiltered;
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
@@ -73,27 +106,38 @@ export default function MatchesHome() {
               <span style={{ color: liveOnly ? t.text : t.dim, fontSize: 13, fontWeight: 700 }}>Live</span>
             </button>
             <div style={{ width: 1, height: 20, background: t.pillBorder }} />
-            <button onClick={toggle} className="flex items-center justify-center px-3 h-full" style={{ color: t.text }}>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{mode === "dark" ? "☾" : "☀"}</span>
+            <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()} className="flex items-center justify-center px-3 h-full" style={{ color: t.text }} aria-label="Pick a date">
+              <Calendar size={16} color={t.text} />
             </button>
           </div>
+          <input ref={dateInputRef} type="date" value={selected} onChange={(e) => e.target.value && setSelected(e.target.value)}
+            style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} tabIndex={-1} />
+          <button onClick={toggle} className="flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: t.pill, border: `1px solid ${t.pillBorder}`, color: t.text }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{mode === "dark" ? "☾" : "☀"}</span>
+          </button>
           <Link href="/admin" className="flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
             <Menu size={18} color={t.text} />
           </Link>
         </div>
       </div>
 
-      <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar sticky z-20" style={{ background: t.bg, height: 46, top: 56 }}>
-        {DAYS.map((d, i) => (
-          <button key={d} className="shrink-0" style={{ color: i === ACTIVE_DAY ? t.text : t.faint, fontSize: i === ACTIVE_DAY ? 16 : 15, fontWeight: i === ACTIVE_DAY ? 800 : 600, whiteSpace: "nowrap" }}>{d}</button>
-        ))}
+      <div ref={stripRef} className="flex items-center gap-6 overflow-x-auto no-scrollbar sticky z-20" style={{ background: t.bg, height: 46, top: 56, padding: "0 50%" }}>
+        {days.map((key) => {
+          const on = key === selected;
+          return (
+            <button key={key} ref={on ? activeRef : null} onClick={() => setSelected(key)} className="shrink-0"
+              style={{ color: on ? t.text : t.faint, fontSize: on ? 16 : 15, fontWeight: on ? 800 : 600, whiteSpace: "nowrap" }}>
+              {dayLabel(key, todayKey)}
+            </button>
+          );
+        })}
       </div>
 
       {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading…</div>}
       {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
-          No matches yet. Open the menu to add teams and matches in the admin area.
+          No matches on {dayLabel(selected, todayKey)}.
         </div>
       )}
 

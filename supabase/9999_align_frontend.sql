@@ -38,3 +38,11 @@ end;
 $$;
 
 grant execute on function public.set_match_stoppage_time(uuid, int) to authenticated;
+
+-- 3) Backfill: attach pre-organizations rows to your organization so the admin can see them.
+update competitions set organization_id = (select id from organizations order by created_at limit 1) where organization_id is null;
+update teams set organization_id = (select id from organizations order by created_at limit 1) where organization_id is null;
+update matches set organization_id = (select id from organizations order by created_at limit 1) where organization_id is null;
+
+-- give old matches a date so the day strip can place them
+update matches set match_date = coalesce(match_date, created_at::date, current_date) where match_date is null;

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch } from "@/lib/db";
@@ -119,10 +120,10 @@ export default function MatchCentre({ id }) {
           </div>
         </div>
         <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
-          <div className="flex flex-col items-center min-w-0">
-            <Crest short={h.short} color={h.color} size={44} ring={t.divider} />
+          <Link href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
+            <Crest short={h.short} color={h.color} logo={h.logoUrl} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
-          </div>
+          </Link>
           <div className="flex flex-col items-center pt-1">
             {m.status === "scheduled"
               ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "—"}</span>
@@ -137,10 +138,10 @@ export default function MatchCentre({ id }) {
             )}
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
-          <div className="flex flex-col items-center min-w-0">
-            <Crest short={a.short} color={a.color} size={44} ring={t.divider} />
+          <Link href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
+            <Crest short={a.short} color={a.color} logo={a.logoUrl} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
-          </div>
+          </Link>
         </div>
         {hasScorerSummary && (
           <div className="grid px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
@@ -521,7 +522,7 @@ function TableTab({ t, m, rows }) {
               <span style={{ color: t.dim, fontSize: 13, fontWeight: 600 }}>{i + 1}</span>
             </div>
             <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
-              <Crest short={tm.short} color={tm.color} size={22} ring={t.divider} />
+              <Crest short={tm.short} color={tm.color} logo={tm.logoUrl} size={22} ring={t.divider} />
               <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>{tm.name}</span>
             </div>
             <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.pl}</span>

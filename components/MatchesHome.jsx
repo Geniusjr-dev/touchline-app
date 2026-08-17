@@ -32,23 +32,24 @@ function dayLabel(key, todayKey) {
 function MatchRow({ m, teams, t }) {
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
-  const showScore = m.status !== "scheduled";
+  const started = m.status !== "scheduled";
+  const nameStyle = { color: t.text, fontSize: 15, fontWeight: 500, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.15, wordBreak: "break-word" };
   return (
-    <Link href={`/match/${m.id}`} className="flex items-center px-3 active:opacity-70"
-      style={{ minHeight: 60, borderTop: `1px solid ${t.divider}`, textDecoration: "none" }}>
-      <div style={{ width: 46 }} className="flex justify-center">{showScore ? <StatusChip m={m} t={t} /> : <span />}</div>
-      <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
-        <span className="text-right" style={{ color: t.text, fontSize: 14.5, fontWeight: 500, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.15, wordBreak: "break-word" }}>{h.name}</span>
-        <span className="shrink-0"><Crest short={h.short} color={h.color} size={24} ring={t.divider} /></span>
+    <Link href={`/match/${m.id}`} className="flex items-center active:opacity-70"
+      style={{ minHeight: 64, borderTop: `1px solid ${t.divider}`, textDecoration: "none", paddingLeft: 8, paddingRight: 8 }}>
+      <div style={{ width: 50, flexShrink: 0 }} className="flex justify-center">{started ? <StatusChip m={m} t={t} /> : null}</div>
+      <div className="flex-1 flex items-center justify-end min-w-0" style={{ gap: 8 }}>
+        <span className="text-right" style={nameStyle}>{h.name}</span>
+        <span style={{ flexShrink: 0 }}><Crest short={h.short} color={h.color} size={26} ring={t.divider} /></span>
       </div>
-      <div className="px-3 shrink-0 text-center" style={{ minWidth: 58 }}>
-        {showScore
-          ? <span className="tnum" style={{ color: t.text, fontSize: 15, fontWeight: 700 }}>{m.hs} - {m.as}</span>
-          : <span className="tnum" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "&ndash;"}</span>}
+      <div className="text-center" style={{ width: 64, flexShrink: 0 }}>
+        {started
+          ? <span className="tnum" style={{ color: t.text, fontSize: 16, fontWeight: 700 }}>{m.hs} - {m.as}</span>
+          : <span className="tnum" style={{ color: t.dim, fontSize: 14, fontWeight: 600 }}>{m.time || "–"}</span>}
       </div>
-      <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
-        <span className="shrink-0"><Crest short={a.short} color={a.color} size={24} ring={t.divider} /></span>
-        <span style={{ color: t.text, fontSize: 14.5, fontWeight: 500, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.15, wordBreak: "break-word" }}>{a.name}</span>
+      <div className="flex-1 flex items-center justify-start min-w-0" style={{ gap: 8 }}>
+        <span style={{ flexShrink: 0 }}><Crest short={a.short} color={a.color} size={26} ring={t.divider} /></span>
+        <span style={nameStyle}>{a.name}</span>
       </div>
     </Link>
   );

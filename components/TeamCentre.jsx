@@ -237,7 +237,7 @@ function MatchList({ title, matches, teams, t }) {
 function TeamMatchLine({ match, teams, t, large = false }) {
   const home = teams[match.home] || { name: "TBD", short: "?", color: "#555" };
   const away = teams[match.away] || { name: "TBD", short: "?", color: "#555" };
-  const score = match.status === "scheduled" ? (match.time || "—") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
+  const score = match.status === "scheduled" ? (match.time || "TBD") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
   return (
     <Link href={`/match/${match.id}`} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">

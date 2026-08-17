@@ -394,7 +394,7 @@ function AttributionModal({ pending, team, squad, busy, onCancel, onChoose }) {
         <div style={{ display: "grid", gap: 7 }}>
           {filtered.map((player) => (
             <button key={player.id} disabled={busy} onClick={() => onChoose(player)} style={playerButton}>
-              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? "–"}</span><span>{player.name}</span>
+              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
             </button>
           ))}
           {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}

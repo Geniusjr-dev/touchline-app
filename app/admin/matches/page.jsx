@@ -78,7 +78,7 @@ export default function Matches() {
     if (error) return setErr(error.message);
     setAssignments((current) => ({ ...current, [matchId]: scorerId ? [scorerId] : [] }));
   }
-  const teamName = (id) => teams.find((t) => t.id === id)?.name || "—";
+  const teamName = (id) => teams.find((t) => t.id === id)?.name || "Team not found";
   const selectedCompetition = comps.find((competition) => competition.id === comp);
   const registeredTeamIds = new Set(competitionTeams
     .filter((entry) => selectedCompetition?.competition_type !== "tournament" || Number(entry.group_number) === Number(groupNumber))
@@ -96,27 +96,27 @@ export default function Matches() {
           <div style={h3}>New match</div>
           <Field label="Competition">
             <select value={comp} onChange={(e) => { setComp(e.target.value); setGroupNumber(""); setHome(""); setAway(""); }} style={inp}>
-              <option value="">— choose format and competition —</option>
+              <option value="">Choose format and competition</option>
               {comps.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.competition_type || "tournament"}{c.sub ? ` · ${c.sub}` : ""}</option>)}
             </select>
           </Field>
           {selectedCompetition?.competition_type === "tournament" && (
             <Field label="Tournament group">
               <select value={groupNumber} onChange={(e) => { setGroupNumber(e.target.value); setHome(""); setAway(""); }} style={inp}>
-                <option value="">— choose group —</option>
+                <option value="">Choose group</option>
                 {Array.from({ length: Number(selectedCompetition.group_count) || 0 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Group {String.fromCharCode(64 + number)}</option>)}
               </select>
             </Field>
           )}
           <Field label="Home team">
             <select value={home} onChange={(e) => setHome(e.target.value)} style={inp}>
-              <option value="">— pick —</option>
+              <option value="">Choose a home team</option>
               {eligibleTeams.map((t) => <option key={t.id} value={t.id}>{t.display_name || t.name}</option>)}
             </select>
           </Field>
           <Field label="Away team">
             <select value={away} onChange={(e) => setAway(e.target.value)} style={inp}>
-              <option value="">— pick —</option>
+              <option value="">Choose an away team</option>
               {eligibleTeams.filter((team) => team.id !== home).map((t) => <option key={t.id} value={t.id}>{t.display_name || t.name}</option>)}
             </select>
           </Field>

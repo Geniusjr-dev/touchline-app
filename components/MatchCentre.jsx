@@ -126,7 +126,7 @@ export default function MatchCentre({ id }) {
           </Link>
           <div className="flex flex-col items-center pt-1">
             {m.status === "scheduled"
-              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "—"}</span>
+              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
               : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}

@@ -76,9 +76,9 @@ export default function CompetitionsPage() {
           <Field label="Sub-label (optional)"><input value={sub} onChange={(e) => setSub(e.target.value)} placeholder="2026 season" style={inp} /></Field>
           <Field label="Format">
             <select value={format} onChange={(e) => setFormat(e.target.value)} style={inp}>
-              <option value="friendly">Friendly — no table</option>
-              <option value="league">League — one overall table</option>
-              <option value="tournament">Tournament — group tables</option>
+              <option value="friendly">Friendly: no table</option>
+              <option value="league">League: one overall table</option>
+              <option value="tournament">Tournament: group tables</option>
             </select>
           </Field>
           <Field label="Match duration">

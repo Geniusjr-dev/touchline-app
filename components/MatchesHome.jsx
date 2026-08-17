@@ -73,7 +73,7 @@ function MatchRow({ m, teams, t, now }) {
       <div className="shrink-0 text-center min-w-0">
         {showScore
           ? <span style={{ color: t.text, fontSize: 15, fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
-          : <span style={{ color: t.dim, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "—"}</span>}
+          : <span style={{ color: t.dim, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
       </div>
       <div className="flex items-center justify-start gap-1.5 min-w-0">
         <Crest short={a.short} color={a.color} logo={a.logoUrl} size={24} ring={t.divider} />

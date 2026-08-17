@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { announcedStoppageMinutes, formatMatchClock, getMatch } from "@/lib/db";
+import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
@@ -55,6 +55,7 @@ export default function MatchCentre({ id }) {
       ch = supabase.channel("m-" + id)
         .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, load)
         .subscribe();
     }
@@ -136,7 +137,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <StatsTab t={t} />}
+      {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
@@ -155,18 +156,23 @@ function Empty({ t, title, note }) {
   </Card>;
 }
 
-function StatsTab({ t }) {
+function StatsTab({ t, stats }) {
+  const s = { ...EMPTY_MATCH_STATS, ...(stats || {}) };
   const rows = [
-    ["Total shots", 0, 0],
-    ["Shots on target", 0, 0],
-    ["Touches in opposition box", 0, 0],
+    ["Total shots", s.home_total_shots, s.away_total_shots],
+    ["Shots on target", s.home_shots_on_target, s.away_shots_on_target],
+    ["Corners", s.home_corners, s.away_corners],
+    ["Fouls", s.home_fouls, s.away_fouls],
+    ["Offsides", s.home_offsides, s.away_offsides],
+    ["Yellow cards", s.home_yellow_cards, s.away_yellow_cards],
+    ["Red cards", s.home_red_cards, s.away_red_cards],
   ];
   return (
     <Card t={t} style={{ padding: "18px 16px 16px" }}>
       <div className="text-center" style={{ color: t.text, fontSize: 13, marginBottom: 8 }}>Ball possession</div>
       <div className="flex overflow-hidden" style={{ height: 34, borderRadius: 18, marginBottom: 14 }}>
-        <div className="flex items-center px-3" style={{ width: "50%", background: t.blue, color: "#07131B", fontSize: 15, fontWeight: 850 }}>50%</div>
-        <div className="flex items-center justify-end px-3" style={{ width: "50%", background: t.red, color: "#fff", fontSize: 15, fontWeight: 850 }}>50%</div>
+        <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: t.blue, color: "#07131B", fontSize: 15, fontWeight: 850 }}>{s.home_possession}%</div>
+        <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: t.red, color: "#fff", fontSize: 15, fontWeight: 850 }}>{s.away_possession}%</div>
       </div>
       {rows.map(([label, home, away]) => (
         <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>

@@ -1,248 +1,446 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import {
-  getMatchRaw, getEvents, listTeams, listPlayers,
-  transitionMatchStatus, reopenMatch, setMatchStoppageTime, recordMatchEvent, deleteMatchEvent,
-  formatMatchClock, liveMinute, getMatchStats, upsertMatchStats, STAT_DEFS,
+  announcedStoppageMinutes,
+  deleteMatchEvent,
+  EMPTY_MATCH_STATS,
+  formatMatchClock,
+  getEvents,
+  getMatchRaw,
+  getMatchStats,
+  listPlayers,
+  listTeams,
+  recordMatchEvent,
+  reopenMatch,
+  saveMatchStats,
+  setMatchStoppageTime,
+  transitionMatchStatus,
 } from "@/lib/db";
-
-const PERIOD = { 0: "Not started", 1: "First half", 2: "Second half", 3: "Extra time first half", 4: "Extra time second half" };
-const STATUS_LABEL = { scheduled: "Not started", live: "Live", ht: "Half time", et_live: "Extra time", et_ht: "Extra-time break", ft: "Full time" };
 
 export default function Scorer() {
   const { id } = useParams();
+  const { role } = useAuth();
   const [m, setM] = useState(null);
   const [events, setEvents] = useState([]);
   const [teams, setTeams] = useState({});
   const [squads, setSquads] = useState({});
-  const [prompt, setPrompt] = useState(null);
-  const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [stopMin, setStopMin] = useState("");
-  const [, setTick] = useState(0);
+  const [subFor, setSubFor] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [error, setError] = useState("");
+  const [now, setNow] = useState(0);
+  const [stats, setStats] = useState({ ...EMPTY_MATCH_STATS });
+  const [statsMessage, setStatsMessage] = useState("");
 
-  const load = async () => {
-    const mm = await getMatchRaw(id);
-    const [ev, ts] = await Promise.all([getEvents(id), listTeams(mm?.organization_id)]);
-    setM(mm); setEvents(ev);
-    const map = {}; ts.forEach((t) => (map[t.id] = t)); setTeams(map);
-    if (mm) { const [hp, ap] = await Promise.all([listPlayers(mm.home_id), listPlayers(mm.away_id)]); setSquads({ [mm.home_id]: hp, [mm.away_id]: ap }); }
-  };
-  useEffect(() => { load(); }, [id]);
-  useEffect(() => { const i = setInterval(() => setTick((t) => t + 1), 1000); return () => clearInterval(i); }, []);
+  const load = useCallback(async () => {
+    try {
+      const mm = await getMatchRaw(id);
+      const [ev, ts, matchStats] = await Promise.all([getEvents(id), listTeams(mm.organization_id), getMatchStats(id)]);
+      setM(mm);
+      setEvents(ev);
+      setStats(matchStats);
+      const map = {};
+      ts.forEach((team) => { map[team.id] = team; });
+      setTeams(map);
+      const [homePlayers, awayPlayers] = await Promise.all([listPlayers(mm.home_id), listPlayers(mm.away_id)]);
+      setSquads({ [mm.home_id]: homePlayers, [mm.away_id]: awayPlayers });
+    } catch (loadError) {
+      setError(loadError.message || "Could not load this match.");
+    }
+  }, [id]);
 
-  if (!m) return <div style={{ color: "#8E939B" }}>Loading.</div>;
+  useEffect(() => {
+    load();
+    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
+    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
+    let channel;
+    if (supabase) {
+      channel = supabase.channel(`scorer-${id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, load)
+        .subscribe();
+    }
+    return () => {
+      window.clearInterval(ticker);
+      window.clearTimeout(firstTick);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [id, load]);
+
+  if (!m) return <div style={{ color: error ? "#F04444" : "#8E939B" }}>{error || "Loading…"}</div>;
   const home = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
   const away = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
-  const hs = m.home_score || 0, as = m.away_score || 0;
-  const locked = m.status === "ft" && !!m.locked_at;
-  const running = m.status === "live" || m.status === "et_live";
+  const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
+  const storedAway = m.away_score ?? events.filter((e) => e.type === "goal" && e.side === "away").length;
+  const displayedHome = storedHome + (pending?.type === "goal" && pending.side === "home" ? 1 : 0);
+  const displayedAway = storedAway + (pending?.type === "goal" && pending.side === "away" ? 1 : 0);
   const sideTeamId = (side) => (side === "home" ? m.home_id : m.away_id);
+  const fullTimeLocked = m.status === "ft" && Boolean(m.locked_at);
+  const canRecord = ["live", "et_live"].includes(m.status) || (m.status === "ft" && !m.locked_at);
+  const canCorrect = m.status !== "scheduled" && !fullTimeLocked;
 
-  async function callRpc(promise) {
-    setBusy(true); setErr("");
-    const { error } = await promise;
-    if (error) setErr(error.message || "That action was not allowed.");
-    await load(); setBusy(false);
-    return !error;
+  async function run(operation, closePending = false) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await operation();
+      if (result?.error) throw result.error;
+      if (closePending) setPending(null);
+      await load();
+      return true;
+    } catch (operationError) {
+      setError(operationError.message || "The action could not be completed.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
-  const go = (status) => callRpc(transitionMatchStatus(id, status));
-  async function doReopen() {
-    const reason = window.prompt("Reason for reopening this match? (at least 5 characters)");
-    if (!reason) return;
-    await callRpc(reopenMatch(id, reason));
-  }
-  async function applyStoppage() { await callRpc(setMatchStoppageTime(id, Number(stopMin) || 0)); }
-  async function commit(ev) { const ok = await callRpc(recordMatchEvent(id, ev)); if (ok) setPrompt(null); }
-  function askDelete(eventId) { setConfirm({ body: "Delete this event? The score will be recalculated.", onYes: () => callRpc(deleteMatchEvent(eventId)) }); }
 
-  const clock = (m.status === "scheduled") ? "" : formatMatchClock(m);
-  const periodLabel = STATUS_LABEL[m.status] || m.status;
+  function beginEvent(type, side) {
+    if (!canRecord || busy) return;
+    setError("");
+    setPending({ type, side });
+  }
+
+  async function commitPending(player) {
+    if (!pending) return;
+    const event = {
+      type: pending.type,
+      side: pending.side,
+      player_id: player?.id || null,
+      player: player?.name || (pending.type === "goal" ? "Unknown scorer" : "Unknown player"),
+    };
+    await run(() => recordMatchEvent(id, event), true);
+  }
+
+  async function undoLast(type, side) {
+    const latest = events
+      .filter((event) => event.type === type && event.side === side)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (latest) await run(() => deleteMatchEvent(latest.id));
+  }
+
+  async function changeStatus(status) {
+    await run(() => transitionMatchStatus(id, status));
+  }
+
+  async function deliberatelyReopen() {
+    const reason = window.prompt("Why are you reopening this full-time match? This is stored in the audit log.");
+    if (reason === null) return;
+    await run(() => reopenMatch(id, reason));
+  }
+
+  async function setStoppageTime(minutes) {
+    await run(() => setMatchStoppageTime(id, minutes));
+  }
+
+  async function removeEvent(eventId) {
+    await run(() => deleteMatchEvent(eventId));
+  }
+
+  async function saveSub(side, on, off) {
+    const saved = await run(() => recordMatchEvent(id, { type: "sub", side, player: on, assist: off }));
+    if (saved) setSubFor(null);
+  }
+
+  function changeStat(key, value) {
+    const parsed = Number(value);
+    setStats((current) => ({ ...current, [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0 }));
+    setStatsMessage("");
+  }
+
+  async function saveStatistics() {
+    if (Number(stats.home_possession) + Number(stats.away_possession) !== 100) {
+      setStatsMessage("Possession must total 100%.");
+      return;
+    }
+    const saved = await run(() => saveMatchStats(id, stats));
+    setStatsMessage(saved ? "Stats saved." : "Stats were not saved.");
+  }
+
+  const actions = statusActions(m.status, fullTimeLocked);
 
   return (
     <div>
-      <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>All matches</Link>
+      <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
 
-      <div style={{ ...card, textAlign: "center", marginTop: 12 }}>
+      <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
           <Badge t={home} />
-          <div style={{ fontSize: 42, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{hs} <span style={{ color: "#5B6069" }}>-</span> {as}</div>
+          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "#5B6069" }}>-</span> {displayedAway}</div>
           <Badge t={away} />
         </div>
-        <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          {running && <span style={{ width: 7, height: 7, borderRadius: 999, background: "#F04444" }} />}
-          <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: running ? "#F04444" : "#8E939B" }}>{clock}</span>
-          <span style={{ color: "#8E939B", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{periodLabel}</span>
+        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
+          {clockStatus(m, now)}
         </div>
+        {pending?.type === "goal" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Score pending scorer confirmation</div>}
       </div>
 
-      {err && <div style={{ color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 14 }}>{err}</div>}
+      {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
       <div style={card}>
-        <div style={label}>MATCH CLOCK</div>
+        <div style={label}>MATCH STATUS</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button disabled={busy} style={pill(m.status === "live")} onClick={() => go("live")}>{m.status === "scheduled" ? "Kick off" : "Live / Second half"}</button>
-          <button disabled={busy} style={pill(m.status === "ht")} onClick={() => go("ht")}>Half time</button>
-          <button disabled={busy} style={pill(false, "#EF4444")} onClick={() => setConfirm({ body: "End the match at full time? This locks the score.", onYes: () => go("ft") })}>Full time</button>
-          <button disabled={busy} style={pill(m.status === "et_live")} onClick={() => go("et_live")}>Extra time</button>
-          <button disabled={busy} style={pill(m.status === "et_ht")} onClick={() => go("et_ht")}>ET break</button>
-          <button disabled={busy} style={pill(false)} onClick={() => setConfirm({ body: "Reset this match to not started? Only possible before any events.", onYes: () => go("scheduled") })}>Reset</button>
+          {actions.map((action) => (
+            <button key={action.status} disabled={busy} onClick={() => changeStatus(action.status)}
+              style={{ ...pill, background: action.primary ? "#4FC263" : "#0E0F11", color: action.primary ? "#062" : "#fff" }}>{action.label}</button>
+          ))}
+          {role === "admin" && fullTimeLocked && (
+            <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
+          )}
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "end", marginTop: 14, flexWrap: "wrap" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 600 }}>Stoppage minutes (this half)</span>
-            <input type="number" min="0" value={stopMin} onChange={(e) => setStopMin(e.target.value)} style={{ ...finp, width: 150 }} /></label>
-          <button disabled={busy} style={pill(false)} onClick={applyStoppage}>Set stoppage</button>
-        </div>
+        {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
+        {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>
 
-      {locked ? (
-        <div style={{ ...card, borderColor: "#5a2323" }}>
-          <div style={{ color: "#F04444", fontWeight: 800, marginBottom: 6 }}>Match locked, full time</div>
-          <div style={{ color: "#8E939B", fontSize: 13, marginBottom: 12 }}>Scoring is closed. Only an administrator can reopen it, and the reason is recorded.</div>
-          <button disabled={busy} style={pill(false, "#EF4444")} onClick={doReopen}>Reopen match</button>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          {[["home", home], ["away", away]].map(([side, team]) => (
-            <div key={side} style={{ ...card, marginBottom: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.display_name || team.name}</span></div>
-              <button disabled={busy} style={{ width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: 17, cursor: "pointer", marginBottom: 8 }} onClick={() => setPrompt({ kind: "goal", side })}>Goal</button>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={busy} style={{ ...ebtn, color: "#F5C518" }} onClick={() => setPrompt({ kind: "card", side, cardType: "yellow" })}>Yellow</button>
-                <button disabled={busy} style={{ ...ebtn, color: "#F04444" }} onClick={() => setPrompt({ kind: "card", side, cardType: "red" })}>Red</button>
-                <button disabled={busy} style={ebtn} onClick={() => setPrompt({ kind: "sub", side })}>Sub</button>
-              </div>
-            </div>
-          ))}
+      {["live", "et_live"].includes(m.status) && (
+        <div style={card}>
+          <div style={label}>STOPPAGE TIME</div>
+          <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+            {periodName(m.current_period)} · {announcedStoppageMinutes(m) > 0 ? `+${announcedStoppageMinutes(m)} announced` : "none announced"}
+          </div>
+          <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>
+            Tap the minimum added time indicated by the referee. The clock will continue until you end the period.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 7 }}>
+            {Array.from({ length: 11 }, (_, minutes) => (
+              <button
+                key={minutes}
+                disabled={busy}
+                onClick={() => setStoppageTime(minutes)}
+                style={{
+                  ...stoppageButton,
+                  background: announcedStoppageMinutes(m) === minutes ? "#4FC263" : "#0E0F11",
+                  color: announcedStoppageMinutes(m) === minutes ? "#062" : "#fff",
+                }}
+              >
+                {minutes === 0 ? "None" : `+${minutes}`}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      <StatsEditor matchId={id} home={home} away={away} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
+        {[["home", home], ["away", away]].map(([side, team]) => (
+          <div key={side} style={{ ...card, marginBottom: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
+            </div>
+            <button disabled={busy || !canRecord} onClick={() => beginEvent("goal", side)}
+              style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>
+              ⚽ + GOAL
+            </button>
+            <button disabled={busy || !canCorrect} onClick={() => undoLast("goal", side)}
+              style={{ ...undoButton, opacity: canCorrect ? 1 : 0.45 }}>
+              Undo last goal
+            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button disabled={busy || !canRecord} onClick={() => beginEvent("yellow", side)} style={{ ...half, background: "#3a3410", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>+ Yellow</button>
+              <button disabled={busy || !canRecord} onClick={() => beginEvent("red", side)} style={{ ...half, background: "#3a1616", color: "#F04444", opacity: canRecord ? 1 : 0.45 }}>+ Red</button>
+            </div>
+            <button disabled={busy || !canRecord} onClick={() => setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
+          </div>
+        ))}
+      </div>
+
+      <div style={card}>
+        <MatchStatsBoard
+          home={home}
+          away={away}
+          stats={stats}
+          busy={busy}
+          message={statsMessage}
+          onChange={changeStat}
+          onSave={saveStatistics}
+        />
+      </div>
 
       <div style={card}>
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
-        {events.map((e) => {
-          const emoji = e.type === "goal" ? "⚽" : e.type === "yellow" ? "🟨" : e.type === "red" ? "🟥" : "🔁";
-          const team = teams[sideTeamId(e.side)] || {};
-          return (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
-              <span style={{ fontVariantNumeric: "tabular-nums", color: "#8E939B", width: 42, fontSize: 13 }}>{e.display_minute ?? e.minute}'</span>
-              <span>{emoji}</span>
-              <span style={{ flex: 1, fontSize: 14 }}>
-                {e.type === "sub"
-                  ? <><span style={{ color: "#3FC463" }}>{e.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{e.assist}</span></>
-                  : <>{e.player || <span style={{ color: "#5B6069" }}>Unknown</span>}
-                      {e.type === "goal" && e.home_score_after != null && <span style={{ color: "#4FC263", fontVariantNumeric: "tabular-nums" }}> {e.home_score_after}-{e.away_score_after}</span>}</>}
-                <span style={{ color: "#5B6069" }}> · {team.short || e.side}</span>
-              </span>
-              {!locked && <button onClick={() => askDelete(e.id)} style={{ background: "none", border: "none", color: "#8E939B", cursor: "pointer", fontSize: 12 }}>Delete</button>}
-            </div>
-          );
-        })}
+        {[...events].sort(eventOrder).map((event) => (
+          <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} />
+        ))}
       </div>
 
-      {prompt?.kind === "goal" && <PickPrompt title={`Goal, ${(prompt.side === "home" ? home : away).display_name || (prompt.side === "home" ? home : away).name}`} squad={squads[sideTeamId(prompt.side)] || []} requirePlayer
-        onCancel={() => setPrompt(null)} onPick={(player, playerId) => commit({ type: "goal", side: prompt.side, player, player_id: playerId })} />}
-      {prompt?.kind === "card" && <PickPrompt title={`${prompt.cardType === "yellow" ? "Yellow" : "Red"} card`} squad={squads[sideTeamId(prompt.side)] || []}
-        onCancel={() => setPrompt(null)} onPick={(player, playerId) => commit({ type: prompt.cardType, side: prompt.side, player, player_id: playerId })} />}
-      {prompt?.kind === "sub" && <SubForm squad={squads[sideTeamId(prompt.side)] || []} onCancel={() => setPrompt(null)}
-        onCommit={(on, off) => commit({ type: "sub", side: prompt.side, player: on, assist: off })} />}
-
-      {confirm && (
-        <div style={modalWrap} onClick={() => setConfirm(null)}>
-          <div style={modal} onClick={(e) => e.stopPropagation()}>
-            <div style={{ color: "#8E939B", fontSize: 14, marginBottom: 16 }}>{confirm.body}</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }} onClick={() => setConfirm(null)}>Cancel</button>
-              <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#EF4444", color: "#fff", fontWeight: 800, cursor: "pointer" }} onClick={() => { const y = confirm.onYes; setConfirm(null); y(); }}>Confirm</button>
-            </div>
-          </div>
-        </div>
+      {pending && (
+        <AttributionModal
+          pending={pending}
+          team={pending.side === "home" ? home : away}
+          squad={squads[sideTeamId(pending.side)] || []}
+          busy={busy}
+          onCancel={() => !busy && setPending(null)}
+          onChoose={commitPending}
+        />
       )}
+      {subFor && <SubForm side={subFor} team={subFor === "home" ? home : away} squad={squads[sideTeamId(subFor)] || []} busy={busy} onCancel={() => !busy && setSubFor(null)} onSave={saveSub} />}
     </div>
   );
 }
 
-function PickPrompt({ title, squad, requirePlayer, onCancel, onPick }) {
+function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave }) {
+  const rows = [
+    ["Ball possession (%)", "home_possession", "away_possession"],
+    ["Total shots", "home_total_shots", "away_total_shots"],
+    ["Shots on target", "home_shots_on_target", "away_shots_on_target"],
+    ["Corners", "home_corners", "away_corners"],
+    ["Fouls", "home_fouls", "away_fouls"],
+    ["Offsides", "home_offsides", "away_offsides"],
+    ["Yellow cards", "home_yellow_cards", "away_yellow_cards"],
+    ["Red cards", "home_red_cards", "away_red_cards"],
+  ];
   return (
-    <div style={modalWrap} onClick={onCancel}>
-      <div style={modal} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontWeight: 800, marginBottom: 12, textAlign: "center" }}>{title}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: 280, overflowY: "auto" }}>
-          {squad.map((p) => <button key={p.id} style={ebtn} onClick={() => onPick(p.name, p.id)}>{p.number != null ? `${p.number} ` : ""}{p.name}</button>)}
-        </div>
-        {squad.length === 0 && <div style={{ color: "#5B6069", fontSize: 13, margin: "6px 0" }}>No squad added for this team yet.</div>}
-        <button style={{ ...ebtn, width: "100%", marginTop: 10, color: "#8E939B" }} onClick={() => onPick(requirePlayer ? "Unknown" : null, null)}>{requirePlayer ? "Unknown scorer" : "No player / unknown"}</button>
-        <button style={{ ...ebtn, width: "100%", marginTop: 8, background: "transparent" }} onClick={onCancel}>Cancel</button>
-      </div>
-    </div>
-  );
-}
-function SubForm({ squad, onCancel, onCommit }) {
-  const [on, setOn] = useState(""); const [off, setOff] = useState("");
-  return (
-    <div style={modalWrap} onClick={onCancel}>
-      <div style={modal} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution</div>
-        <label style={flabel}>Player coming on</label>
-        <input list="son" value={on} onChange={(e) => setOn(e.target.value)} style={finp} />
-        <label style={flabel}>Player going off</label>
-        <input list="soff" value={off} onChange={(e) => setOff(e.target.value)} style={finp} />
-        <datalist id="son">{squad.map((p) => <option key={p.id} value={p.name} />)}</datalist>
-        <datalist id="soff">{squad.map((p) => <option key={p.id} value={p.name} />)}</datalist>
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }} onClick={onCancel}>Cancel</button>
-          <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" }} onClick={() => on.trim() && off.trim() && onCommit(on.trim(), off.trim())}>Add</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-function StatsEditor({ matchId, home, away }) {
-  const [values, setValues] = useState({ home: {}, away: {} });
-  const [saved, setSaved] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { getMatchStats(matchId).then((r) => { if (r) setValues({ home: r.home || {}, away: r.away || {} }); }).catch(() => {}); }, [matchId]);
-  function set(side, key, v) { setValues((cur) => ({ ...cur, [side]: { ...cur[side], [key]: v === "" ? undefined : Number(v) } })); }
-  async function save() {
-    setBusy(true); setSaved("");
-    const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && !Number.isNaN(v)));
-    const { error } = await upsertMatchStats(matchId, clean(values.home), clean(values.away));
-    setBusy(false); setSaved(error ? error.message : "Saved. It updates live on the public page.");
-  }
-  return (
-    <div style={card}>
+    <div>
       <div style={label}>MATCH STATISTICS</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#8E939B", fontSize: 12 }}>
-        <span style={{ width: 64, textAlign: "center", fontWeight: 700, color: "#fff" }}>{home.short}</span>
-        <span style={{ flex: 1 }} />
-        <span style={{ width: 64, textAlign: "center", fontWeight: 700, color: "#fff" }}>{away.short}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "80px minmax(140px, 1fr) 80px", gap: 12, alignItems: "center" }}>
+        <strong style={{ textAlign: "center", fontSize: 13 }}>{home.short}</strong>
+        <span />
+        <strong style={{ textAlign: "center", fontSize: 13 }}>{away.short}</strong>
+        {rows.map(([rowLabel, homeKey, awayKey]) => (
+          <div key={rowLabel} style={{ display: "contents" }}>
+            <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[homeKey]} onChange={(event) => onChange(homeKey, event.target.value)} style={statInput} />
+            <span style={{ color: "#AAB0BA", fontSize: 13, textAlign: "center" }}>{rowLabel}</span>
+            <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[awayKey]} onChange={(event) => onChange(awayKey, event.target.value)} style={statInput} />
+          </div>
+        ))}
       </div>
-      {STAT_DEFS.map((d) => (
-        <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
-          <input type="number" value={values.home[d.key] ?? ""} onChange={(e) => set("home", d.key, e.target.value)} style={{ ...finp, width: 64, textAlign: "center", fontVariantNumeric: "tabular-nums" }} />
-          <span style={{ flex: 1, textAlign: "center", fontSize: 13, color: "#8E939B" }}>{d.label}{d.pct ? " (%)" : ""}</span>
-          <input type="number" value={values.away[d.key] ?? ""} onChange={(e) => set("away", d.key, e.target.value)} style={{ ...finp, width: 64, textAlign: "center", fontVariantNumeric: "tabular-nums" }} />
+      <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "#0E0F11", color: "#fff" }}>{busy ? "Saving…" : "Save stats"}</button>
+      {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: 12, marginTop: 8 }}>{message}</div>}
+    </div>
+  );
+}
+
+function statusActions(status, locked) {
+  if (status === "scheduled") return [{ status: "live", label: "Kick off", primary: true }];
+  if (status === "live") return [{ status: "ht", label: "Half time" }, { status: "ft", label: "Full time", primary: true }];
+  if (status === "ht") return [{ status: "live", label: "Start second half", primary: true }, { status: "ft", label: "End match" }];
+  if (status === "et_live") return [{ status: "et_ht", label: "Extra-time break" }, { status: "ft", label: "Full time", primary: true }];
+  if (status === "et_ht") return [{ status: "et_live", label: "Resume extra time", primary: true }, { status: "ft", label: "End match" }];
+  if (status === "ft" && !locked) return [{ status: "ft", label: "Lock full time", primary: true }];
+  return [{ status: "et_live", label: "Start extra time" }];
+}
+
+function clockStatus(match, now) {
+  if (match.status === "live") return `LIVE ${formatMatchClock(match, now)}`;
+  if (match.status === "et_live") return `EXTRA TIME ${formatMatchClock(match, now)}`;
+  if (match.status === "ht") return `HALF TIME · ${formatMatchClock(match, now)}`;
+  if (match.status === "et_ht") return `EXTRA-TIME BREAK · ${formatMatchClock(match, now)}`;
+  if (match.status === "ft" && !match.locked_at) return "FULL TIME · REOPENED";
+  if (match.status === "ft") return "FULL TIME · LOCKED";
+  return "SCHEDULED";
+}
+
+function periodName(period) {
+  if (period === 1) return "First half";
+  if (period === 2) return "Second half";
+  if (period === 3) return "First half of extra time";
+  if (period === 4) return "Second half of extra time";
+  return "Current period";
+}
+
+function eventOrder(a, b) {
+  const aSeconds = a.elapsed_seconds ?? (a.minute == null ? 0 : a.minute * 60);
+  const bSeconds = b.elapsed_seconds ?? (b.minute == null ? 0 : b.minute * 60);
+  return Number(a.period || 1) - Number(b.period || 1)
+    || aSeconds - bSeconds
+    || new Date(a.created_at) - new Date(b.created_at);
+}
+
+function scorerEventMinute(event, match) {
+  const duration = Number(match.competition?.match_duration_minutes || 90);
+  const extraTime = Number(match.competition?.extra_time_minutes || 30);
+  const period = Number(event.period || 1);
+  const minute = Number(event.display_minute ?? event.minute ?? 1);
+  const periodEnd = period === 1 ? duration / 2
+    : period === 2 ? duration
+    : period === 3 ? duration + extraTime / 2
+    : duration + extraTime;
+  return minute > periodEnd ? `${periodEnd}+${minute - periodEnd}′` : `${minute}′`;
+}
+
+function EventRow({ event, match, locked, onRemove }) {
+  const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
+      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
+      <span style={{ fontSize: 14 }}>{emoji}</span>
+      {event.type === "sub" ? (
+        <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
+      ) : (
+        <span style={{ flex: 1, fontSize: 14, color: "#fff" }}>{event.player || (event.type === "goal" ? "Unknown scorer" : "Unknown player")}</span>
+      )}
+      <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
+      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+    </div>
+  );
+}
+
+function AttributionModal({ pending, team, squad, busy, onCancel, onChoose }) {
+  const [query, setQuery] = useState("");
+  const filtered = squad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
+  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Who received the yellow card?" : "Who received the red card?";
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 380, maxHeight: "82vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={team} size={30} /><strong>{title}</strong></div>
+        <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>{pending.type === "goal" ? "The score is shown immediately and saved only after this confirmation." : "Choose a squad player or use the unknown option."}</div>
+        <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
+        <div style={{ display: "grid", gap: 7 }}>
+          {filtered.map((player) => (
+            <button key={player.id} disabled={busy} onClick={() => onChoose(player)} style={playerButton}>
+              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? "–"}</span><span>{player.name}</span>
+            </button>
+          ))}
+          {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
         </div>
-      ))}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
-        <button disabled={busy} style={pill(false)} onClick={save}>{busy ? "Saving." : "Save stats"}</button>
-        {saved && <span style={{ color: /Saved/.test(saved) ? "#4FC263" : "#F04444", fontSize: 12 }}>{saved}</span>}
+        <button disabled={busy} onClick={() => onChoose(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518" }}>{pending.type === "goal" ? "Use Unknown scorer" : "Use Unknown player"}</button>
+        <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
       </div>
     </div>
   );
 }
 
-function Badge({ t, size = 44 }) { return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.34 }}>{t.short}</span>; }
+function SubForm({ side, team, squad, busy, onCancel, onSave }) {
+  const [on, setOn] = useState("");
+  const [off, setOff] = useState("");
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div role="dialog" aria-modal="true" style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution · {team.name}</div>
+        <label style={flabel}>Player coming ON</label>
+        <input list="sub-on" value={on} onChange={(event) => setOn(event.target.value)} style={finp} />
+        <label style={flabel}>Player going OFF</label>
+        <input list="sub-off" value={off} onChange={(event) => setOff(event.target.value)} style={finp} />
+        <datalist id="sub-on">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
+        <datalist id="sub-off">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
+          <button disabled={busy || !on.trim() || !off.trim()} onClick={() => onSave(side, on.trim(), off.trim())} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" }}>Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Badge({ t, size = 40 }) {
+  return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
+}
+
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };
 const label = { color: "#8E939B", fontSize: 12, fontWeight: 700, marginBottom: 10 };
-const pill = (on, danger) => ({ padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", background: on ? "#4FC263" : "#0E0F11", color: on ? "#062" : (danger || "#fff"), fontSize: 13, fontWeight: 700, cursor: "pointer" });
-const ebtn = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const goalButton = { width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: 18, cursor: "pointer", marginBottom: 8 };
+const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid #2A2C30", background: "transparent", color: "#8E939B", fontSize: 12, cursor: "pointer", marginBottom: 10 };
+const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 };
 const flabel = { display: "block", color: "#8E939B", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
 const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
-const modalWrap = { position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 };
-const modal = { background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 360, border: "1px solid #26282B" };
+const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
+const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, textAlign: "center", outline: "none" };

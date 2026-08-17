@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MoreHorizontal, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
@@ -17,6 +17,16 @@ function goalsBySide(events, side) {
 function hasKnownScorer(player) {
   const name = player?.trim().toLowerCase();
   return Boolean(name && !["unknown", "unknown scorer", "unknown player", "n/a", "na"].includes(name));
+}
+
+function MonoFootball({ size = 14 }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} style={{ display: "inline-block", flex: "0 0 auto" }}>
+      <circle cx="12" cy="12" r="10" fill="#FFFFFF" stroke="#111111" strokeWidth="1.5" />
+      <path d="M12 6.3 15.4 8.8 14.1 12.8 9.9 12.8 8.6 8.8Z" fill="#111111" />
+      <path d="m12 6.3-2.1-3.1M8.6 8.8 4.7 9.2M9.9 12.8 7.6 16.2M14.1 12.8l2.3 3.4M15.4 8.8l3.9.4M7.6 16.2l.5 3.8M16.4 16.2l-.5 3.8" fill="none" stroke="#111111" strokeWidth="1.45" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function breakClock(match) {
@@ -43,6 +53,16 @@ export default function MatchCentre({ id }) {
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
   const [now, setNow] = useState(0);
+  const [following, setFollowing] = useState(false);
+
+  async function shareMatch() {
+    const shareData = { title: "Touchline match", url: window.location.href };
+    if (navigator.share) {
+      await navigator.share(shareData).catch(() => {});
+      return;
+    }
+    await navigator.clipboard?.writeText(window.location.href).catch(() => {});
+  }
 
   useEffect(() => {
     let alive = true;
@@ -88,9 +108,15 @@ export default function MatchCentre({ id }) {
             <ChevronLeft size={22} color={t.text} />
           </button>
           <span />
-          <button className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
-            <MoreHorizontal size={20} color={t.text} />
-          </button>
+          <div className="flex items-center rounded-full" style={{ height: 38, background: t.pill, border: `1px solid ${t.divider}` }}>
+            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
+              <Share2 size={18} color={t.text} />
+            </button>
+            <span style={{ width: 1, height: 22, background: t.divider }} />
+            <button aria-label={following ? "Stop following match" : "Follow match"} onClick={() => setFollowing((value) => !value)} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
+              <Star size={19} color={t.text} fill={following ? t.text : "none"} />
+            </button>
+          </div>
         </div>
         <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
           <div className="flex flex-col items-center min-w-0">
@@ -118,8 +144,12 @@ export default function MatchCentre({ id }) {
         </div>
         {(homeScorers || awayScorers) && (
           <div className="grid px-10 pb-2" style={{ gridTemplateColumns: "1fr 1fr", columnGap: 42 }}>
-            <span style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "right" }}>{homeScorers}</span>
-            <span style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "left" }}>{awayScorers}</span>
+            <span className="inline-flex items-start justify-end gap-1" style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "right" }}>
+              {homeScorers}{homeScorers && <MonoFootball size={12} />}
+            </span>
+            <span className="inline-flex items-start gap-1" style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "left" }}>
+              {awayScorers && <MonoFootball size={12} />}{awayScorers}
+            </span>
           </div>
         )}
         <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar" style={{ height: 46, borderBottom: `1px solid ${t.divider}` }}>
@@ -265,7 +295,7 @@ function Ev({ e, t }) {
       <div className="flex-1" style={{ height: 1, background: t.divider }} />
     </div>;
   }
-  const icon = e.type === "goal" ? <span style={{ fontSize: 15 }}>⚽</span>
+  const icon = e.type === "goal" ? <MonoFootball size={16} />
     : e.type === "yellow" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.yellow, display: "inline-block" }} />
     : e.type === "red" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.red, display: "inline-block" }} />
     : <span className="inline-flex flex-col items-center" style={{ gap: 2 }}>
@@ -310,6 +340,27 @@ function eventSortSeconds(event, match) {
   const displayedMinute = Number(event.displayMinute ?? event.m ?? 0);
   const period = Number(event.period || (displayedMinute > duration / 2 ? 2 : 1));
   return period * 100000 + rawEventSeconds(event);
+}
+
+function fotMobMinuteLabel(value) {
+  const label = String(value || "").trim();
+  const addedTime = label.match(/^(\d+)\+(\d+)'?$/);
+  return addedTime ? `${addedTime[1]}'+${addedTime[2]}` : label;
+}
+
+function finalWhistleMinute(match) {
+  const duration = Number(match.matchDurationMinutes || 90);
+  const extraTime = Number(match.extraTimeMinutes || 30);
+  const period = Number(match.current_period || 2);
+  const extraTimePlayed = period >= 3;
+  const endMinute = extraTimePlayed ? duration + extraTime : duration;
+  const announced = extraTimePlayed
+    ? Number(match.extra_time_second_half_stoppage_minutes || 0)
+    : Number(match.second_half_stoppage_minutes || 0);
+  const elapsedSeconds = Number(match.clock_elapsed_seconds || 0);
+  const elapsedMinute = elapsedSeconds > 0 ? Math.ceil(elapsedSeconds / 60) : endMinute;
+  const added = Math.max(0, announced, elapsedMinute - endMinute);
+  return added > 0 ? `${endMinute}'+${added}` : `${endMinute}'`;
 }
 
 function goalCommentary(event, match, home, away) {
@@ -380,8 +431,14 @@ function Commentary({ t, m, d, h, a }) {
     const sort = eventSortSeconds(e, m);
     if (e.type === "half") return { sort, m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
     if (e.type === "goal") return { sort, m: e.min, text: goalCommentary(e, m, h, a) };
-    if (e.type === "yellow") return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Yellow card shown to ${e.player}.` : "Yellow card." };
-    if (e.type === "red") return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Red card! ${e.player} is sent off.` : "Red card." };
+    if (e.type === "yellow") {
+      const team = e.side === "away" ? a : h;
+      return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Yellow card shown to ${e.player} (${team.name}).` : `Yellow card for ${team.name}.` };
+    }
+    if (e.type === "red") {
+      const team = e.side === "away" ? a : h;
+      return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Red card! ${e.player} (${team.name}) is sent off.` : `Red card for ${team.name}.` };
+    }
     if (e.type === "sub") {
       const playerOn = hasKnownScorer(e.player) ? e.player : null;
       const playerOff = hasKnownScorer(e.assist) ? e.assist : null;
@@ -393,17 +450,33 @@ function Commentary({ t, m, d, h, a }) {
     }
     return { sort, m: e.min, text: "" };
   });
-  const lines = [...eventLines, ...commentaryMilestones(m, !d.events.some((event) => event.type === "half"))]
+  const fullTimeLines = m.status === "ft" ? [
+    {
+      sort: 900000002,
+      m: null,
+      text: `Match ends, ${h.name} ${m.hs}, ${a.name} ${m.as}.`,
+    },
+    {
+      sort: 900000001,
+      m: finalWhistleMinute(m),
+      text: `${Number(m.current_period || 2) >= 3 ? "Second half of extra time" : "Second half"} ends, ${h.name} ${m.hs}, ${a.name} ${m.as}.`,
+    },
+  ] : [];
+  const lines = [...eventLines, ...commentaryMilestones(m, !d.events.some((event) => event.type === "half")), ...fullTimeLines]
     .filter((line) => line.text)
     .sort((x, y) => y.sort - x.sort);
-  return <Card t={t} style={{ paddingTop: 6, paddingBottom: 8 }}>
-    {lines.map((l, i) => (
-      <div key={i} className="flex gap-3 px-4 py-3" style={{ borderTop: i ? `1px solid ${t.divider}` : "none" }}>
-        <span className="font-mono shrink-0" style={{ color: t.dim, fontSize: 13, fontWeight: 700, width: 34 }}>{l.m}</span>
-        <span style={{ color: t.text, fontSize: 14 }}>{l.text}</span>
+  return <div className="px-2 py-1">
+    {lines.map((line, index) => (
+      <div key={`${line.sort}-${index}`} className="rounded-2xl px-4 py-4" style={{ background: t.card, marginBottom: 8 }}>
+        {line.m && (
+          <div style={{ color: t.text, fontSize: 14, lineHeight: 1.2, fontWeight: 800, marginBottom: 12 }}>
+            {fotMobMinuteLabel(line.m)}
+          </div>
+        )}
+        <div style={{ color: t.text, fontSize: 15, lineHeight: 1.55, fontWeight: 600 }}>{line.text}</div>
       </div>
     ))}
-  </Card>;
+  </div>;
 }
 
 // ---------- Table ----------

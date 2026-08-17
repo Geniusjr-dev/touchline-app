@@ -150,7 +150,15 @@ export default function Scorer() {
 
   function changeStat(key, value) {
     const parsed = Number(value);
-    setStats((current) => ({ ...current, [key]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0 }));
+    const nextValue = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    setStats((current) => {
+      if (key === "home_possession" || key === "away_possession") {
+        const possession = Math.min(100, Math.round(nextValue));
+        const oppositeKey = key === "home_possession" ? "away_possession" : "home_possession";
+        return { ...current, [key]: possession, [oppositeKey]: 100 - possession };
+      }
+      return { ...current, [key]: nextValue };
+    });
     setStatsMessage("");
   }
 

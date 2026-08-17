@@ -4,13 +4,6 @@ import Link from "next/link";
 import { listTeams, listCompetitions, listCompetitionTeams, listMatches, listScorers, listMatchScorers, replaceMatchScorer, createMatch } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 
-function localDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export default function Matches() {
   const { user, role, activeOrganizationId } = useAuth();
   const [teams, setTeams] = useState([]);
@@ -23,7 +16,7 @@ export default function Matches() {
   const [comp, setComp] = useState("");
   const [groupNumber, setGroupNumber] = useState("");
   const [competitionTeams, setCompetitionTeams] = useState([]);
-  const [matchDate, setMatchDate] = useState(() => localDateKey());
+  const [matchDate, setMatchDate] = useState("");
   const [kickoff, setKickoff] = useState("");
   const [err, setErr] = useState("");
 
@@ -67,8 +60,9 @@ export default function Matches() {
     if (!comp) return setErr("Choose a friendly, league or tournament competition.");
     if (!home || !away || home === away) return setErr("Pick two different teams.");
     if (!matchDate) return setErr("Choose the match date.");
+    if (!kickoff) return setErr("Choose the kick-off time.");
     if (selectedCompetition?.competition_type === "tournament" && !groupNumber) return setErr("Choose the tournament group for this match.");
-    const { error } = await createMatch(activeOrganizationId, comp, home, away, kickoff.trim() || null, matchDate, groupNumber ? Number(groupNumber) : null);
+    const { error } = await createMatch(activeOrganizationId, comp, home, away, kickoff, matchDate, groupNumber ? Number(groupNumber) : null);
     if (error) return setErr(error.message);
     setHome(""); setAway(""); setKickoff(""); load();
   }
@@ -120,8 +114,31 @@ export default function Matches() {
               {eligibleTeams.filter((team) => team.id !== home).map((t) => <option key={t.id} value={t.id}>{t.display_name || t.name}</option>)}
             </select>
           </Field>
-          <Field label="Match date"><input type="date" required value={matchDate} onChange={(e) => setMatchDate(e.target.value)} style={inp} /></Field>
-          <Field label="Kick-off time (e.g. 16:00)"><input value={kickoff} onChange={(e) => setKickoff(e.target.value)} placeholder="16:00" style={inp} /></Field>
+          <Field label="Match date">
+            <input
+              type="date"
+              required
+              value={matchDate}
+              onChange={(event) => setMatchDate(event.target.value)}
+              onClick={openNativePicker}
+              onKeyDown={preventManualPickerEntry}
+              aria-label="Choose match date"
+              style={pickerInput}
+            />
+          </Field>
+          <Field label="Kick-off time">
+            <input
+              type="time"
+              required
+              step="300"
+              value={kickoff}
+              onChange={(event) => setKickoff(event.target.value)}
+              onClick={openNativePicker}
+              onKeyDown={preventManualPickerEntry}
+              aria-label="Choose kick-off time"
+              style={pickerInput}
+            />
+          </Field>
           <button type="submit" style={btn}>Create match</button>
           {selectedCompetition && selectedCompetition.competition_type !== "friendly" && eligibleTeams.length === 0 && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 8 }}>No teams are registered for {selectedCompetition.competition_type === "tournament" ? "this group" : "this league"}. Configure them under Competitions first.</div>}
           <div style={{ marginTop: 10 }}><Link href="/admin/competitions" style={{ color: "#4FC263", fontSize: 12, fontWeight: 700 }}>Manage competition formats and teams →</Link></div>
@@ -152,8 +169,19 @@ export default function Matches() {
   );
 }
 function statusColor(s) { return s === "live" ? "#F04444" : s === "ft" ? "#8E939B" : s === "ht" ? "#F5C518" : "#4FC263"; }
+function openNativePicker(event) {
+  if (typeof event.currentTarget.showPicker === "function") event.currentTarget.showPicker();
+}
+function preventManualPickerEntry(event) {
+  if (["Tab", "Shift", "Escape"].includes(event.key)) return;
+  event.preventDefault();
+  if (["Enter", " "].includes(event.key) && typeof event.currentTarget.showPicker === "function") {
+    event.currentTarget.showPicker();
+  }
+}
 function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 600 }}>{label}</span>{children}</label>; }
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
 const h3 = { fontSize: 15, fontWeight: 700, marginBottom: 12 };
 const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
+const pickerInput = { ...inp, colorScheme: "dark", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };

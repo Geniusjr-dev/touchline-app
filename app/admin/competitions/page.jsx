@@ -1,6 +1,15 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { addCompetition, listCompetitions, listCompetitionTeams, listTeams, removeCompetitionTeam, setCompetitionTeam, updateCompetition } from "@/lib/db";
+import {
+  addCompetition,
+  deleteCompetition,
+  listCompetitions,
+  listCompetitionTeams,
+  listTeams,
+  removeCompetitionTeam,
+  setCompetitionTeam,
+  updateCompetition,
+} from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 
 const groupName = (number) => `Group ${String.fromCharCode(64 + Number(number))}`;
@@ -21,10 +30,17 @@ export default function CompetitionsPage() {
   const load = useCallback(async () => {
     if (!activeOrganizationId) return;
     try {
-      const [nextCompetitions, nextTeams] = await Promise.all([listCompetitions(activeOrganizationId), listTeams(activeOrganizationId)]);
-      setCompetitions(nextCompetitions); setTeams(nextTeams);
-    } catch (loadError) { setError(loadError.message || "Could not load competitions."); }
+      const [nextCompetitions, nextTeams] = await Promise.all([
+        listCompetitions(activeOrganizationId),
+        listTeams(activeOrganizationId),
+      ]);
+      setCompetitions(nextCompetitions);
+      setTeams(nextTeams);
+    } catch (loadError) {
+      setError(loadError.message || "Could not load competitions.");
+    }
   }, [activeOrganizationId]);
+
   useEffect(() => { load(); }, [load]);
 
   async function create(e) {
@@ -33,16 +49,26 @@ export default function CompetitionsPage() {
     setBusy(true); setError("");
     const groups = format === "tournament" ? Number(groupCount) : 0;
     const perGroup = format === "tournament" ? Number(teamsPerGroup) : 0;
-    const { error: createError } = await addCompetition(activeOrganizationId, name.trim(), sub.trim() || null, Number(duration), format, groups, perGroup);
+    const { error: createError } = await addCompetition(
+      activeOrganizationId,
+      name.trim(),
+      sub.trim() || null,
+      Number(duration),
+      format,
+      groups,
+      perGroup
+    );
     setBusy(false);
     if (createError) return setError(createError.message);
-    setName(""); setSub(""); setFormat("friendly"); setDuration("90"); setGroupCount("4"); setTeamsPerGroup("4"); load();
+    setName(""); setSub(""); setFormat("friendly"); setDuration("90"); setGroupCount("4"); setTeamsPerGroup("4");
+    load();
   }
 
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Competitions</h1>
       <p style={{ color: "#8E939B", fontSize: 13, marginBottom: 16 }}>Choose the football format first. The format controls fixtures, team registration and whether a table is shown.</p>
+
       <form onSubmit={create} style={{ ...card, marginBottom: 18 }}>
         <div style={h3}>New competition</div>
         <div style={grid}>
@@ -50,9 +76,9 @@ export default function CompetitionsPage() {
           <Field label="Sub-label (optional)"><input value={sub} onChange={(e) => setSub(e.target.value)} placeholder="2026 season" style={inp} /></Field>
           <Field label="Format">
             <select value={format} onChange={(e) => setFormat(e.target.value)} style={inp}>
-              <option value="friendly">Friendly, no table</option>
-              <option value="league">League, one overall table</option>
-              <option value="tournament">Tournament, group tables</option>
+              <option value="friendly">Friendly — no table</option>
+              <option value="league">League — one overall table</option>
+              <option value="tournament">Tournament — group tables</option>
             </select>
           </Field>
           <Field label="Match duration">
@@ -66,13 +92,16 @@ export default function CompetitionsPage() {
           </>}
         </div>
         <div style={{ color: "#8E939B", fontSize: 12, margin: "2px 0 12px" }}>
-          {format === "friendly" ? "Friendly matches never show a Table tab." : format === "league" ? "Every registered team appears in one overall league table." : `${groupCount || 0} groups by ${teamsPerGroup || 0} teams. Each match shows only its group table.`}
+          {format === "friendly" ? "Friendly matches never show a Table tab." : format === "league" ? "Every registered team appears in one overall league table." : `${groupCount || 0} groups × ${teamsPerGroup || 0} teams. Each match shows only its group table.`}
         </div>
-        <button type="submit" disabled={busy} style={btn}>{busy ? "Creating." : "Create competition"}</button>
+        <button type="submit" disabled={busy} style={btn}>{busy ? "Creating…" : "Create competition"}</button>
       </form>
+
       {error && <div style={errorBox}>{error}</div>}
       {competitions.length === 0 && <div style={{ ...card, color: "#8E939B", fontSize: 14 }}>No competitions yet.</div>}
-      {competitions.map((competition) => <CompetitionEditor key={competition.id} competition={competition} teams={teams} onSaved={load} />)}
+      {competitions.map((competition) => (
+        <CompetitionEditor key={competition.id} competition={competition} teams={teams} onSaved={load} />
+      ))}
     </div>
   );
 }
@@ -98,11 +127,17 @@ function CompetitionEditor({ competition, teams, onSaved }) {
     e.preventDefault();
     const groups = format === "tournament" ? Number(groupCount) : 0;
     const perGroup = format === "tournament" ? Number(teamsPerGroup) : 0;
-    if (format === "tournament" && entries.some((entry) => Number(entry.group_number) > groups)) return setMessage("Move teams out of groups above the new group limit first.");
+    if (format === "tournament" && entries.some((entry) => Number(entry.group_number) > groups)) {
+      return setMessage("Move teams out of groups above the new group limit first.");
+    }
     const { error } = await updateCompetition(competition.id, name.trim(), sub.trim() || null, Number(duration), format, groups, perGroup);
     if (error) return setMessage(error.message);
-    if (format !== "tournament") await Promise.all(entries.filter((entry) => entry.group_number).map((entry) => setCompetitionTeam(competition.id, entry.team_id, null)));
-    setMessage("Competition settings saved."); await loadEntries(); onSaved();
+    if (format !== "tournament") {
+      await Promise.all(entries.filter((entry) => entry.group_number).map((entry) => setCompetitionTeam(competition.id, entry.team_id, null)));
+    }
+    setMessage("Competition settings saved.");
+    await loadEntries();
+    onSaved();
   }
 
   async function changeRegistration(teamId, value) {
@@ -124,13 +159,22 @@ function CompetitionEditor({ competition, teams, onSaved }) {
     if (!current && value) setMessage("Team registered.");
   }
 
+  async function removeCompetition() {
+    const confirmed = window.confirm(`Delete ${competition.name}? Its existing matches will remain in Touchline without this competition label.`);
+    if (!confirmed) return;
+    setMessage("");
+    const { error } = await deleteCompetition(competition.id);
+    if (error) return setMessage(error.message);
+    onSaved();
+  }
+
   const entryByTeam = Object.fromEntries(entries.map((entry) => [entry.team_id, entry]));
   return (
     <div style={{ ...card, padding: 0, marginBottom: 12, overflow: "hidden" }}>
       <button type="button" onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "#fff", cursor: "pointer" }}>
         <span style={{ fontSize: 15, fontWeight: 750, textAlign: "left", flex: 1 }}>{competition.name}</span>
         <span style={formatPill(competition.competition_type)}>{competition.competition_type || "tournament"}</span>
-        <span style={{ color: "#8E939B" }}>{open ? "Close" : "Open"}</span>
+        <span style={{ color: "#8E939B" }}>{open ? "▲" : "▼"}</span>
       </button>
       {open && <div style={{ padding: 16, borderTop: "1px solid #26282B" }}>
         <form onSubmit={saveSettings}>
@@ -141,8 +185,12 @@ function CompetitionEditor({ competition, teams, onSaved }) {
             <Field label="Duration"><select value={duration} onChange={(e) => setDuration(e.target.value)} style={inp}>{[60, 70, 80, 90].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></Field>
             {format === "tournament" && <><Field label="Groups"><input type="number" min="1" max="26" value={groupCount} onChange={(e) => setGroupCount(e.target.value)} style={inp} /></Field><Field label="Teams per group"><input type="number" min="2" max="32" value={teamsPerGroup} onChange={(e) => setTeamsPerGroup(e.target.value)} style={inp} /></Field></>}
           </div>
-          <button type="submit" style={btn}>Save settings</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button type="submit" style={btn}>Save settings</button>
+            <button type="button" onClick={removeCompetition} style={dangerBtn}>Delete competition</button>
+          </div>
         </form>
+
         <div style={{ fontSize: 14, fontWeight: 750, margin: "18px 0 4px" }}>{format === "tournament" ? "Assign teams to groups" : "Register teams"}</div>
         <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 8 }}>{format === "friendly" ? "Registration is optional for friendly competitions." : format === "league" ? "All registered teams appear in the overall table, including teams that have not played yet." : "A group cannot exceed the configured teams-per-group limit."}</div>
         <div style={{ border: "1px solid #26282B", borderRadius: 10, overflow: "hidden" }}>
@@ -178,4 +226,5 @@ const card = { background: "#161719", border: "1px solid #26282B", borderRadius:
 const h3 = { fontSize: 15, fontWeight: 750, marginBottom: 12 };
 const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
+const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", fontWeight: 800, cursor: "pointer" };
 const errorBox = { color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 };

@@ -56,7 +56,7 @@ function scoreForTeam(match, teamId) {
   return match.home === teamId ? [match.hs, match.as] : [match.as, match.hs];
 }
 
-function Photo({ src, name, size = 46, color = "#30343A" }) {
+function Photo({ src, name, size = 40, color = "#30343A" }) {
   const initials = name?.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "?";
   return (
     <span className="inline-flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: size, height: size, background: color, color: "#fff", fontSize: size * 0.3, fontWeight: 800 }}>
@@ -107,30 +107,30 @@ export default function TeamCentre({ id }) {
   return (
     <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
       <header style={{ background: t.card }}>
-        <div className="flex items-center justify-between px-4" style={{ height: 70 }}>
-          <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 44, height: 44, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
-            <ChevronLeft size={26} />
+        <div className="flex items-center justify-between px-3" style={{ height: 56 }}>
+          <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+            <ChevronLeft size={22} />
           </button>
-          <div className="flex items-center rounded-full" style={{ height: 46, padding: 4, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
-            <span className="flex items-center justify-center" style={{ width: 39 }}><ShieldCheck size={22} /></span>
-            <span className="flex items-center justify-center" style={{ width: 39 }}><Bell size={21} /></span>
-            <button onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 36, padding: "0 18px", background: following ? t.accent : t.text, color: following ? "#07130B" : t.bg, fontWeight: 850, fontSize: 14 }}>
+          <div className="flex items-center rounded-full" style={{ height: 40, padding: 3, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+            <span className="flex items-center justify-center" style={{ width: 34 }}><ShieldCheck size={19} /></span>
+            <span className="flex items-center justify-center" style={{ width: 34 }}><Bell size={18} /></span>
+            <button onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: following ? t.accent : t.text, color: following ? "#07130B" : t.bg, fontWeight: 850, fontSize: 12.5 }}>
               {following ? "Following" : "Follow"}
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-5 px-6" style={{ minHeight: 170, paddingBottom: 24 }}>
-          <Crest short={team.short} color={team.color} logo={team.logoUrl} size={82} ring={t.divider} />
+        <div className="flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
+          <Crest short={team.short} color={team.color} logo={team.logoUrl} size={64} ring={t.divider} />
           <div className="min-w-0">
-            <h1 style={{ fontSize: 32, lineHeight: 1.08, fontWeight: 900, margin: 0 }}>{team.fullName}</h1>
-            <div style={{ color: t.dim, fontSize: 19, fontWeight: 700, marginTop: 8 }}>{team.country}</div>
+            <h1 style={{ fontSize: 24, lineHeight: 1.08, fontWeight: 850, margin: 0 }}>{team.fullName}</h1>
+            <div style={{ color: t.dim, fontSize: 14, fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
-        <nav className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 58, borderTop: `1px solid ${t.divider}` }}>
+        <nav className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
           {TABS.map((item) => (
-            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 18px", color: tab === item ? t.text : t.tab, fontSize: 16, fontWeight: tab === item ? 850 : 700 }}>
+            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: tab === item ? t.text : t.tab, fontSize: 14, fontWeight: tab === item ? 800 : 650 }}>
               {item}
-              {tab === item && <span className="absolute left-4 right-4 bottom-0 rounded-full" style={{ height: 4, background: t.accent }} />}
+              {tab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: t.accent }} />}
             </button>
           ))}
         </nav>
@@ -151,14 +151,14 @@ export default function TeamCentre({ id }) {
 }
 
 function Card({ t, children, style }) {
-  return <section className="mx-3 mb-3 rounded-2xl overflow-hidden" style={{ background: t.card, ...style }}>{children}</section>;
+  return <section className="mx-3 mb-3 overflow-hidden" style={{ background: t.card, borderRadius: 14, ...style }}>{children}</section>;
 }
 
 function SectionTitle({ children, action, t }) {
   return (
-    <div className="flex items-center justify-between" style={{ padding: "18px 18px 12px" }}>
-      <h2 style={{ margin: 0, color: t.text, fontSize: 19, fontWeight: 900 }}>{children}</h2>
-      {action && <button onClick={action} aria-label="Open section"><ChevronRight size={22} color={t.dim} /></button>}
+    <div className="flex items-center justify-between" style={{ padding: "15px 16px 10px" }}>
+      <h2 style={{ margin: 0, color: t.text, fontSize: 16, fontWeight: 800 }}>{children}</h2>
+      {action && <button onClick={action} aria-label="Open section"><ChevronRight size={19} color={t.dim} /></button>}
     </div>
   );
 }
@@ -183,16 +183,16 @@ function Overview({ state, t, onMatches }) {
       {form.length > 0 && (
         <Card t={t}>
           <SectionTitle t={t} action={onMatches}>Team form</SectionTitle>
-          <div className="grid px-4 pb-5" style={{ gridTemplateColumns: `repeat(${form.length}, minmax(0, 1fr))`, gap: 8 }}>
+          <div className="flex items-start overflow-x-auto no-scrollbar px-4 pb-4" style={{ gap: 22 }}>
             {form.map((match) => {
               const opponentId = match.home === team.id ? match.away : match.home;
               const opponent = teams[opponentId];
               const [scored, conceded] = scoreForTeam(match, team.id);
               const resultColor = match.result === "W" ? t.green : match.result === "L" ? t.red : t.drawPill;
               return (
-                <Link href={`/match/${match.id}`} key={match.id} className="flex flex-col items-center gap-3 min-w-0">
-                  <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "5px 8px", fontSize: 14, fontWeight: 850, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
-                  <Crest short={opponent?.short || "?"} color={opponent?.color || "#555"} logo={opponent?.logoUrl} size={34} ring={t.divider} />
+                <Link href={`/match/${match.id}`} key={match.id} className="flex flex-col items-center shrink-0" style={{ gap: 8, width: 48 }}>
+                  <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "4px 7px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
+                  <Crest short={opponent?.short || "?"} color={opponent?.color || "#555"} logo={opponent?.logoUrl} size={30} ring={t.divider} />
                 </Link>
               );
             })}
@@ -239,15 +239,15 @@ function TeamMatchLine({ match, teams, t, large = false }) {
   const away = teams[match.away] || { name: "TBD", short: "?", color: "#555" };
   const score = match.status === "scheduled" ? (match.time || "—") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
   return (
-    <Link href={`/match/${match.id}`} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 12 : 9, minHeight: large ? 105 : 82, padding: "14px 18px" }}>
+    <Link href={`/match/${match.id}`} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">
-        <span className="text-right" style={{ color: t.text, fontSize: large ? 16 : 14, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
-        <Crest short={home.short} color={home.color} logo={home.logoUrl} size={large ? 40 : 31} ring={t.divider} />
+        <span className="text-right" style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
+        <Crest short={home.short} color={home.color} logo={home.logoUrl} size={large ? 34 : 28} ring={t.divider} />
       </div>
-      <span style={{ color: match.status === "live" ? t.green : match.status === "scheduled" ? t.dim : t.text, fontSize: large ? 19 : 15, fontWeight: 850, whiteSpace: "nowrap" }}>{score}</span>
+      <span style={{ color: match.status === "live" ? t.green : match.status === "scheduled" ? t.dim : t.text, fontSize: large ? 16 : 14, fontWeight: 800, whiteSpace: "nowrap" }}>{score}</span>
       <div className="flex items-center gap-2 min-w-0">
-        <Crest short={away.short} color={away.color} logo={away.logoUrl} size={large ? 40 : 31} ring={t.divider} />
-        <span style={{ color: t.text, fontSize: large ? 16 : 14, fontWeight: 700, lineHeight: 1.15 }}>{away.name}</span>
+        <Crest short={away.short} color={away.color} logo={away.logoUrl} size={large ? 34 : 28} ring={t.divider} />
+        <span style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{away.name}</span>
       </div>
     </Link>
   );
@@ -286,7 +286,7 @@ function Stats({ state, t }) {
   return (
     <>
       <Card t={t} style={{ padding: 18 }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 900 }}>Team statistics</h2>
+        <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 800 }}>Team statistics</h2>
         <div style={{ color: t.dim, fontSize: 12.5, marginBottom: 8 }}>Average possession</div>
         <div className="rounded-full overflow-hidden" style={{ height: 32, background: t.track }}>
           <div className="flex items-center px-3 h-full" style={{ width: `${Math.max(4, Math.min(100, s.averagePossession))}%`, background: t.accent, color: "#07130B", fontWeight: 900 }}>{s.averagePossession}%</div>
@@ -296,7 +296,7 @@ function Stats({ state, t }) {
         <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
           {metrics.map(([label, value]) => (
             <div key={label} style={{ padding: "15px 12px", borderBottom: `1px solid ${t.divider}` }}>
-              <div style={{ fontSize: 24, fontWeight: 900 }}>{value}</div>
+              <div style={{ fontSize: 20, fontWeight: 850 }}>{value}</div>
               <div style={{ color: t.dim, fontSize: 12.5, marginTop: 3 }}>{label}</div>
             </div>
           ))}
@@ -322,13 +322,13 @@ function Squad({ state, t }) {
     <>
       {state.team.coach && (
         <Card t={t}>
-          <div className="flex justify-between px-5 pt-4"><strong style={{ fontSize: 16 }}>Coach</strong><span style={{ color: t.dim, fontSize: 12 }}>Age</span></div>
+          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: 14 }}>Coach</strong><span style={{ color: t.dim, fontSize: 11.5 }}>Age</span></div>
           <PersonRow person={state.team.coach} t={t} />
         </Card>
       )}
       {grouped.map(([name, players]) => (
         <Card t={t} key={name}>
-          <div className="flex justify-between px-5 pt-4"><strong style={{ fontSize: 16 }}>{name}</strong><span style={{ color: t.dim, fontSize: 12 }}>Age</span></div>
+          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: 14 }}>{name}</strong><span style={{ color: t.dim, fontSize: 11.5 }}>Age</span></div>
           {players.map((player) => <PersonRow key={player.id} person={player} t={t} player />)}
         </Card>
       ))}
@@ -340,13 +340,13 @@ function Squad({ state, t }) {
 function PersonRow({ person, t, player = false }) {
   const age = ageFromDate(person.dateOfBirth);
   return (
-    <div className="flex items-center gap-3 px-5" style={{ minHeight: 76 }}>
+    <div className="flex items-center gap-3 px-4" style={{ minHeight: 68 }}>
       <Photo src={person.photoUrl} name={person.name} />
       <div className="min-w-0 flex-1">
-        <div style={{ color: t.text, fontSize: 15, fontWeight: 750 }}>{player && person.number != null ? `${person.number} ` : ""}{person.name}</div>
-        {person.country && <div style={{ color: t.dim, fontSize: 13, marginTop: 4 }}>{flagFor(person.country)} <span style={{ marginLeft: 5 }}>{person.country}</span></div>}
+        <div style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{player && person.number != null ? `${person.number} ` : ""}{person.name}</div>
+        {person.country && <div style={{ color: t.dim, fontSize: 12, marginTop: 3 }}>{flagFor(person.country)} <span style={{ marginLeft: 4 }}>{person.country}</span></div>}
       </div>
-      <span style={{ color: t.text, fontSize: 15, fontWeight: 650 }}>{age ?? ""}</span>
+      <span style={{ color: t.text, fontSize: 14, fontWeight: 650 }}>{age ?? ""}</span>
     </div>
   );
 }
@@ -356,11 +356,11 @@ function Trophies({ state, t }) {
     <Card t={t}>
       <SectionTitle t={t}>Trophies</SectionTitle>
       {state.trophies.length > 0 ? state.trophies.map((trophy) => (
-        <div key={trophy.id} className="flex items-center gap-4 px-5" style={{ minHeight: 90, borderTop: `1px solid ${t.divider}` }}>
-          {trophy.imageUrl ? <Photo src={trophy.imageUrl} name={trophy.name} size={54} color="transparent" /> : <span className="flex items-center justify-center rounded-full" style={{ width: 54, height: 54, background: t.chip }}><Trophy size={28} color={t.yellow} /></span>}
+        <div key={trophy.id} className="flex items-center gap-3 px-4" style={{ minHeight: 76, borderTop: `1px solid ${t.divider}` }}>
+          {trophy.imageUrl ? <Photo src={trophy.imageUrl} name={trophy.name} size={46} color="transparent" /> : <span className="flex items-center justify-center rounded-full" style={{ width: 46, height: 46, background: t.chip }}><Trophy size={24} color={t.yellow} /></span>}
           <div className="flex-1">
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{trophy.name}</div>
-            {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: 13, marginTop: 5 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
+            <div style={{ fontSize: 14, fontWeight: 750 }}>{trophy.name}</div>
+            {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: 12, marginTop: 4 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
           </div>
         </div>
       )) : <div style={{ height: 110 }} />}

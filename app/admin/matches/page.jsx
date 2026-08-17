@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { listTeams, listCompetitions, listCompetitionTeams, listMatches, listScorers, listMatchScorers, replaceMatchScorer, createMatch, deleteMatch } from "@/lib/db";
+import { listTeams, listCompetitions, listCompetitionTeams, listMatches, listScorers, listMatchScorers, replaceMatchScorer, createMatch } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 
 function localDateKey(date = new Date()) {
@@ -26,32 +26,44 @@ export default function Matches() {
   const [matchDate, setMatchDate] = useState(() => localDateKey());
   const [kickoff, setKickoff] = useState("");
   const [err, setErr] = useState("");
-  const [confirmDel, setConfirmDel] = useState(null);
 
   const load = useCallback(async () => {
     if (!activeOrganizationId) return;
     try {
       const [nextTeams, nextComps, nextMatches] = await Promise.all([
-        listTeams(activeOrganizationId), listCompetitions(activeOrganizationId), listMatches(activeOrganizationId, role, user?.id),
+        listTeams(activeOrganizationId),
+        listCompetitions(activeOrganizationId),
+        listMatches(activeOrganizationId, role, user?.id),
       ]);
-      setTeams(nextTeams); setComps(nextComps); setMatches(nextMatches);
+      setTeams(nextTeams);
+      setComps(nextComps);
+      setMatches(nextMatches);
       if (role === "admin") {
-        const [nextScorers, nextAssignments] = await Promise.all([listScorers(activeOrganizationId), listMatchScorers(nextMatches.map((match) => match.id))]);
-        setScorers(nextScorers); setAssignments(nextAssignments);
+        const [nextScorers, nextAssignments] = await Promise.all([
+          listScorers(activeOrganizationId),
+          listMatchScorers(nextMatches.map((match) => match.id)),
+        ]);
+        setScorers(nextScorers);
+        setAssignments(nextAssignments);
       }
-    } catch (error) { setErr(error.message || "Could not load matches."); }
+    } catch (error) {
+      setErr(error.message || "Could not load matches.");
+    }
   }, [activeOrganizationId, role, user]);
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     let alive = true;
     if (!comp) { setCompetitionTeams([]); return undefined; }
-    listCompetitionTeams(comp).then((entries) => { if (alive) setCompetitionTeams(entries); }).catch((error) => { if (alive) setErr(error.message || "Could not load competition teams."); });
+    listCompetitionTeams(comp)
+      .then((entries) => { if (alive) setCompetitionTeams(entries); })
+      .catch((error) => { if (alive) setErr(error.message || "Could not load competition teams."); });
     return () => { alive = false; };
   }, [comp]);
 
   async function make(e) {
-    e.preventDefault(); setErr("");
+    e.preventDefault();
+    setErr("");
     if (!comp) return setErr("Choose a friendly, league or tournament competition.");
     if (!home || !away || home === away) return setErr("Pick two different teams.");
     if (!matchDate) return setErr("Choose the match date.");
@@ -66,42 +78,45 @@ export default function Matches() {
     if (error) return setErr(error.message);
     setAssignments((current) => ({ ...current, [matchId]: scorerId ? [scorerId] : [] }));
   }
-  async function doDelete(id) { const { error } = await deleteMatch(id); setConfirmDel(null); if (error) return setErr(error.message); load(); }
-
-  const teamName = (id) => teams.find((t) => t.id === id)?.name || "TBD";
+  const teamName = (id) => teams.find((t) => t.id === id)?.name || "—";
   const selectedCompetition = comps.find((competition) => competition.id === comp);
-  const registeredTeamIds = new Set(competitionTeams.filter((entry) => selectedCompetition?.competition_type !== "tournament" || Number(entry.group_number) === Number(groupNumber)).map((entry) => entry.team_id));
-  const eligibleTeams = selectedCompetition?.competition_type === "friendly" ? teams : teams.filter((team) => registeredTeamIds.has(team.id));
+  const registeredTeamIds = new Set(competitionTeams
+    .filter((entry) => selectedCompetition?.competition_type !== "tournament" || Number(entry.group_number) === Number(groupNumber))
+    .map((entry) => entry.team_id));
+  const eligibleTeams = selectedCompetition?.competition_type === "friendly"
+    ? teams
+    : teams.filter((team) => registeredTeamIds.has(team.id));
 
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{role === "admin" ? "Matches" : "Assigned matches"}</h1>
+
       {role === "admin" && <div style={{ marginBottom: 20 }}>
         <form onSubmit={make} style={card}>
           <div style={h3}>New match</div>
           <Field label="Competition">
             <select value={comp} onChange={(e) => { setComp(e.target.value); setGroupNumber(""); setHome(""); setAway(""); }} style={inp}>
-              <option value="">Choose format and competition</option>
+              <option value="">— choose format and competition —</option>
               {comps.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.competition_type || "tournament"}{c.sub ? ` · ${c.sub}` : ""}</option>)}
             </select>
           </Field>
           {selectedCompetition?.competition_type === "tournament" && (
             <Field label="Tournament group">
               <select value={groupNumber} onChange={(e) => { setGroupNumber(e.target.value); setHome(""); setAway(""); }} style={inp}>
-                <option value="">Choose group</option>
+                <option value="">— choose group —</option>
                 {Array.from({ length: Number(selectedCompetition.group_count) || 0 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Group {String.fromCharCode(64 + number)}</option>)}
               </select>
             </Field>
           )}
           <Field label="Home team">
             <select value={home} onChange={(e) => setHome(e.target.value)} style={inp}>
-              <option value="">Pick a team</option>
+              <option value="">— pick —</option>
               {eligibleTeams.map((t) => <option key={t.id} value={t.id}>{t.display_name || t.name}</option>)}
             </select>
           </Field>
           <Field label="Away team">
             <select value={away} onChange={(e) => setAway(e.target.value)} style={inp}>
-              <option value="">Pick a team</option>
+              <option value="">— pick —</option>
               {eligibleTeams.filter((team) => team.id !== home).map((t) => <option key={t.id} value={t.id}>{t.display_name || t.name}</option>)}
             </select>
           </Field>
@@ -109,11 +124,13 @@ export default function Matches() {
           <Field label="Kick-off time (e.g. 16:00)"><input value={kickoff} onChange={(e) => setKickoff(e.target.value)} placeholder="16:00" style={inp} /></Field>
           <button type="submit" style={btn}>Create match</button>
           {selectedCompetition && selectedCompetition.competition_type !== "friendly" && eligibleTeams.length === 0 && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 8 }}>No teams are registered for {selectedCompetition.competition_type === "tournament" ? "this group" : "this league"}. Configure them under Competitions first.</div>}
-          <div style={{ marginTop: 10 }}><Link href="/admin/competitions" style={{ color: "#4FC263", fontSize: 12, fontWeight: 700 }}>Manage competition formats and teams</Link></div>
+          <div style={{ marginTop: 10 }}><Link href="/admin/competitions" style={{ color: "#4FC263", fontSize: 12, fontWeight: 700 }}>Manage competition formats and teams →</Link></div>
           {err && <div style={{ color: "#F04444", fontSize: 13, marginTop: 8 }}>{err}</div>}
         </form>
       </div>}
+
       {err && <div style={{ color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{err}</div>}
+
       <div style={{ ...card, padding: 0 }}>
         <div style={{ ...h3, padding: "14px 16px 0" }}>All matches</div>
         {matches.length === 0 && <div style={{ color: "#8E939B", padding: 20, fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
@@ -122,28 +139,15 @@ export default function Matches() {
             <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: statusColor(m.status), width: 64 }}>{m.status}</span>
             <span style={{ flex: 1, minWidth: 200, fontSize: 14 }}><span style={{ color: "#8E939B", fontSize: 12 }}>{m.match_date}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""} · </span>{m.home?.display_name || m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.display_name || m.away?.name || teamName(m.away_id)}</span>
             {role === "admin" && (
-              <select value={assignments[m.id]?.[0] || ""} onChange={(e) => assignScorer(m.id, e.target.value)} aria-label="Assign scorer" style={{ ...inp, width: 190, padding: "7px 9px", fontSize: 12 }}>
+              <select value={assignments[m.id]?.[0] || ""} onChange={(e) => assignScorer(m.id, e.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 190, padding: "7px 9px", fontSize: 12 }}>
                 <option value="">No scorer assigned</option>
                 {scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}
               </select>
             )}
             <Link href={`/admin/match/${m.id}`} style={{ ...btn, textDecoration: "none", padding: "7px 14px" }}>Score</Link>
-            {role === "admin" && <button onClick={() => setConfirmDel(m)} style={{ ...btn, background: "#301719", color: "#FCA5A5", padding: "7px 12px" }}>Delete</button>}
           </div>
         ))}
       </div>
-      {confirmDel && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.62)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 20 }} onClick={() => setConfirmDel(null)}>
-          <div style={{ background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 20, width: "100%", maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Delete this match?</div>
-            <div style={{ color: "#8E939B", fontSize: 14, marginBottom: 16 }}>{confirmDel.home?.name || teamName(confirmDel.home_id)} vs {confirmDel.away?.name || teamName(confirmDel.away_id)} and all its events will be permanently removed.</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }} onClick={() => setConfirmDel(null)}>Keep it</button>
-              <button style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#EF4444", color: "#fff", fontWeight: 800, cursor: "pointer" }} onClick={() => doDelete(confirmDel.id)}>Delete permanently</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

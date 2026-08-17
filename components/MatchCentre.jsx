@@ -19,12 +19,11 @@ function hasKnownScorer(player) {
   return Boolean(name && !["unknown", "unknown scorer", "unknown player", "n/a", "na"].includes(name));
 }
 
-function MonoFootball({ size = 14 }) {
+function MonoFootball({ size = 14, color = "#FFFFFF" }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} style={{ display: "inline-block", flex: "0 0 auto" }}>
-      <circle cx="12" cy="12" r="10" fill="#FFFFFF" stroke="#111111" strokeWidth="1.5" />
-      <path d="M12 6.3 15.4 8.8 14.1 12.8 9.9 12.8 8.6 8.8Z" fill="#111111" />
-      <path d="m12 6.3-2.1-3.1M8.6 8.8 4.7 9.2M9.9 12.8 7.6 16.2M14.1 12.8l2.3 3.4M15.4 8.8l3.9.4M7.6 16.2l.5 3.8M16.4 16.2l-.5 3.8" fill="none" stroke="#111111" strokeWidth="1.45" strokeLinecap="round" />
+    <svg aria-hidden="true" viewBox="0 0 512 512" width={size} height={size} style={{ display: "inline-block", flex: "0 0 auto", color }}>
+      {/* Font Awesome Free futbol icon, used as a fixed monochrome match symbol. */}
+      <path fill="currentColor" d="M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6h59.2c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z" />
     </svg>
   );
 }
@@ -40,11 +39,11 @@ function scorerSummary(events, side) {
   const grouped = new Map();
   (events || []).filter((event) => event.type === "goal" && event.side === side && hasKnownScorer(event.player)).forEach((event) => {
     const player = event.player.trim();
-    const minute = event.min || `${event.displayMinute || 1}'`;
+    const minute = fotMobMinuteLabel(event.min || `${event.displayMinute || 1}'`);
     if (!grouped.has(player)) grouped.set(player, []);
     grouped.get(player).push(minute);
   });
-  return [...grouped.entries()].map(([player, minutes]) => `${player} ${minutes.join(", ")}`).join(" · ");
+  return [...grouped.entries()].map(([player, minutes]) => `${player} ${minutes.join(", ")}`);
 }
 
 export default function MatchCentre({ id }) {
@@ -98,6 +97,7 @@ export default function MatchCentre({ id }) {
   const announcedStoppage = announcedStoppageMinutes(m);
   const homeScorers = scorerSummary(d?.events, "home");
   const awayScorers = scorerSummary(d?.events, "away");
+  const hasScorerSummary = homeScorers.length > 0 || awayScorers.length > 0;
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
@@ -142,14 +142,15 @@ export default function MatchCentre({ id }) {
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
           </div>
         </div>
-        {(homeScorers || awayScorers) && (
-          <div className="grid px-10 pb-2" style={{ gridTemplateColumns: "1fr 1fr", columnGap: 42 }}>
-            <span className="inline-flex items-start justify-end gap-1" style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "right" }}>
-              {homeScorers}{homeScorers && <MonoFootball size={12} />}
-            </span>
-            <span className="inline-flex items-start gap-1" style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "left" }}>
-              {awayScorers && <MonoFootball size={12} />}{awayScorers}
-            </span>
+        {hasScorerSummary && (
+          <div className="grid px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
+            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "right", minWidth: 0 }}>
+              {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
+            </div>
+            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={11} color={t.text} /></span>
+            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "left", minWidth: 0 }}>
+              {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
+            </div>
           </div>
         )}
         <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar" style={{ height: 46, borderBottom: `1px solid ${t.divider}` }}>
@@ -263,7 +264,7 @@ function FactsPreview({ t, m, h, a, d, started }) {
       )}
 
       {started ? (
-        d ? <Timeline t={t} events={d.events} /> : <Empty t={t} title="Match started" note="Events will appear here as the scorer records them." />
+        d ? <Timeline t={t} events={d.events} match={m} /> : <Empty t={t} title="Match started" note="Events will appear here as the scorer records them." />
       ) : (
         <Empty t={t} title="Not started yet" note="Line-ups and match events will appear here once the match kicks off." />
       )}
@@ -271,9 +272,27 @@ function FactsPreview({ t, m, h, a, d, started }) {
   );
 }
 
-function Timeline({ t, events }) {
-  if (!events || !events.length) return <Empty t={t} title="No events yet" note="The timeline fills as the match unfolds." />;
-  const sorted = [...events].sort((x, y) => x.m - y.m);
+function Timeline({ t, events = [], match }) {
+  const timelineEvents = [...events];
+  const currentPeriod = Number(match.current_period || 0);
+  const showHalfTime = match.status === "ht" || match.status === "ft" || currentPeriod >= 2;
+  const hasHalfTime = timelineEvents.some((event) => event.type === "half");
+  const hasFullTime = timelineEvents.some((event) => event.type === "full");
+
+  if (showHalfTime && !hasHalfTime) {
+    const firstHalfEvents = events.filter((event) => Number(event.period || 1) === 1);
+    timelineEvents.push({
+      type: "half",
+      label: "HT",
+      score: `${goalsBySide(firstHalfEvents, "home")} - ${goalsBySide(firstHalfEvents, "away")}`,
+      m: 199999,
+    });
+  }
+  if (match.status === "ft" && !hasFullTime) {
+    timelineEvents.push({ type: "full", label: "FT", score: `${match.hs} - ${match.as}`, m: 999999 });
+  }
+  if (!timelineEvents.length) return <Empty t={t} title="No events yet" note="The timeline fills as the match unfolds." />;
+  const sorted = timelineEvents.sort((x, y) => x.m - y.m);
   return (
     <Card t={t} style={{ paddingTop: 4, paddingBottom: 8 }}>
       <div className="px-3">{sorted.map((e, i) => <Ev key={i} e={e} t={t} />)}</div>
@@ -295,7 +314,7 @@ function Ev({ e, t }) {
       <div className="flex-1" style={{ height: 1, background: t.divider }} />
     </div>;
   }
-  const icon = e.type === "goal" ? <MonoFootball size={16} />
+  const icon = e.type === "goal" ? <MonoFootball size={16} color={t.text} />
     : e.type === "yellow" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.yellow, display: "inline-block" }} />
     : e.type === "red" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.red, display: "inline-block" }} />
     : <span className="inline-flex flex-col items-center" style={{ gap: 2 }}>
@@ -322,7 +341,7 @@ function Ev({ e, t }) {
       ? <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>
       : null;
   };
-  const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{e.min}</span></div>;
+  const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{fotMobMinuteLabel(e.min)}</span></div>;
   if (e.side === "home") return <div className="flex items-start gap-2 py-2.5" style={{ paddingRight: 12 }}>{minute}<span className="shrink-0 mt-0.5">{icon}</span><div className="flex-1">{body("left")}</div></div>;
   return <div className="flex items-start gap-2 py-2.5 justify-end" style={{ paddingLeft: 12 }}><div className="flex-1">{body("right")}</div><span className="shrink-0 mt-0.5">{icon}</span>{minute}</div>;
 }

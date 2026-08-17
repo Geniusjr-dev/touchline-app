@@ -7,7 +7,7 @@ import { announcedStoppageMinutes, formatMatchClock, getMatch } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
-const TABS_PRE = ["Preview", "H2H"];
+const TABS_PRE = ["Preview", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
 
 function goalsBySide(events, side) {
@@ -16,7 +16,25 @@ function goalsBySide(events, side) {
 
 function hasKnownScorer(player) {
   const name = player?.trim().toLowerCase();
-  return Boolean(name && name !== "unknown scorer" && name !== "unknown player");
+  return Boolean(name && !["unknown", "unknown scorer", "unknown player", "n/a", "na"].includes(name));
+}
+
+function breakClock(match) {
+  const duration = Number(match.matchDurationMinutes || 90);
+  const extraTime = Number(match.extraTimeMinutes || 30);
+  const minute = match.status === "et_ht" ? duration + extraTime / 2 : duration / 2;
+  return `${minute}:00`;
+}
+
+function scorerSummary(events, side) {
+  const grouped = new Map();
+  (events || []).filter((event) => event.type === "goal" && event.side === side && hasKnownScorer(event.player)).forEach((event) => {
+    const player = event.player.trim();
+    const minute = event.min || `${event.displayMinute || 1}'`;
+    if (!grouped.has(player)) grouped.set(player, []);
+    grouped.get(player).push(minute);
+  });
+  return [...grouped.entries()].map(([player, minutes]) => `${player} ${minutes.join(", ")}`).join(" · ");
 }
 
 export default function MatchCentre({ id }) {
@@ -57,34 +75,50 @@ export default function MatchCentre({ id }) {
   const activeTab = tab || (started ? "Facts" : "Preview");
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
   const announcedStoppage = announcedStoppageMinutes(m);
+  const homeScorers = scorerSummary(d?.events, "home");
+  const awayScorers = scorerSummary(d?.events, "away");
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       {/* header */}
       <div className="sticky top-0 z-30" style={{ background: t.bg }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 56 }}>
+        <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
           <button onClick={() => router.push("/")} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
             <ChevronLeft size={22} color={t.text} />
           </button>
-          <div className="flex items-center gap-3">
-            <Crest short={h.short} color={h.color} ring={t.divider} />
-            {m.status === "scheduled"
-              ? <span style={{ color: t.text, fontSize: 18, fontWeight: 700 }}>{m.time}</span>
-              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 20, fontWeight: 700 }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
-            <Crest short={a.short} color={a.color} ring={t.divider} />
-          </div>
+          <span />
           <button className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
             <MoreHorizontal size={20} color={t.text} />
           </button>
         </div>
-        {started && (
-          <div className="text-center pb-1">
-            {live
-              ? <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 12, fontWeight: 700 }}>
-                  <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
-                  {m.status === "ht" ? `Half time · ${formatMatchClock(m, now)}` : m.status === "et_ht" ? `Extra-time break · ${formatMatchClock(m, now)}` : `${m.status === "et_live" ? "ET " : ""}${formatMatchClock(m, now)}${announcedStoppage ? ` · +${announcedStoppage} added` : ""}`}
-                </span>
-              : <span style={{ color: t.dim, fontSize: 12, fontWeight: 700 }}>Full time</span>}
+        <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
+          <div className="flex flex-col items-center min-w-0">
+            <Crest short={h.short} color={h.color} size={44} ring={t.divider} />
+            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
+          </div>
+          <div className="flex flex-col items-center pt-1">
+            {m.status === "scheduled"
+              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "—"}</span>
+              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
+            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
+            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
+            {(m.status === "live" || m.status === "et_live") && (
+              <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 11, fontWeight: 700, marginTop: 3 }}>
+                <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
+                {m.status === "et_live" ? "ET " : ""}{formatMatchClock(m, now)}{announcedStoppage ? ` · +${announcedStoppage} added` : ""}
+              </span>
+            )}
+            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
+          </div>
+          <div className="flex flex-col items-center min-w-0">
+            <Crest short={a.short} color={a.color} size={44} ring={t.divider} />
+            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
+          </div>
+        </div>
+        {(homeScorers || awayScorers) && (
+          <div className="grid px-10 pb-2" style={{ gridTemplateColumns: "1fr 1fr", columnGap: 42 }}>
+            <span style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "right" }}>{homeScorers}</span>
+            <span style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.3, textAlign: "left" }}>{awayScorers}</span>
           </div>
         )}
         <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar" style={{ height: 46, borderBottom: `1px solid ${t.divider}` }}>
@@ -102,7 +136,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <Empty t={t} title="Match stats" note="No verified match statistics have been recorded yet." />}
+      {activeTab === "Stats" && <StatsTab t={t} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
@@ -119,6 +153,30 @@ function Empty({ t, title, note }) {
       <div style={{ color: t.dim, fontSize: 13 }}>{note}</div>
     </div>
   </Card>;
+}
+
+function StatsTab({ t }) {
+  const rows = [
+    ["Total shots", 0, 0],
+    ["Shots on target", 0, 0],
+    ["Touches in opposition box", 0, 0],
+  ];
+  return (
+    <Card t={t} style={{ padding: "18px 16px 16px" }}>
+      <div className="text-center" style={{ color: t.text, fontSize: 13, marginBottom: 8 }}>Ball possession</div>
+      <div className="flex overflow-hidden" style={{ height: 34, borderRadius: 18, marginBottom: 14 }}>
+        <div className="flex items-center px-3" style={{ width: "50%", background: t.blue, color: "#07131B", fontSize: 15, fontWeight: 850 }}>50%</div>
+        <div className="flex items-center justify-end px-3" style={{ width: "50%", background: t.red, color: "#fff", fontSize: 15, fontWeight: 850 }}>50%</div>
+      </div>
+      {rows.map(([label, home, away]) => (
+        <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>
+          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "start", minWidth: 30, height: 24, padding: "0 7px", background: t.blue, color: "#07131B", fontSize: 13, fontWeight: 800 }}>{home}</span>
+          <span className="text-center" style={{ color: t.text, fontSize: 13 }}>{label}</span>
+          <span style={{ justifySelf: "end", color: t.text, fontSize: 13, fontWeight: 700 }}>{away}</span>
+        </div>
+      ))}
+    </Card>
+  );
 }
 
 // ---------- Facts / Preview ----------
@@ -209,18 +267,24 @@ function Ev({ e, t }) {
         <span className="inline-flex items-center justify-center rounded-full" style={{ width: 15, height: 15, background: t.red }}><ArrowDown size={10} color="#fff" strokeWidth={3} /></span>
       </span>;
   const body = (align) => {
-    if (e.type === "sub") return <div style={{ textAlign: align }}>
-      <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{e.player}</div>
-      <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{e.assist}</div>
-    </div>;
+    if (e.type === "sub") {
+      const playerOn = hasKnownScorer(e.player) ? e.player : null;
+      const playerOff = hasKnownScorer(e.assist) ? e.assist : null;
+      return <div style={{ textAlign: align }}>
+        {playerOn && <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{playerOn}</div>}
+        {playerOff && <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{playerOff}</div>}
+      </div>;
+    }
     if (e.type === "goal") {
       const knownScorer = hasKnownScorer(e.player);
       return <div style={{ textAlign: align }}>
         <div style={{ fontSize: 14 }}>{knownScorer && <span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span>}<RunScore score={e.score} scored={e.scored} t={t} /></div>
-        {knownScorer && e.assist && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
+        {knownScorer && hasKnownScorer(e.assist) && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
       </div>;
     }
-    return <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>;
+    return hasKnownScorer(e.player)
+      ? <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>
+      : null;
   };
   const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{e.min}</span></div>;
   if (e.side === "home") return <div className="flex items-start gap-2 py-2.5" style={{ paddingRight: 12 }}>{minute}<span className="shrink-0 mt-0.5">{icon}</span><div className="flex-1">{body("left")}</div></div>;
@@ -277,7 +341,7 @@ function goalCommentary(event, match, home, away) {
   return `GOAL! ${scoreline}${scorer}`;
 }
 
-function commentaryMilestones(match) {
+function commentaryMilestones(match, includeHalfTime = true) {
   const duration = Number(match.matchDurationMinutes || 90);
   const extraTime = Number(match.extraTimeMinutes || 30);
   const half = duration / 2;
@@ -292,6 +356,9 @@ function commentaryMilestones(match) {
   };
 
   addStoppage(Number(match.first_half_stoppage_minutes || 0), half, 1, "the first half");
+  if (includeHalfTime && (match.status === "ht" || currentPeriod >= 2 || match.status === "ft")) {
+    lines.push({ sort: 100000 + (half + Number(match.first_half_stoppage_minutes || 0)) * 60 + 1, m: `${half}'`, text: "Half time." });
+  }
   if (currentPeriod >= 2) lines.push({ sort: 200000 + half * 60 + 1, m: `${half + 1}'`, text: "Second half begins." });
   addStoppage(Number(match.second_half_stoppage_minutes || 0), duration, 2, "the second half");
   if (currentPeriod >= 3) lines.push({ sort: 300000 + duration * 60 + 1, m: `${duration + 1}'`, text: "First half of extra time begins." });
@@ -307,12 +374,20 @@ function Commentary({ t, m, d, h, a }) {
     const sort = eventSortSeconds(e, m);
     if (e.type === "half") return { sort, m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
     if (e.type === "goal") return { sort, m: e.min, text: goalCommentary(e, m, h, a) };
-    if (e.type === "yellow") return { sort, m: e.min, text: `Yellow card shown to ${e.player}.` };
-    if (e.type === "red") return { sort, m: e.min, text: `Red card! ${e.player} is sent off.` };
-    if (e.type === "sub") return { sort, m: e.min, text: `Substitution: ${e.player} replaces ${e.assist}.` };
+    if (e.type === "yellow") return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Yellow card shown to ${e.player}.` : "Yellow card." };
+    if (e.type === "red") return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Red card! ${e.player} is sent off.` : "Red card." };
+    if (e.type === "sub") {
+      const playerOn = hasKnownScorer(e.player) ? e.player : null;
+      const playerOff = hasKnownScorer(e.assist) ? e.assist : null;
+      const text = playerOn && playerOff ? `Substitution: ${playerOn} replaces ${playerOff}.`
+        : playerOn ? `Substitution: ${playerOn} comes on.`
+        : playerOff ? `Substitution: ${playerOff} leaves the field.`
+        : "Substitution.";
+      return { sort, m: e.min, text };
+    }
     return { sort, m: e.min, text: "" };
   });
-  const lines = [...eventLines, ...commentaryMilestones(m)]
+  const lines = [...eventLines, ...commentaryMilestones(m, !d.events.some((event) => event.type === "half"))]
     .filter((line) => line.text)
     .sort((x, y) => y.sort - x.sort);
   return <Card t={t} style={{ paddingTop: 6, paddingBottom: 8 }}>

@@ -5,11 +5,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronLeft, ChevronRight, ShieldCheck, Trophy } from "lucide-react";
 import { getTeamCentre, liveMinute } from "@/lib/db";
+import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
 import { BottomNav, Crest } from "@/components/ui";
 
 const TABS = ["Overview", "Matches", "Table", "Stats", "Squad", "Trophies"];
+
+function withDeadline(promise, milliseconds = 6000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("The team request timed out.")), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 const COUNTRY_CODES = {
   ghana: "GH", nigeria: "NG", england: "GB", scotland: "GB", wales: "GB", spain: "ES",
   france: "FR", brazil: "BR", belgium: "BE", usa: "US", "united states": "US",
@@ -78,14 +87,13 @@ export default function TeamCentre({ id }) {
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
-    getTeamCentre(id)
+    withDeadline(getTeamCentre(id))
       .then((result) => { setState(result); setLoadError(!result); })
       .catch(() => setLoadError(true));
   }, [id]);
 
   useEffect(() => {
-    let active = true;
-    getTeamCentre(id).then((result) => { if (active) { setState(result); setLoadError(!result); } }).catch(() => { if (active) setLoadError(true); });
+    load();
     let channel;
     if (supabase) {
       channel = supabase.channel(`team-centre-${id}`)
@@ -96,11 +104,11 @@ export default function TeamCentre({ id }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics" }, load)
         .subscribe();
     }
-    return () => { active = false; if (channel) supabase.removeChannel(channel); };
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, [id, load]);
 
   if (!state) {
-    return <div style={{ minHeight: "100vh", background: t.bg, color: t.dim, display: "flex", alignItems: "center", justifyContent: "center" }}>{loadError ? "Team not found." : "Loading…"}</div>;
+    return <TeamPageShell t={t} onBack={() => router.back()} error={loadError ? "This team could not be opened." : ""} onRetry={load} />;
   }
 
   const { team } = state;
@@ -150,6 +158,27 @@ export default function TeamCentre({ id }) {
   );
 }
 
+function TeamPageShell({ t, onBack, error, onRetry }) {
+  return <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text }}>
+    <div className="flex items-center px-3" style={{ height: 56, background: t.card }}>
+      <button onClick={onBack} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}><ChevronLeft size={22} /></button>
+    </div>
+    <div className="flex items-center gap-4 px-5" style={{ height: 132, background: t.card }}>
+      <div className="rounded-full" style={{ width: 64, height: 64, background: t.chip }} />
+      <div>
+        <div className="rounded-md" style={{ width: 176, height: 18, background: t.chip }} />
+        <div className="rounded-md" style={{ width: 82, height: 12, background: t.chip, marginTop: 10 }} />
+      </div>
+    </div>
+    <div style={{ height: 48, background: t.card, borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }} />
+    {error && <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card }}>
+      <div style={{ fontSize: 14, fontWeight: 700 }}>{error}</div>
+      <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button>
+    </div>}
+    <BottomNav t={t} active="Matches" />
+  </div>;
+}
+
 function Card({ t, children, style }) {
   return <section className="mx-3 mb-3 overflow-hidden" style={{ background: t.card, borderRadius: 14, ...style }}>{children}</section>;
 }
@@ -190,7 +219,7 @@ function Overview({ state, t, onMatches }) {
               const [scored, conceded] = scoreForTeam(match, team.id);
               const resultColor = match.result === "W" ? t.green : match.result === "L" ? t.red : t.drawPill;
               return (
-                <Link href={`/match/${match.id}`} key={match.id} className="flex flex-col items-center shrink-0" style={{ gap: 8, width: 48 }}>
+                <Link href={`/match/${match.id}`} key={match.id} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="flex flex-col items-center shrink-0" style={{ gap: 8, width: 48 }}>
                   <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "4px 7px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
                   <Crest short={opponent?.short || "?"} color={opponent?.color || "#555"} logo={opponent?.logoUrl} size={30} ring={t.divider} />
                 </Link>
@@ -239,7 +268,7 @@ function TeamMatchLine({ match, teams, t, large = false }) {
   const away = teams[match.away] || { name: "TBD", short: "?", color: "#555" };
   const score = match.status === "scheduled" ? (match.time || "TBD") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
   return (
-    <Link href={`/match/${match.id}`} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
+    <Link href={`/match/${match.id}`} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">
         <span className="text-right" style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
         <Crest short={home.short} color={home.color} logo={home.logoUrl} size={large ? 34 : 28} ring={t.divider} />

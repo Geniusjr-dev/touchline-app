@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Menu, ChevronUp, ChevronDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { getHome } from "@/lib/db";
+import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 
@@ -37,6 +38,7 @@ function MatchRow({ m, teams, t, now }) {
   const awayName = a.displayName || a.name;
   const showScore = ["live", "ht", "ft", "et_live", "et_ht"].includes(m.status);
   const showStatus = showScore || ["postponed", "cancelled"].includes(m.status);
+  const rememberMatch = () => cachePublicMatch(m, teams);
   const teamNameStyle = {
     color: t.text,
     fontSize: "clamp(12.5px, 3.5vw, 14px)",
@@ -53,6 +55,8 @@ function MatchRow({ m, teams, t, now }) {
   return (
     <Link
       href={`/match/${m.id}`}
+      onPointerDown={rememberMatch}
+      onClick={rememberMatch}
       className="relative grid items-center gap-x-2 px-3 py-2 active:opacity-70"
       style={{
         gridTemplateColumns: "minmax(0, 1fr) 54px minmax(0, 1fr)",
@@ -242,7 +246,7 @@ export default function MatchesHome() {
         })}
       </div>
 
-      {!data && <div className="text-center py-16" style={{ color: t.dim, fontSize: 14 }}>Loading…</div>}
+      {!data && <HomeContentShell t={t} />}
       {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
       {data && comps.length === 0 && (
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
@@ -253,4 +257,21 @@ export default function MatchesHome() {
       <BottomNav t={t} active="Matches" />
     </div>
   );
+}
+
+function HomeContentShell({ t }) {
+  return <div aria-hidden="true">
+    {[0, 1].map((group) => (
+      <div key={group} className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
+        <div style={{ height: 46, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }} />
+        {[0, 1, 2].map((row) => (
+          <div key={row} className="grid items-center px-5" style={{ height: 72, gridTemplateColumns: "1fr 54px 1fr", borderTop: row ? `1px solid ${t.divider}` : "none" }}>
+            <div className="rounded-md justify-self-end" style={{ width: 96, height: 13, background: t.chip }} />
+            <div className="rounded-md justify-self-center" style={{ width: 34, height: 13, background: t.chip }} />
+            <div className="rounded-md" style={{ width: 96, height: 13, background: t.chip }} />
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>;
 }

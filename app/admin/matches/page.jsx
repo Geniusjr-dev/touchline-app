@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { listTeams, listCompetitions, listCompetitionTeams, listMatches, listScorers, listMatchScorers, replaceMatchScorer, createMatch } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
+import { cacheAdminMatch } from "@/lib/matchCache";
 
 export default function Matches() {
   const { user, role, activeOrganizationId } = useAuth();
@@ -161,7 +162,7 @@ export default function Matches() {
                 {scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}
               </select>
             )}
-            <Link href={`/admin/match/${m.id}`} style={{ ...btn, textDecoration: "none", padding: "7px 14px" }}>Score</Link>
+            <Link href={`/admin/match/${m.id}`} onPointerDown={() => cacheAdminMatch(m)} onClick={() => cacheAdminMatch(m)} style={{ ...btn, textDecoration: "none", padding: "7px 14px" }}>Score</Link>
           </div>
         ))}
       </div>

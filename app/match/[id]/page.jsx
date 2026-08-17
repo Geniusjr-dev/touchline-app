@@ -1,5 +1,9 @@
+"use client";
+
 import MatchCentre from "@/components/MatchCentre";
-export const dynamic = "force-dynamic";
-export default function Page({ params }) {
-  return <MatchCentre id={params.id} />;
+import { useParams } from "next/navigation";
+
+export default function Page() {
+  const { id } = useParams();
+  return <MatchCentre id={id} />;
 }

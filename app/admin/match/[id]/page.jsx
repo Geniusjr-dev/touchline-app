@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { readAdminMatch } from "@/lib/matchCache";
 import {
   announcedStoppageMinutes,
   deleteMatchEvent,
@@ -20,6 +21,14 @@ import {
   setMatchStoppageTime,
   transitionMatchStatus,
 } from "@/lib/db";
+
+function withDeadline(promise, milliseconds = 6000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("The match request timed out.")), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 
 export default function Scorer() {
   const { id } = useParams();
@@ -38,22 +47,46 @@ export default function Scorer() {
 
   const load = useCallback(async () => {
     try {
-      const mm = await getMatchRaw(id);
-      const [ev, ts, matchStats] = await Promise.all([getEvents(id), listTeams(mm.organization_id), getMatchStats(id)]);
+      const mm = await withDeadline(getMatchRaw(id));
+      if (!mm) throw new Error("This match was not found.");
       setM(mm);
-      setEvents(ev);
-      setStats(matchStats);
-      const map = {};
-      ts.forEach((team) => { map[team.id] = team; });
-      setTeams(map);
-      const [homePlayers, awayPlayers] = await Promise.all([listPlayers(mm.home_id), listPlayers(mm.away_id)]);
-      setSquads({ [mm.home_id]: homePlayers, [mm.away_id]: awayPlayers });
+      setError("");
+
+      const [eventsOutcome, teamsOutcome, statsOutcome] = await Promise.allSettled([
+        getEvents(id),
+        listTeams(mm.organization_id),
+        getMatchStats(id),
+      ]);
+      if (eventsOutcome.status === "fulfilled") setEvents(eventsOutcome.value);
+      if (statsOutcome.status === "fulfilled") setStats(statsOutcome.value);
+      if (teamsOutcome.status === "fulfilled") {
+        const map = {};
+        teamsOutcome.value.forEach((team) => { map[team.id] = team; });
+        setTeams(map);
+      }
+
+      const [homePlayersOutcome, awayPlayersOutcome] = await Promise.allSettled([
+        listPlayers(mm.home_id),
+        listPlayers(mm.away_id),
+      ]);
+      setSquads({
+        [mm.home_id]: homePlayersOutcome.status === "fulfilled" ? homePlayersOutcome.value : [],
+        [mm.away_id]: awayPlayersOutcome.status === "fulfilled" ? awayPlayersOutcome.value : [],
+      });
     } catch (loadError) {
       setError(loadError.message || "Could not load this match.");
     }
   }, [id]);
 
   useEffect(() => {
+    const cached = readAdminMatch(id);
+    if (cached) {
+      setM(cached);
+      const cachedTeams = {};
+      if (cached.home_id && cached.home) cachedTeams[cached.home_id] = cached.home;
+      if (cached.away_id && cached.away) cachedTeams[cached.away_id] = cached.away;
+      setTeams(cachedTeams);
+    }
     load();
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
     const ticker = window.setInterval(() => setNow(Date.now()), 1000);
@@ -72,7 +105,7 @@ export default function Scorer() {
     };
   }, [id, load]);
 
-  if (!m) return <div style={{ color: error ? "#F04444" : "#8E939B" }}>{error || "Loading…"}</div>;
+  if (!m) return <AdminMatchShell error={error} onRetry={load} />;
   const home = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
   const away = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
   const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
@@ -290,6 +323,23 @@ export default function Scorer() {
       {subFor && <SubForm side={subFor} team={subFor === "home" ? home : away} squad={squads[sideTeamId(subFor)] || []} busy={busy} onCancel={() => !busy && setSubFor(null)} onSave={saveSub} />}
     </div>
   );
+}
+
+function AdminMatchShell({ error, onRetry }) {
+  return <div>
+    <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
+    <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18 }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
+        <div style={{ width: 82, height: 24, borderRadius: 7, background: "#24262A" }} />
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
+      </div>
+    </div>
+    {error && <div style={{ ...card, color: "#F7B4B4" }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{error}</div>
+      <button onClick={onRetry} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062" }}>Try again</button>
+    </div>}
+  </div>;
 }
 
 function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave }) {

@@ -1,15 +1,24 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch } from "@/lib/db";
+import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable } from "@/lib/db";
+import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
 const TABS_PRE = ["Preview", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
+
+function withDeadline(promise, milliseconds = 6000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("The match request timed out.")), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 
 function goalsBySide(events, side) {
   return (events || []).filter((e) => e.type === "goal" && e.side === side).length;
@@ -54,6 +63,30 @@ export default function MatchCentre({ id }) {
   const [tab, setTab] = useState(null);
   const [now, setNow] = useState(0);
   const [following, setFollowing] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const next = await withDeadline(getMatch(id));
+      if (!next?.match) {
+        setLoadError("This match is unavailable.");
+        return;
+      }
+      setState(next);
+      setLoadError("");
+      cachePublicMatch(next.match, next.teams, next.detail);
+      getMatchTable(next.match).then((table) => {
+        setState((current) => {
+          if (current?.match?.id !== next.match.id) return current;
+          const updated = { ...current, detail: { ...(current.detail || {}), table } };
+          cachePublicMatch(updated.match, updated.teams, updated.detail);
+          return updated;
+        });
+      });
+    } catch {
+      setLoadError("The match could not be refreshed. Check your connection and try again.");
+    }
+  }, [id]);
 
   async function shareMatch() {
     const shareData = { title: "Touchline match", url: window.location.href };
@@ -65,8 +98,8 @@ export default function MatchCentre({ id }) {
   }
 
   useEffect(() => {
-    let alive = true;
-    const load = () => getMatch(id).then((r) => { if (alive) setState(r); });
+    const cached = readPublicMatch(id);
+    if (cached?.match) setState(cached);
     load();
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
     const ticker = window.setInterval(() => setNow(Date.now()), 1000);
@@ -79,13 +112,12 @@ export default function MatchCentre({ id }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, load)
         .subscribe();
     }
-    return () => { alive = false; window.clearTimeout(firstTick); window.clearInterval(ticker); if (ch) supabase.removeChannel(ch); };
-  }, [id]);
+    return () => { window.clearTimeout(firstTick); window.clearInterval(ticker); if (ch) supabase.removeChannel(ch); };
+  }, [id, load]);
 
-  const loadingStyle = { background: t.bg, minHeight: "100vh", color: t.dim, display: "flex", alignItems: "center", justifyContent: "center" };
-  if (!state) return <div style={loadingStyle}>Loading…</div>;
+  if (!state) return <MatchPageShell t={t} onBack={() => router.push("/")} error={loadError} onRetry={load} />;
   const { match: m, teams, detail: d } = state;
-  if (!m) return <div style={loadingStyle}>Match not found.</div>;
+  if (!m) return <MatchPageShell t={t} onBack={() => router.push("/")} error="Match not found." onRetry={load} />;
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
@@ -173,6 +205,32 @@ export default function MatchCentre({ id }) {
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
+      <BottomNav t={t} active="Matches" />
+    </div>
+  );
+}
+
+function MatchPageShell({ t, onBack, error, onRetry }) {
+  return (
+    <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
+      <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
+        <button onClick={onBack} aria-label="Return to matches" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
+          <ChevronLeft size={22} color={t.text} />
+        </button>
+        <div className="rounded-full" style={{ width: 82, height: 38, background: t.pill }} />
+      </div>
+      <div className="grid items-center px-8" style={{ height: 104, gridTemplateColumns: "1fr 90px 1fr" }}>
+        <div className="rounded-full mx-auto" style={{ width: 44, height: 44, background: t.card }} />
+        <div className="rounded-lg mx-auto" style={{ width: 54, height: 24, background: t.card }} />
+        <div className="rounded-full mx-auto" style={{ width: 44, height: 44, background: t.card }} />
+      </div>
+      <div style={{ height: 46, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }} />
+      {error && (
+        <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card, color: t.text }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{error}</div>
+          <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button>
+        </div>
+      )}
       <BottomNav t={t} active="Matches" />
     </div>
   );

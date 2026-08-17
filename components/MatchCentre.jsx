@@ -124,8 +124,11 @@ export default function MatchCentre({ id }) {
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
-  const tabs = started ? TABS_LIVE : TABS_PRE;
-  const activeTab = tab || (started ? "Facts" : "Preview");
+  const tabs = started
+    ? TABS_LIVE.filter((item) => item !== "Table" || m.competitionType !== "friendly")
+    : TABS_PRE;
+  const defaultTab = started ? "Facts" : "Preview";
+  const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
   const announcedStoppage = announcedStoppageMinutes(m);
   const homeScorers = scorerSummary(d?.events, "home");

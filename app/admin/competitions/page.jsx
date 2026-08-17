@@ -67,18 +67,17 @@ export default function CompetitionsPage() {
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Competitions</h1>
-      <p style={{ color: "#8E939B", fontSize: 13, marginBottom: 16 }}>Choose the football format first. The format controls fixtures, team registration and whether a table is shown.</p>
 
-      <form onSubmit={create} style={{ ...card, marginBottom: 18 }}>
+      <form onSubmit={create} style={{ ...card, marginTop: 16, marginBottom: 18 }}>
         <div style={h3}>New competition</div>
         <div style={grid}>
           <Field label="Competition name"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Community Premier League" style={inp} /></Field>
           <Field label="Sub-label (optional)"><input value={sub} onChange={(e) => setSub(e.target.value)} placeholder="2026 season" style={inp} /></Field>
           <Field label="Format">
             <select value={format} onChange={(e) => setFormat(e.target.value)} style={inp}>
-              <option value="friendly">Friendly: no table</option>
-              <option value="league">League: one overall table</option>
-              <option value="tournament">Tournament: group tables</option>
+              <option value="friendly">Friendly</option>
+              <option value="league">League</option>
+              <option value="tournament">Tournament</option>
             </select>
           </Field>
           <Field label="Match duration">
@@ -90,9 +89,6 @@ export default function CompetitionsPage() {
             <Field label="Number of groups"><input type="number" min="1" max="26" value={groupCount} onChange={(e) => setGroupCount(e.target.value)} style={inp} /></Field>
             <Field label="Teams in each group"><input type="number" min="2" max="32" value={teamsPerGroup} onChange={(e) => setTeamsPerGroup(e.target.value)} style={inp} /></Field>
           </>}
-        </div>
-        <div style={{ color: "#8E939B", fontSize: 12, margin: "2px 0 12px" }}>
-          {format === "friendly" ? "Friendly matches never show a Table tab." : format === "league" ? "Every registered team appears in one overall league table." : `${groupCount || 0} groups × ${teamsPerGroup || 0} teams. Each match shows only its group table.`}
         </div>
         <button type="submit" disabled={busy} style={btn}>{busy ? "Creating…" : "Create competition"}</button>
       </form>

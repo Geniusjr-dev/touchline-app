@@ -112,6 +112,8 @@ export default function TeamCentre({ id }) {
   }
 
   const { team } = state;
+  const tabs = state.tableCompetition ? TABS : TABS.filter((item) => item !== "Table");
+  const activeTab = tabs.includes(tab) ? tab : "Overview";
   return (
     <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
       <header style={{ background: t.card }}>
@@ -135,22 +137,22 @@ export default function TeamCentre({ id }) {
           </div>
         </div>
         <nav className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
-          {TABS.map((item) => (
-            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: tab === item ? t.text : t.tab, fontSize: 14, fontWeight: tab === item ? 800 : 650 }}>
+          {tabs.map((item) => (
+            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: activeTab === item ? t.text : t.tab, fontSize: 14, fontWeight: activeTab === item ? 800 : 650 }}>
               {item}
-              {tab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: t.accent }} />}
+              {activeTab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: t.accent }} />}
             </button>
           ))}
         </nav>
       </header>
 
       <main style={{ paddingTop: 10 }}>
-        {tab === "Overview" && <Overview state={state} t={t} onMatches={() => setTab("Matches")} />}
-        {tab === "Matches" && <Matches state={state} t={t} />}
-        {tab === "Table" && <Table state={state} t={t} />}
-        {tab === "Stats" && <Stats state={state} t={t} />}
-        {tab === "Squad" && <Squad state={state} t={t} />}
-        {tab === "Trophies" && <Trophies state={state} t={t} />}
+        {activeTab === "Overview" && <Overview state={state} t={t} onMatches={() => setTab("Matches")} />}
+        {activeTab === "Matches" && <Matches state={state} t={t} />}
+        {activeTab === "Table" && <Table state={state} t={t} />}
+        {activeTab === "Stats" && <Stats state={state} t={t} />}
+        {activeTab === "Squad" && <Squad state={state} t={t} />}
+        {activeTab === "Trophies" && <Trophies state={state} t={t} />}
       </main>
 
       <BottomNav t={t} active="Matches" />

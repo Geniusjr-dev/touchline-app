@@ -34,8 +34,13 @@ create table if not exists matches (
   kickoff text,
   clock_base int default 0,
   clock_started_at timestamptz,
+  home_kit text,   -- colour the home team wears this match (set at kick-off)
+  away_kit text,   -- colour the away team wears this match (must differ from home)
   created_at timestamptz default now()
 );
+-- Idempotent for existing projects created before kits existed:
+alter table matches add column if not exists home_kit text;
+alter table matches add column if not exists away_kit text;
 
 create table if not exists events (
   id uuid primary key default gen_random_uuid(),

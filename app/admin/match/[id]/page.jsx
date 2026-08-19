@@ -1,202 +1,504 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getMatchRaw, getEvents, listTeams, setStatus, setKits, addEvent, deleteEvent, liveMinute } from "@/lib/db";
+import { useAuth } from "@/components/AuthProvider";
+import { supabase } from "@/lib/supabase";
+import { readAdminMatch } from "@/lib/matchCache";
+import {
+  announcedStoppageMinutes,
+  deleteMatchEvent,
+  EMPTY_MATCH_STATS,
+  formatMatchClock,
+  getEvents,
+  getMatchRaw,
+  getMatchStats,
+  listPlayers,
+  listTeams,
+  recordMatchEvent,
+  reopenMatch,
+  saveMatchStats,
+  setMatchStoppageTime,
+  transitionMatchStatus,
+} from "@/lib/db";
 
-// Colours the admin can pick from for a match kit. Includes dark + white change kits.
-const KIT_PALETTE = ["#18A558", "#2563EB", "#DC2626", "#F5C518", "#7C3AED", "#EA580C", "#0891B2", "#DB2777", "#111827", "#F1F5F9"];
-const sameColor = (x, y) => (x || "").toLowerCase() === (y || "").toLowerCase();
+function withDeadline(promise, milliseconds = 6000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("The match request timed out.")), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 
 export default function Scorer() {
   const { id } = useParams();
+  const { role } = useAuth();
   const [m, setM] = useState(null);
   const [events, setEvents] = useState([]);
   const [teams, setTeams] = useState({});
-  const [form, setForm] = useState(null); // {type, side}
+  const [squads, setSquads] = useState({});
   const [busy, setBusy] = useState(false);
-  const [homeKit, setHomeKit] = useState(null);
-  const [awayKit, setAwayKit] = useState(null);
+  const [subFor, setSubFor] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [error, setError] = useState("");
+  const [now, setNow] = useState(0);
+  const [stats, setStats] = useState({ ...EMPTY_MATCH_STATS });
+  const [statsMessage, setStatsMessage] = useState("");
 
-  const load = async () => {
-    const [mm, ev, ts] = await Promise.all([getMatchRaw(id), getEvents(id), listTeams()]);
-    setM(mm); setEvents(ev);
-    const map = {}; ts.forEach((t) => (map[t.id] = t)); setTeams(map);
-  };
-  useEffect(() => { load(); }, [id]);
+  const load = useCallback(async () => {
+    try {
+      const mm = await withDeadline(getMatchRaw(id));
+      if (!mm) throw new Error("This match was not found.");
+      setM(mm);
+      setError("");
 
-  // Initialise kit colours once the match and its teams are loaded.
-  // Away auto-switches to a non-clashing palette colour if it would match home.
+      const [eventsOutcome, teamsOutcome, statsOutcome] = await Promise.allSettled([
+        getEvents(id),
+        listTeams(mm.organization_id),
+        getMatchStats(id),
+      ]);
+      if (eventsOutcome.status === "fulfilled") setEvents(eventsOutcome.value);
+      if (statsOutcome.status === "fulfilled") setStats(statsOutcome.value);
+      if (teamsOutcome.status === "fulfilled") {
+        const map = {};
+        teamsOutcome.value.forEach((team) => { map[team.id] = team; });
+        setTeams(map);
+      }
+
+      const [homePlayersOutcome, awayPlayersOutcome] = await Promise.allSettled([
+        listPlayers(mm.home_id),
+        listPlayers(mm.away_id),
+      ]);
+      setSquads({
+        [mm.home_id]: homePlayersOutcome.status === "fulfilled" ? homePlayersOutcome.value : [],
+        [mm.away_id]: awayPlayersOutcome.status === "fulfilled" ? awayPlayersOutcome.value : [],
+      });
+    } catch (loadError) {
+      setError(loadError.message || "Could not load this match.");
+    }
+  }, [id]);
+
   useEffect(() => {
-    if (!m || (homeKit && awayKit)) return;
-    const hcTeam = teams[m.home_id]?.color;
-    const acTeam = teams[m.away_id]?.color;
-    if (!hcTeam || !acTeam) return;
-    const hc = m.home_kit || hcTeam;
-    let ac = m.away_kit || acTeam;
-    if (sameColor(ac, hc)) ac = KIT_PALETTE.find((c) => !sameColor(c, hc)) || "#DC2626";
-    setHomeKit(hc); setAwayKit(ac);
-  }, [m, teams, homeKit, awayKit]);
+    const cached = readAdminMatch(id);
+    if (cached) {
+      setM(cached);
+      const cachedTeams = {};
+      if (cached.home_id && cached.home) cachedTeams[cached.home_id] = cached.home;
+      if (cached.away_id && cached.away) cachedTeams[cached.away_id] = cached.away;
+      setTeams(cachedTeams);
+    }
+    load();
+    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
+    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
+    let channel;
+    if (supabase) {
+      channel = supabase.channel(`scorer-${id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, load)
+        .subscribe();
+    }
+    return () => {
+      window.clearInterval(ticker);
+      window.clearTimeout(firstTick);
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [id, load]);
 
-  if (!m) return <div style={{ color: "#8E939B" }}>Loading…</div>;
+  if (!m) return <AdminMatchShell error={error} onRetry={load} />;
   const home = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
   const away = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
-  const hs = events.filter((e) => e.type === "goal" && e.side === "home").length;
-  const as = events.filter((e) => e.type === "goal" && e.side === "away").length;
-  const min = liveMinute(m);
+  const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
+  const storedAway = m.away_score ?? events.filter((e) => e.type === "goal" && e.side === "away").length;
+  const displayedHome = storedHome + (pending?.type === "goal" && pending.side === "home" ? 1 : 0);
+  const displayedAway = storedAway + (pending?.type === "goal" && pending.side === "away" ? 1 : 0);
+  const sideTeamId = (side) => (side === "home" ? m.home_id : m.away_id);
+  const fullTimeLocked = m.status === "ft" && Boolean(m.locked_at);
+  const canRecord = ["live", "et_live"].includes(m.status) || (m.status === "ft" && !m.locked_at);
+  const canCorrect = m.status !== "scheduled" && !fullTimeLocked;
 
-  const clash = !!(homeKit && awayKit && sameColor(homeKit, awayKit));
+  async function run(operation, closePending = false) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await operation();
+      if (result?.error) throw result.error;
+      if (closePending) setPending(null);
+      await load();
+      return true;
+    } catch (operationError) {
+      setError(operationError.message || "The action could not be completed.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  async function changeStatus(s) { setBusy(true); await setStatus(id, s); await load(); setBusy(false); }
-  async function saveEvent(ev) { setBusy(true); await addEvent(id, ev); setForm(null); await load(); setBusy(false); }
-  async function removeEvent(eid) { setBusy(true); await deleteEvent(eid); await load(); setBusy(false); }
-  async function saveKits() { if (clash) return; setBusy(true); await setKits(id, homeKit, awayKit); await load(); setBusy(false); }
-  // Kick-off persists the kits, then sets the match live. Blocked while colours clash.
-  async function kickoff() { if (clash) return; setBusy(true); await setKits(id, homeKit, awayKit); await setStatus(id, "live"); await load(); setBusy(false); }
+  function beginEvent(type, side) {
+    if (!canRecord || busy) return;
+    setError("");
+    setPending({ type, side });
+  }
 
-  const statuses = [["live", "Kick off / Live"], ["ht", "Half time"], ["ft", "Full time"], ["scheduled", "Reset"]];
+  async function commitPending(player) {
+    if (!pending) return;
+    const event = {
+      type: pending.type,
+      side: pending.side,
+      player_id: player?.id || null,
+      player: player?.name || (pending.type === "goal" ? "Unknown scorer" : "Unknown player"),
+    };
+    await run(() => recordMatchEvent(id, event), true);
+  }
+
+  async function undoLast(type, side) {
+    const latest = events
+      .filter((event) => event.type === type && event.side === side)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (latest) await run(() => deleteMatchEvent(latest.id));
+  }
+
+  async function changeStatus(status) {
+    await run(() => transitionMatchStatus(id, status));
+  }
+
+  async function deliberatelyReopen() {
+    const reason = window.prompt("Why are you reopening this full-time match? This is stored in the audit log.");
+    if (reason === null) return;
+    await run(() => reopenMatch(id, reason));
+  }
+
+  async function setStoppageTime(minutes) {
+    await run(() => setMatchStoppageTime(id, minutes));
+  }
+
+  async function removeEvent(eventId) {
+    await run(() => deleteMatchEvent(eventId));
+  }
+
+  async function saveSub(side, on, off) {
+    const saved = await run(() => recordMatchEvent(id, { type: "sub", side, player: on, assist: off }));
+    if (saved) setSubFor(null);
+  }
+
+  function changeStat(key, value) {
+    const parsed = Number(value);
+    const nextValue = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    setStats((current) => {
+      if (key === "home_possession" || key === "away_possession") {
+        const possession = Math.min(100, Math.round(nextValue));
+        const oppositeKey = key === "home_possession" ? "away_possession" : "home_possession";
+        return { ...current, [key]: possession, [oppositeKey]: 100 - possession };
+      }
+      return { ...current, [key]: nextValue };
+    });
+    setStatsMessage("");
+  }
+
+  async function saveStatistics() {
+    if (Number(stats.home_possession) + Number(stats.away_possession) !== 100) {
+      setStatsMessage("Possession must total 100%.");
+      return;
+    }
+    const saved = await run(() => saveMatchStats(id, stats));
+    setStatsMessage(saved ? "Stats saved." : "Stats were not saved.");
+  }
+
+  const actions = statusActions(m.status, fullTimeLocked);
 
   return (
     <div>
       <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
 
-      {/* scoreboard */}
-      <div style={{ background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 18, margin: "12px 0", textAlign: "center" }}>
+      <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
-          <TeamBadge t={home} />
-          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{hs} <span style={{ color: "#5B6069" }}>-</span> {as}</div>
-          <TeamBadge t={away} />
+          <Badge t={home} />
+          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "#5B6069" }}>-</span> {displayedAway}</div>
+          <Badge t={away} />
         </div>
-        <div style={{ marginTop: 8, color: m.status === "live" ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
-          {m.status === "live" ? `LIVE ${min}′` : m.status.toUpperCase()}
+        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
+          {clockStatus(m, now)}
         </div>
+        {pending?.type === "goal" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Score pending scorer confirmation</div>}
       </div>
 
-      {/* kits — set the colours each team wears for THIS match (drives the live stats bars) */}
-      <div style={{ ...card }}>
-        <div style={label}>KITS FOR THIS MATCH</div>
-        <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
-          Set the colour each team wears today. The away team must switch if it clashes with the home colour. These colours drive the live stats bars — the crests keep each team&rsquo;s identity colour.
-        </div>
-        {[["home", home, homeKit, setHomeKit, awayKit], ["away", away, awayKit, setAwayKit, homeKit]].map(([side, team, val, setVal, other]) => (
-          <div key={side} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-            <span style={{ width: 26, height: 26, borderRadius: "50%", background: val || "#333", display: "inline-block", boxShadow: "0 0 0 2px #26282B", flexShrink: 0 }} />
-            <span style={{ width: 120 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{team.name}</span>
-              <div style={{ color: "#5B6069", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{side === "home" ? "Home kit" : "Away kit"}</div>
-            </span>
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-              {KIT_PALETTE.map((c) => {
-                const isClash = sameColor(c, other);
-                const on = sameColor(c, val);
-                return (
-                  <button key={c} type="button" disabled={isClash} onClick={() => setVal(c)}
-                    title={isClash ? "Clashes with the other team" : c}
-                    style={{ width: 26, height: 26, borderRadius: "50%", background: c, cursor: isClash ? "not-allowed" : "pointer", opacity: isClash ? 0.2 : 1, border: on ? "2px solid #fff" : "2px solid transparent", boxShadow: on ? "none" : "0 0 0 1px #2A2C30" }} />
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {clash && <div style={{ color: "#F04444", fontSize: 13, fontWeight: 700, marginTop: 4 }}>⚠ Kit clash — the away team must switch to a different colour before kick-off.</div>}
-        <div style={{ marginTop: 10 }}>
-          <button disabled={busy || clash} onClick={saveKits}
-            style={{ ...pill, background: "#0E0F11", color: "#fff", opacity: (busy || clash) ? 0.5 : 1, cursor: (busy || clash) ? "not-allowed" : "pointer" }}>Save kits</button>
-        </div>
-      </div>
+      {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
-      {/* status */}
-      <div style={{ ...card }}>
+      <div style={card}>
         <div style={label}>MATCH STATUS</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {statuses.map(([s, txt]) => {
-            const blocked = s === "live" && clash;
-            return (
-              <button key={s} disabled={busy || blocked} onClick={() => (s === "live" ? kickoff() : changeStatus(s))}
-                title={blocked ? "Resolve the kit clash before kick-off" : ""}
-                style={{ ...pill, background: m.status === s ? "#4FC263" : "#0E0F11", color: m.status === s ? "#062" : "#fff", opacity: blocked ? 0.5 : 1, cursor: blocked ? "not-allowed" : "pointer" }}>{txt}</button>
-            );
-          })}
+          {actions.map((action) => (
+            <button key={action.status} disabled={busy} onClick={() => changeStatus(action.status)}
+              style={{ ...pill, background: action.primary ? "#4FC263" : "#0E0F11", color: action.primary ? "#062" : "#fff" }}>{action.label}</button>
+          ))}
+          {role === "admin" && fullTimeLocked && (
+            <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
+          )}
         </div>
+        {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
+        {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>
 
-      {/* add events */}
-      <div style={{ ...card }}>
-        <div style={label}>ADD EVENT</div>
+      {["live", "et_live"].includes(m.status) && (
+        <div style={card}>
+          <div style={label}>STOPPAGE TIME</div>
+          <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+            {periodName(m.current_period)} · {announcedStoppageMinutes(m) > 0 ? `+${announcedStoppageMinutes(m)} announced` : "none announced"}
+          </div>
+          <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>
+            Tap the minimum added time indicated by the referee. The clock will continue until you end the period.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 7 }}>
+            {Array.from({ length: 11 }, (_, minutes) => (
+              <button
+                key={minutes}
+                disabled={busy}
+                onClick={() => setStoppageTime(minutes)}
+                style={{
+                  ...stoppageButton,
+                  background: announcedStoppageMinutes(m) === minutes ? "#4FC263" : "#0E0F11",
+                  color: announcedStoppageMinutes(m) === minutes ? "#062" : "#fff",
+                }}
+              >
+                {minutes === 0 ? "None" : `+${minutes}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
         {[["home", home], ["away", away]].map(([side, team]) => (
-          <div key={side} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <TeamBadge t={team} size={24} />
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{team.name}</span>
-            <button style={ebtn} onClick={() => setForm({ type: "goal", side })}>⚽ Goal</button>
-            <button style={{ ...ebtn, color: "#F5C518" }} onClick={() => setForm({ type: "yellow", side })}>Yellow</button>
-            <button style={{ ...ebtn, color: "#F04444" }} onClick={() => setForm({ type: "red", side })}>Red</button>
-            <button style={ebtn} onClick={() => setForm({ type: "sub", side })}>Sub</button>
+          <div key={side} style={{ ...card, marginBottom: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
+            </div>
+            <button disabled={busy || !canRecord} onClick={() => beginEvent("goal", side)}
+              style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>
+              ⚽ + GOAL
+            </button>
+            <button disabled={busy || !canCorrect} onClick={() => undoLast("goal", side)}
+              style={{ ...undoButton, opacity: canCorrect ? 1 : 0.45 }}>
+              Undo last goal
+            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button disabled={busy || !canRecord} onClick={() => beginEvent("yellow", side)} style={{ ...half, background: "#3a3410", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>+ Yellow</button>
+              <button disabled={busy || !canRecord} onClick={() => beginEvent("red", side)} style={{ ...half, background: "#3a1616", color: "#F04444", opacity: canRecord ? 1 : 0.45 }}>+ Red</button>
+            </div>
+            <button disabled={busy || !canRecord} onClick={() => setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
           </div>
         ))}
       </div>
 
-      {/* event log */}
-      <div style={{ ...card }}>
+      <div style={card}>
+        <MatchStatsBoard
+          home={home}
+          away={away}
+          stats={stats}
+          busy={busy}
+          message={statsMessage}
+          onChange={changeStat}
+          onSave={saveStatistics}
+        />
+      </div>
+
+      <div style={card}>
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
-        {[...events].sort((a, b) => (a.minute || 0) - (b.minute || 0)).map((e) => (
-          <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid #26282B" }}>
-            <span style={{ fontFamily: "monospace", color: "#8E939B", width: 34, fontSize: 13 }}>{e.minute}′</span>
-            <span style={{ fontSize: 13 }}>{icon(e.type)}</span>
-            <span style={{ flex: 1, fontSize: 14 }}>
-              {e.type === "sub" ? <><span style={{ color: "#3FC463" }}>{e.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{e.assist}</span></> : e.player}
-              <span style={{ color: "#5B6069" }}> · {e.side}</span>
-            </span>
-            <button onClick={() => removeEvent(e.id)} style={{ background: "none", border: "none", color: "#8E939B", cursor: "pointer", fontSize: 13 }}>Delete</button>
-          </div>
+        {[...events].sort(eventOrder).map((event) => (
+          <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} />
         ))}
       </div>
 
-      {form && <EventForm form={form} home={home} away={away} defaultMinute={min} onCancel={() => setForm(null)} onSave={saveEvent} />}
+      {pending && (
+        <AttributionModal
+          pending={pending}
+          team={pending.side === "home" ? home : away}
+          squad={squads[sideTeamId(pending.side)] || []}
+          busy={busy}
+          onCancel={() => !busy && setPending(null)}
+          onChoose={commitPending}
+        />
+      )}
+      {subFor && <SubForm side={subFor} team={subFor === "home" ? home : away} squad={squads[sideTeamId(subFor)] || []} busy={busy} onCancel={() => !busy && setSubFor(null)} onSave={saveSub} />}
     </div>
   );
 }
 
-function EventForm({ form, home, away, defaultMinute, onCancel, onSave }) {
-  const team = form.side === "home" ? home : away;
-  const [player, setPlayer] = useState("");
-  const [assist, setAssist] = useState("");
-  const [minute, setMinute] = useState(defaultMinute || 0);
-  const isSub = form.type === "sub";
-  const title = form.type === "goal" ? "Goal" : form.type === "yellow" ? "Yellow card" : form.type === "red" ? "Red card" : "Substitution";
-  function save() {
-    if (!player.trim()) return;
-    onSave({ type: form.type, side: form.side, minute: Number(minute) || 0, player: player.trim(), assist: (isSub || form.type === "goal") ? (assist.trim() || null) : null });
-  }
+function AdminMatchShell({ error, onRetry }) {
+  return <div>
+    <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
+    <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18 }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
+        <div style={{ width: 82, height: 24, borderRadius: 7, background: "#24262A" }} />
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
+      </div>
+    </div>
+    {error && <div style={{ ...card, color: "#F7B4B4" }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>{error}</div>
+      <button onClick={onRetry} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062" }}>Try again</button>
+    </div>}
+  </div>;
+}
+
+function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave }) {
+  const rows = [
+    ["Ball possession (%)", "home_possession", "away_possession"],
+    ["Total shots", "home_total_shots", "away_total_shots"],
+    ["Shots on target", "home_shots_on_target", "away_shots_on_target"],
+    ["Corners", "home_corners", "away_corners"],
+    ["Fouls", "home_fouls", "away_fouls"],
+    ["Offsides", "home_offsides", "away_offsides"],
+    ["Yellow cards", "home_yellow_cards", "away_yellow_cards"],
+    ["Red cards", "home_red_cards", "away_red_cards"],
+  ];
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 }} onClick={onCancel}>
-      <div style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontWeight: 800, marginBottom: 12 }}>{title} · {team.name}</div>
-        <label style={flabel}>{isSub ? "Player coming ON" : "Player"}</label>
-        <input autoFocus value={player} onChange={(e) => setPlayer(e.target.value)} style={finp} />
-        {(isSub || form.type === "goal") && <>
-          <label style={flabel}>{isSub ? "Player going OFF" : "Assist (optional)"}</label>
-          <input value={assist} onChange={(e) => setAssist(e.target.value)} style={finp} />
-        </>}
-        <label style={flabel}>Minute</label>
-        <input type="number" value={minute} onChange={(e) => setMinute(e.target.value)} style={finp} />
-        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-          <button onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
-          <button onClick={save} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" }}>Add</button>
+    <div>
+      <div style={label}>MATCH STATISTICS</div>
+      <div style={{ display: "grid", gridTemplateColumns: "80px minmax(140px, 1fr) 80px", gap: 12, alignItems: "center" }}>
+        <strong style={{ textAlign: "center", fontSize: 13 }}>{home.short}</strong>
+        <span />
+        <strong style={{ textAlign: "center", fontSize: 13 }}>{away.short}</strong>
+        {rows.map(([rowLabel, homeKey, awayKey]) => (
+          <div key={rowLabel} style={{ display: "contents" }}>
+            <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[homeKey]} onChange={(event) => onChange(homeKey, event.target.value)} style={statInput} />
+            <span style={{ color: "#AAB0BA", fontSize: 13, textAlign: "center" }}>{rowLabel}</span>
+            <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[awayKey]} onChange={(event) => onChange(awayKey, event.target.value)} style={statInput} />
+          </div>
+        ))}
+      </div>
+      <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "#0E0F11", color: "#fff" }}>{busy ? "Saving…" : "Save stats"}</button>
+      {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: 12, marginTop: 8 }}>{message}</div>}
+    </div>
+  );
+}
+
+function statusActions(status, locked) {
+  if (status === "scheduled") return [{ status: "live", label: "Kick off", primary: true }];
+  if (status === "live") return [{ status: "ht", label: "Half time" }, { status: "ft", label: "Full time", primary: true }];
+  if (status === "ht") return [{ status: "live", label: "Start second half", primary: true }, { status: "ft", label: "End match" }];
+  if (status === "et_live") return [{ status: "et_ht", label: "Extra-time break" }, { status: "ft", label: "Full time", primary: true }];
+  if (status === "et_ht") return [{ status: "et_live", label: "Resume extra time", primary: true }, { status: "ft", label: "End match" }];
+  if (status === "ft" && !locked) return [{ status: "ft", label: "Lock full time", primary: true }];
+  return [{ status: "et_live", label: "Start extra time" }];
+}
+
+function clockStatus(match, now) {
+  if (match.status === "live") return `LIVE ${formatMatchClock(match, now)}`;
+  if (match.status === "et_live") return `EXTRA TIME ${formatMatchClock(match, now)}`;
+  if (match.status === "ht") return `HALF TIME · ${formatMatchClock(match, now)}`;
+  if (match.status === "et_ht") return `EXTRA-TIME BREAK · ${formatMatchClock(match, now)}`;
+  if (match.status === "ft" && !match.locked_at) return "FULL TIME · REOPENED";
+  if (match.status === "ft") return "FULL TIME · LOCKED";
+  return "SCHEDULED";
+}
+
+function periodName(period) {
+  if (period === 1) return "First half";
+  if (period === 2) return "Second half";
+  if (period === 3) return "First half of extra time";
+  if (period === 4) return "Second half of extra time";
+  return "Current period";
+}
+
+function eventOrder(a, b) {
+  const aSeconds = a.elapsed_seconds ?? (a.minute == null ? 0 : a.minute * 60);
+  const bSeconds = b.elapsed_seconds ?? (b.minute == null ? 0 : b.minute * 60);
+  return Number(a.period || 1) - Number(b.period || 1)
+    || aSeconds - bSeconds
+    || new Date(a.created_at) - new Date(b.created_at);
+}
+
+function scorerEventMinute(event, match) {
+  const duration = Number(match.competition?.match_duration_minutes || 90);
+  const extraTime = Number(match.competition?.extra_time_minutes || 30);
+  const period = Number(event.period || 1);
+  const minute = Number(event.display_minute ?? event.minute ?? 1);
+  const periodEnd = period === 1 ? duration / 2
+    : period === 2 ? duration
+    : period === 3 ? duration + extraTime / 2
+    : duration + extraTime;
+  return minute > periodEnd ? `${periodEnd}+${minute - periodEnd}′` : `${minute}′`;
+}
+
+function EventRow({ event, match, locked, onRemove }) {
+  const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
+      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
+      <span style={{ fontSize: 14 }}>{emoji}</span>
+      {event.type === "sub" ? (
+        <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
+      ) : (
+        <span style={{ flex: 1, fontSize: 14, color: "#fff" }}>{event.player || (event.type === "goal" ? "Unknown scorer" : "Unknown player")}</span>
+      )}
+      <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
+      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+    </div>
+  );
+}
+
+function AttributionModal({ pending, team, squad, busy, onCancel, onChoose }) {
+  const [query, setQuery] = useState("");
+  const filtered = squad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
+  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Who received the yellow card?" : "Who received the red card?";
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 380, maxHeight: "82vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={team} size={30} /><strong>{title}</strong></div>
+        <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>{pending.type === "goal" ? "The score is shown immediately and saved only after this confirmation." : "Choose a squad player or use the unknown option."}</div>
+        <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
+        <div style={{ display: "grid", gap: 7 }}>
+          {filtered.map((player) => (
+            <button key={player.id} disabled={busy} onClick={() => onChoose(player)} style={playerButton}>
+              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
+            </button>
+          ))}
+          {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
+        </div>
+        <button disabled={busy} onClick={() => onChoose(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518" }}>{pending.type === "goal" ? "Use Unknown scorer" : "Use Unknown player"}</button>
+        <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
+      </div>
+    </div>
+  );
+}
+
+function SubForm({ side, team, squad, busy, onCancel, onSave }) {
+  const [on, setOn] = useState("");
+  const [off, setOff] = useState("");
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div role="dialog" aria-modal="true" style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution · {team.name}</div>
+        <label style={flabel}>Player coming ON</label>
+        <input list="sub-on" value={on} onChange={(event) => setOn(event.target.value)} style={finp} />
+        <label style={flabel}>Player going OFF</label>
+        <input list="sub-off" value={off} onChange={(event) => setOff(event.target.value)} style={finp} />
+        <datalist id="sub-on">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
+        <datalist id="sub-off">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
+          <button disabled={busy || !on.trim() || !off.trim()} onClick={() => onSave(side, on.trim(), off.trim())} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" }}>Add</button>
         </div>
       </div>
     </div>
   );
 }
-function icon(type) { return type === "goal" ? "⚽" : type === "yellow" ? "🟨" : type === "red" ? "🟥" : "🔁"; }
-function TeamBadge({ t, size = 40 }) {
-  return <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-    <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>
-  </span>;
+
+function Badge({ t, size = 40 }) {
+  return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
 }
+
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };
 const label = { color: "#8E939B", fontSize: 12, fontWeight: 700, marginBottom: 10 };
 const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
-const ebtn = { padding: "6px 12px", borderRadius: 8, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const goalButton = { width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: 18, cursor: "pointer", marginBottom: 8 };
+const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid #2A2C30", background: "transparent", color: "#8E939B", fontSize: 12, cursor: "pointer", marginBottom: 10 };
+const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 };
 const flabel = { display: "block", color: "#8E939B", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
 const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
+const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
+const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, textAlign: "center", outline: "none" };

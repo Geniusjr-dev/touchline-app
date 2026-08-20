@@ -47,6 +47,20 @@ function MonoFootball({ size = 14, color = "#FFFFFF" }) {
   );
 }
 
+function goalTypeSuffix(goalType) {
+  if (goalType === "penalty") return " (Pen)";
+  if (goalType === "own_goal") return " (OG)";
+  if (goalType === "free_kick") return " (FK)";
+  return "";
+}
+
+function goalTypeName(goalType) {
+  if (goalType === "penalty") return "Penalty";
+  if (goalType === "own_goal") return "Own goal";
+  if (goalType === "free_kick") return "Free kick";
+  return null;
+}
+
 function breakClock(match) {
   const duration = Number(match.matchDurationMinutes || 90);
   const extraTime = Number(match.extraTimeMinutes || 30);
@@ -58,7 +72,7 @@ function scorerSummary(events, side) {
   const grouped = new Map();
   (events || []).filter((event) => event.type === "goal" && event.side === side && hasKnownScorer(event.player)).forEach((event) => {
     const player = event.player.trim();
-    const minute = fotMobMinuteLabel(event.min || `${event.displayMinute || 1}'`);
+    const minute = `${fotMobMinuteLabel(event.min || `${event.displayMinute || 1}'`)}${goalTypeSuffix(event.goalType)}`;
     if (!grouped.has(player)) grouped.set(player, []);
     grouped.get(player).push(minute);
   });
@@ -399,9 +413,35 @@ function Timeline({ t, events = [], match }) {
   );
 }
 function RunScore({ score, scored, t }) {
-  const [x, y] = score.split(" - ");
+  const [x, y] = String(score || "0 - 0").split(" - ");
   return <span style={{ color: t.dim, fontSize: 13 }}>(<span style={{ color: scored === "home" ? t.green : t.dim, fontWeight: 700 }}>{x}</span> - <span style={{ color: scored === "away" ? t.green : t.dim, fontWeight: 700 }}>{y}</span>)</span>;
 }
+
+function GoalEvent({ e, t }) {
+  const knownScorer = hasKnownScorer(e.player);
+  const knownAssist = hasKnownScorer(e.assist);
+  const typeName = goalTypeName(e.goalType);
+  const primaryText = knownScorer ? `${e.player}${goalTypeSuffix(e.goalType)}` : typeName;
+  const align = e.side === "home" ? "left" : "right";
+  const justify = e.side === "home" ? "flex-start" : "flex-end";
+  const content = (
+    <div style={{ minWidth: 0, textAlign: align }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: justify, gap: 5, minHeight: 16, lineHeight: "16px" }}>
+        {primaryText && <span style={{ color: t.text, fontSize: 13.5, fontWeight: 700 }}>{primaryText}</span>}
+        <RunScore score={e.score} scored={e.scored} t={t} />
+      </div>
+      {knownAssist && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: 3 }}>Assist by {e.assist}</div>}
+    </div>
+  );
+  const minute = <span style={{ color: t.text, fontSize: 13, fontWeight: 700, lineHeight: "16px", whiteSpace: "nowrap" }}>{fotMobMinuteLabel(e.min)}</span>;
+  const ball = <span className="inline-flex items-center justify-center" style={{ width: 16, height: 16 }}><MonoFootball size={15} color={t.text} /></span>;
+
+  if (e.side === "home") {
+    return <div className="py-2.5" style={{ display: "grid", gridTemplateColumns: "38px 16px minmax(0, 1fr)", columnGap: 8, alignItems: "start", paddingRight: 12 }}>{minute}{ball}{content}</div>;
+  }
+  return <div className="py-2.5" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 16px 38px", columnGap: 8, alignItems: "start", paddingLeft: 12 }}>{content}{ball}<span style={{ textAlign: "right" }}>{minute}</span></div>;
+}
+
 function Ev({ e, t }) {
   if (e.type === "half" || e.type === "full") {
     return <div className="flex items-center gap-3 py-3">
@@ -413,8 +453,8 @@ function Ev({ e, t }) {
       <div className="flex-1" style={{ height: 1, background: t.divider }} />
     </div>;
   }
-  const icon = e.type === "goal" ? <MonoFootball size={16} color={t.text} />
-    : e.type === "yellow" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.yellow, display: "inline-block" }} />
+  if (e.type === "goal") return <GoalEvent e={e} t={t} />;
+  const icon = e.type === "yellow" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.yellow, display: "inline-block" }} />
     : e.type === "red" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.red, display: "inline-block" }} />
     : <span className="inline-flex flex-col items-center" style={{ gap: 2 }}>
         <span className="inline-flex items-center justify-center rounded-full" style={{ width: 15, height: 15, background: t.green }}><ArrowUp size={10} color="#fff" strokeWidth={3} /></span>
@@ -427,13 +467,6 @@ function Ev({ e, t }) {
       return <div style={{ textAlign: align }}>
         {playerOn && <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{playerOn}</div>}
         {playerOff && <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{playerOff}</div>}
-      </div>;
-    }
-    if (e.type === "goal") {
-      const knownScorer = hasKnownScorer(e.player);
-      return <div style={{ textAlign: align }}>
-        <div style={{ fontSize: 14 }}>{knownScorer && <span style={{ color: t.text, fontWeight: 700 }}>{e.player} </span>}<RunScore score={e.score} scored={e.scored} t={t} /></div>
-        {knownScorer && hasKnownScorer(e.assist) && <div style={{ color: t.dim, fontSize: 12 }}>Assist by {e.assist}</div>}
       </div>;
     }
     return hasKnownScorer(e.player)
@@ -488,7 +521,15 @@ function goalCommentary(event, match, home, away) {
   const scoringTeamScore = Number(event.side === "away" ? awayScore : homeScore);
   const concedingTeamScore = Number(event.side === "away" ? homeScore : awayScore);
   const scoreline = `${scoringTeam.name} ${scoringTeamScore}, ${concedingTeam.name} ${concedingTeamScore}.`;
-  const scorer = hasKnownScorer(event.player) ? ` Scored by: ${event.player}.` : "";
+  const knownScorer = hasKnownScorer(event.player);
+  const scorer = event.goalType === "own_goal"
+    ? knownScorer ? ` Own goal by: ${event.player}.` : " Own goal."
+    : event.goalType === "penalty"
+      ? knownScorer ? ` Penalty scored by: ${event.player}.` : " Penalty."
+      : event.goalType === "free_kick"
+        ? knownScorer ? ` Free kick scored by: ${event.player}.` : " Direct free kick."
+        : knownScorer ? ` Scored by: ${event.player}.` : "";
+  const assist = event.goalType !== "own_goal" && hasKnownScorer(event.assist) ? ` Assisted by: ${event.assist}.` : "";
   const duration = Number(match.matchDurationMinutes || 90);
   const extraTime = Number(match.extraTimeMinutes || 30);
   const displayedMinute = Number(event.displayMinute || Math.max(1, Math.ceil(rawEventSeconds(event) / 60)));
@@ -505,15 +546,15 @@ function goalCommentary(event, match, home, away) {
 
   if (late && equaliser) {
     return friendly
-      ? `GOALLLLLL! ${scoringTeam.name} find a late equaliser. ${scoreline}${scorer}`
-      : `GOALLLLLLLLLLLLLL! Late drama! ${scoringTeam.name} draw level ${moment}! ${scoreline}${scorer}`;
+      ? `GOALLLLLL! ${scoringTeam.name} find a late equaliser. ${scoreline}${scorer}${assist}`
+      : `GOALLLLLLLLLLLLLL! Late drama! ${scoringTeam.name} draw level ${moment}! ${scoreline}${scorer}${assist}`;
   }
   if (late && takesLead) {
     return friendly
-      ? `GOALLLLLL! A late goal puts ${scoringTeam.name} in front. ${scoreline}${scorer}`
-      : `GOALLLLLLLLLLLLLL! Incredible late drama! ${scoringTeam.name} take the lead ${moment}. Could this be the winner? ${scoreline}${scorer}`;
+      ? `GOALLLLLL! A late goal puts ${scoringTeam.name} in front. ${scoreline}${scorer}${assist}`
+      : `GOALLLLLLLLLLLLLL! Incredible late drama! ${scoringTeam.name} take the lead ${moment}. Could this be the winner? ${scoreline}${scorer}${assist}`;
   }
-  return `GOAL! ${scoreline}${scorer}`;
+  return `GOAL! ${scoreline}${scorer}${assist}`;
 }
 
 function commentaryMilestones(match, includeHalfTime = true) {

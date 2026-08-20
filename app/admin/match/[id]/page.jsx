@@ -24,6 +24,16 @@ import {
 } from "@/lib/db";
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/i;
+const GOAL_TYPES = [
+  { value: "direct_goal", label: "Direct goal" },
+  { value: "penalty", label: "Penalty" },
+  { value: "own_goal", label: "Own goal" },
+  { value: "free_kick", label: "Free kick" },
+];
+
+function goalTypeLabel(value) {
+  return GOAL_TYPES.find((item) => item.value === value)?.label || "Direct goal";
+}
 
 function normalizeKitColor(color, fallback) {
   const next = String(color || "").trim().toUpperCase();
@@ -187,16 +197,22 @@ export default function Scorer() {
   function beginEvent(type, side) {
     if (!canRecord || busy) return;
     setError("");
-    setPending({ type, side });
+    setPending({ type, side, goalType: type === "goal" ? "direct_goal" : null });
   }
 
-  async function commitPending(player) {
+  async function commitPending(selection) {
     if (!pending) return;
+    const player = selection?.player || null;
+    const assist = selection?.assist || null;
     const event = {
       type: pending.type,
       side: pending.side,
       player_id: player?.id || null,
-      player: player?.name || (pending.type === "goal" ? "Unknown scorer" : "Unknown player"),
+      player: player?.name || null,
+      assist: assist?.name || null,
+      goal_type: pending.type === "goal"
+        ? (selection?.goalType || pending.goalType || "direct_goal")
+        : null,
     };
     await run(() => recordMatchEvent(id, event), true);
   }
@@ -389,8 +405,10 @@ export default function Scorer() {
       {pending && (
         <AttributionModal
           pending={pending}
-          team={pending.side === "home" ? home : away}
-          squad={squads[sideTeamId(pending.side)] || []}
+          scoringTeam={pending.side === "home" ? home : away}
+          scoringSquad={squads[sideTeamId(pending.side)] || []}
+          opponentTeam={pending.side === "home" ? away : home}
+          opponentSquad={squads[sideTeamId(pending.side === "home" ? "away" : "home")] || []}
           busy={busy}
           onCancel={() => !busy && setPending(null)}
           onChoose={commitPending}
@@ -526,6 +544,7 @@ function scorerEventMinute(event, match) {
 
 function EventRow({ event, match, locked, onRemove }) {
   const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
+  const eventName = event.player || (event.type === "goal" ? "Scorer not recorded" : "Player not recorded");
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
       <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
@@ -533,7 +552,10 @@ function EventRow({ event, match, locked, onRemove }) {
       {event.type === "sub" ? (
         <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
       ) : (
-        <span style={{ flex: 1, fontSize: 14, color: "#fff" }}>{event.player || (event.type === "goal" ? "Unknown scorer" : "Unknown player")}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#fff" }}>
+          <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : ""}</span>
+          {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
+        </span>
       )}
       <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
       <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
@@ -541,25 +563,97 @@ function EventRow({ event, match, locked, onRemove }) {
   );
 }
 
-function AttributionModal({ pending, team, squad, busy, onCancel, onChoose }) {
+function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, opponentSquad, busy, onCancel, onChoose }) {
   const [query, setQuery] = useState("");
-  const filtered = squad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
+  const [goalType, setGoalType] = useState(pending.goalType || "direct_goal");
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedAssist, setSelectedAssist] = useState(null);
+  const [hasChosenScorer, setHasChosenScorer] = useState(false);
+  const isGoal = pending.type === "goal";
+  const scorerTeam = isGoal && goalType === "own_goal" ? opponentTeam : scoringTeam;
+  const scorerSquad = isGoal && goalType === "own_goal" ? opponentSquad : scoringSquad;
+  const filtered = scorerSquad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
+  const assistOptions = scoringSquad.filter((player) => player.id !== selectedPlayer?.id);
   const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Who received the yellow card?" : "Who received the red card?";
+
+  function chooseGoalType(nextGoalType) {
+    setGoalType(nextGoalType);
+    setSelectedPlayer(null);
+    setSelectedAssist(null);
+    setHasChosenScorer(false);
+    setQuery("");
+  }
+
+  function chooseScorer(player) {
+    setSelectedPlayer(player);
+    setHasChosenScorer(true);
+    if (player?.id === selectedAssist?.id) setSelectedAssist(null);
+  }
+
+  function submitGoal() {
+    if (!hasChosenScorer || busy) return;
+    onChoose({
+      player: selectedPlayer,
+      assist: goalType === "own_goal" ? null : selectedAssist,
+      goalType,
+    });
+  }
+
   return (
     <div style={overlay} onClick={onCancel}>
-      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 380, maxHeight: "82vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={team} size={30} /><strong>{title}</strong></div>
-        <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>{pending.type === "goal" ? "The score is shown immediately and saved only after this confirmation." : "Choose a squad player or use the unknown option."}</div>
+      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 420, maxHeight: "88vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={scorerTeam} size={30} /><strong>{title}</strong></div>
+        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+          {isGoal
+            ? goalType === "own_goal"
+              ? `The goal benefits ${scoringTeam.name}. Select the scorer from ${opponentTeam.name}.`
+              : "The score is shown immediately and is saved after this confirmation."
+            : "Choose a squad player or record the card without a player name."}
+        </div>
+
+        {isGoal && (
+          <>
+            <div style={{ ...flabel, marginTop: 0 }}>Goal type</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7, marginBottom: 14 }}>
+              {GOAL_TYPES.map((item) => {
+                const selected = goalType === item.value;
+                return <button key={item.value} disabled={busy} onClick={() => chooseGoalType(item.value)} style={{ ...playerButton, justifyContent: "center", background: selected ? "#4FC263" : "#0E0F11", color: selected ? "#062" : "#fff", borderColor: selected ? "#4FC263" : "#2A2C30", fontWeight: 800 }}>{item.label}</button>;
+              })}
+            </div>
+            <div style={flabel}>Scorer</div>
+          </>
+        )}
+
         <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
         <div style={{ display: "grid", gap: 7 }}>
           {filtered.map((player) => (
-            <button key={player.id} disabled={busy} onClick={() => onChoose(player)} style={playerButton}>
+            <button key={player.id} disabled={busy} onClick={() => isGoal ? chooseScorer(player) : onChoose({ player })} style={{ ...playerButton, borderColor: isGoal && selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30" }}>
               <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
             </button>
           ))}
-          {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
+          {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
         </div>
-        <button disabled={busy} onClick={() => onChoose(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518" }}>{pending.type === "goal" ? "Use Unknown scorer" : "Use Unknown player"}</button>
+
+        <button disabled={busy} onClick={() => isGoal ? chooseScorer(null) : onChoose({ player: null })} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: isGoal && hasChosenScorer && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
+
+        {isGoal && hasChosenScorer && goalType !== "own_goal" && (
+          <div style={{ marginTop: 14 }}>
+            <label htmlFor="goal-assist" style={flabel}>Assist, optional</label>
+            <select
+              id="goal-assist"
+              value={selectedAssist?.id || ""}
+              onChange={(event) => setSelectedAssist(assistOptions.find((player) => player.id === event.target.value) || null)}
+              style={finp}
+            >
+              <option value="">No assist</option>
+              {assistOptions.map((player) => <option key={player.id} value={player.id}>{player.number ? `${player.number} ` : ""}{player.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {isGoal && (
+          <button disabled={busy || !hasChosenScorer} onClick={submitGoal} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !hasChosenScorer ? "not-allowed" : "pointer", opacity: busy || !hasChosenScorer ? 0.45 : 1 }}>Record goal</button>
+        )}
         <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
       </div>
     </div>

@@ -18,6 +18,7 @@ export default function Teams() {
   const [displayName, setDisplayName] = useState("");
   const [short, setShort] = useState("");
   const [color, setColor] = useState(COLORS[0]);
+  const [logoFile, setLogoFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [openTeam, setOpenTeam] = useState(null);
@@ -28,11 +29,43 @@ export default function Teams() {
   async function submit(event) {
     event.preventDefault();
     if (!name.trim() || !short.trim()) return;
+    if (logoFile && !logoFile.type?.match(/^image\/(jpeg|png|webp)$/)) {
+      setErr("Use a JPG, PNG or WebP team logo.");
+      return;
+    }
+    if (logoFile && logoFile.size > 5 * 1024 * 1024) {
+      setErr("The team logo must be 5 MB or smaller.");
+      return;
+    }
     setBusy(true); setErr("");
-    const { error } = await addTeam(activeOrganizationId, name.trim(), displayName.trim() || null, short.trim().toUpperCase().slice(0, 4), color);
+    const officialName = name.trim();
+    const publicName = displayName.trim() || null;
+    const badgeCode = short.trim().toUpperCase().slice(0, 4);
+    const { data: createdTeam, error } = await addTeam(activeOrganizationId, officialName, publicName, badgeCode, color);
+    if (error) { setBusy(false); setErr(error.message); return; }
+
+    let logoError = "";
+    if (logoFile && createdTeam) {
+      try {
+        const logoUrl = await uploadTeamMedia(logoFile, createdTeam.id, "crests");
+        const saved = await updateTeamProfile(createdTeam.id, {
+          name: officialName,
+          display_name: publicName,
+          short: badgeCode,
+          color,
+          country: "Ghana",
+          logo_url: logoUrl,
+        });
+        if (saved.error) throw saved.error;
+      } catch (uploadError) {
+        logoError = `Team added, but the logo was not saved. ${uploadError.message || "Open the team profile and try again."}`;
+      }
+    }
+
+    setName(""); setDisplayName(""); setShort(""); setLogoFile(null);
+    await load();
     setBusy(false);
-    if (error) { setErr(error.message); return; }
-    setName(""); setDisplayName(""); setShort(""); await load();
+    if (logoError) setErr(logoError);
   }
 
   return (
@@ -46,6 +79,7 @@ export default function Teams() {
           <Field label="Display name (optional)"><input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Euphoria FC" maxLength={40} style={inp} /></Field>
           <Field label="Badge code"><input value={short} onChange={(event) => setShort(event.target.value)} placeholder="EFC" maxLength={4} style={{ ...inp, width: 90, textTransform: "uppercase" }} /></Field>
           <ColourPicker value={color} onChange={setColor} />
+          <NewTeamLogoPicker file={logoFile} onChange={setLogoFile} fallback={short.trim().toUpperCase().slice(0, 4) || "FC"} color={color} />
           <button type="submit" disabled={busy} style={btn}>{busy ? "Adding…" : "Add team"}</button>
         </div>
         {err && <Message error>{err}</Message>}
@@ -124,7 +158,7 @@ function TeamEditor({ team, onSaved }) {
       </div>
       <div style={{ ...formRow, marginTop: 12 }}>
         <ColourPicker value={values.color} onChange={(value) => set("color", value)} />
-        <ImageUpload label="Team crest" src={values.logo_url} onFile={(file) => upload(file, "logo_url", "crests")} fallback={values.short} color={values.color} />
+        <ImageUpload label="Team crest" src={values.logo_url} onFile={(file) => upload(file, "logo_url", "crests")} onRemove={() => set("logo_url", "")} fallback={values.short} color={values.color} />
       </div>
 
       <AdminHeading style={{ marginTop: 22 }}>Coach</AdminHeading>
@@ -295,15 +329,42 @@ function PositionSelect({ value, onChange }) {
   return <select value={value} onChange={(event) => onChange(event.target.value)} style={inp}>{POSITIONS.map((position) => <option key={position}>{position}</option>)}</select>;
 }
 
-function ImageUpload({ label, src, onFile, fallback, color }) {
-  return <Field label={label}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><AdminImage src={src} fallback={fallback} color={color} /><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onFile(event.target.files?.[0])} style={{ color: "#8E939B", fontSize: 11, maxWidth: 180 }} /></div></Field>;
+function NewTeamLogoPicker({ file, onChange, fallback, color }) {
+  const [preview, setPreview] = useState("");
+  useEffect(() => {
+    if (!file) { setPreview(""); return undefined; }
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return (
+    <Field label="Team crest">
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <AdminImage src={preview} fallback={fallback} color={color} />
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onChange(event.target.files?.[0] || null)} style={{ color: "#8E939B", fontSize: 11, maxWidth: 180 }} />
+      </div>
+    </Field>
+  );
+}
+
+function ImageUpload({ label, src, onFile, onRemove, fallback, color }) {
+  return (
+    <Field label={label}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <AdminImage src={src} fallback={fallback} color={color} />
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onFile(event.target.files?.[0])} style={{ color: "#8E939B", fontSize: 11, maxWidth: 180 }} />
+        {src && onRemove && <button type="button" onClick={onRemove} style={{ ...dangerBtn, padding: "7px 9px", fontSize: 11 }}>Remove</button>}
+      </div>
+    </Field>
+  );
 }
 
 function AdminImage({ src, fallback, color = "#30343A" }) {
-  return <span style={{ width: 38, height: 38, borderRadius: "50%", background: color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, fontSize: 11, fontWeight: 850 }}>{src ? (
+  return <span style={{ width: 38, height: 38, borderRadius: src ? 0 : "50%", background: src ? "transparent" : color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, fontSize: 11, fontWeight: 850 }}>{src ? (
     // Supabase public media URLs are administrator-controlled team assets.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
   ) : fallback}</span>;
 }
 

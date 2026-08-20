@@ -4,12 +4,22 @@ import { liveMinute } from "@/lib/db";
 
 export function Crest({ short, color, logo, size = 26, ring }) {
   return (
-    <span className="inline-flex items-center justify-center rounded-full shrink-0 overflow-hidden"
-      style={{ width: size, height: size, background: color, color: "#fff", fontSize: size * 0.36, fontWeight: 800, boxShadow: ring ? `0 0 0 1.5px ${ring}` : "none" }}>
+    <span className="inline-flex items-center justify-center shrink-0"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: logo ? 0 : "50%",
+        background: logo ? "transparent" : color,
+        color: "#fff",
+        fontSize: size * 0.36,
+        fontWeight: 800,
+        boxShadow: ring && !logo ? `0 0 0 1.5px ${ring}` : "none",
+        overflow: "hidden",
+      }}>
       {logo ? (
         // Supabase public media URLs are administrator-controlled team assets.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", background: "transparent" }} />
+        <img src={logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", background: "transparent", filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }} />
       ) : short}
     </span>
   );

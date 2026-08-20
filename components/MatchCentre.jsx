@@ -29,6 +29,15 @@ function hasKnownScorer(player) {
   return Boolean(name && !["unknown", "unknown scorer", "unknown player", "n/a", "na"].includes(name));
 }
 
+function readableTextColor(color) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return "#FFFFFF";
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 155 ? "#07130B" : "#FFFFFF";
+}
+
 function MonoFootball({ size = 14, color = "#FFFFFF" }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 512 512" width={size} height={size} style={{ display: "inline-block", flex: "0 0 auto", color }}>
@@ -121,6 +130,8 @@ export default function MatchCentre({ id }) {
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
+  const homeKitColor = m.homeKitColor || h.color || "#18A558";
+  const awayKitColor = m.awayKitColor || a.color || "#2563EB";
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
@@ -156,7 +167,7 @@ export default function MatchCentre({ id }) {
         </div>
         <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
           <Link href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
-            <Crest short={h.short} color={h.color} logo={h.logoUrl} size={44} ring={t.divider} />
+            <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
           </Link>
           <div className="flex flex-col items-center pt-1">
@@ -174,7 +185,7 @@ export default function MatchCentre({ id }) {
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
           <Link href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
-            <Crest short={a.short} color={a.color} logo={a.logoUrl} size={44} ring={t.divider} />
+            <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
           </Link>
         </div>
@@ -204,7 +215,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
-      {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} />}
+      {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
 
@@ -249,8 +260,10 @@ function Empty({ t, title, note }) {
   </Card>;
 }
 
-function StatsTab({ t, stats }) {
+function StatsTab({ t, stats, homeColor, awayColor }) {
   const s = { ...EMPTY_MATCH_STATS, ...(stats || {}) };
+  const homeTextColor = readableTextColor(homeColor);
+  const awayTextColor = readableTextColor(awayColor);
   const rows = [
     ["Total shots", s.home_total_shots, s.away_total_shots],
     ["Shots on target", s.home_shots_on_target, s.away_shots_on_target],
@@ -264,14 +277,14 @@ function StatsTab({ t, stats }) {
     <Card t={t} style={{ padding: "18px 16px 16px" }}>
       <div className="text-center" style={{ color: t.text, fontSize: 13, marginBottom: 8 }}>Ball possession</div>
       <div className="flex overflow-hidden" style={{ height: 34, borderRadius: 18, marginBottom: 14 }}>
-        <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: t.blue, color: "#07131B", fontSize: 15, fontWeight: 850 }}>{s.home_possession}%</div>
-        <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: t.red, color: "#fff", fontSize: 15, fontWeight: 850 }}>{s.away_possession}%</div>
+        <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: homeColor, color: homeTextColor, fontSize: 15, fontWeight: 850 }}>{s.home_possession}%</div>
+        <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: awayColor, color: awayTextColor, fontSize: 15, fontWeight: 850 }}>{s.away_possession}%</div>
       </div>
       {rows.map(([label, home, away]) => (
         <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>
-          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "start", minWidth: 30, height: 24, padding: "0 7px", background: t.blue, color: "#07131B", fontSize: 13, fontWeight: 800 }}>{home}</span>
+          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "start", minWidth: 30, height: 24, padding: "0 7px", background: homeColor, color: homeTextColor, fontSize: 13, fontWeight: 800 }}>{home}</span>
           <span className="text-center" style={{ color: t.text, fontSize: 13 }}>{label}</span>
-          <span style={{ justifySelf: "end", color: t.text, fontSize: 13, fontWeight: 700 }}>{away}</span>
+          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "end", minWidth: 30, height: 24, padding: "0 7px", background: awayColor, color: awayTextColor, fontSize: 13, fontWeight: 800 }}>{away}</span>
         </div>
       ))}
     </Card>

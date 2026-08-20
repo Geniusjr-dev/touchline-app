@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
@@ -19,8 +19,34 @@ import {
   reopenMatch,
   saveMatchStats,
   setMatchStoppageTime,
+  startMatchWithKits,
   transitionMatchStatus,
 } from "@/lib/db";
+
+const HEX_COLOR = /^#[0-9A-F]{6}$/i;
+
+function normalizeKitColor(color, fallback) {
+  const next = String(color || "").trim().toUpperCase();
+  return HEX_COLOR.test(next) ? next : fallback;
+}
+
+function kitColorDistance(first, second) {
+  const left = normalizeKitColor(first, "#000000").slice(1);
+  const right = normalizeKitColor(second, "#000000").slice(1);
+  const red = parseInt(left.slice(0, 2), 16) - parseInt(right.slice(0, 2), 16);
+  const green = parseInt(left.slice(2, 4), 16) - parseInt(right.slice(2, 4), 16);
+  const blue = parseInt(left.slice(4, 6), 16) - parseInt(right.slice(4, 6), 16);
+  return Math.sqrt(red * red + green * green + blue * blue);
+}
+
+function kitsAreDistinct(homeColor, awayColor) {
+  return HEX_COLOR.test(homeColor) && HEX_COLOR.test(awayColor) && kitColorDistance(homeColor, awayColor) >= 80;
+}
+
+function suggestedAwayKit(homeColor, preferredColor) {
+  const choices = [preferredColor, "#FFFFFF", "#111111", "#F5C518", "#E53935", "#2563EB"];
+  return choices.map((color) => normalizeKitColor(color, "#FFFFFF")).find((color) => kitsAreDistinct(homeColor, color)) || "#FFFFFF";
+}
 
 function withDeadline(promise, milliseconds = 6000) {
   let timeoutId;
@@ -44,6 +70,9 @@ export default function Scorer() {
   const [now, setNow] = useState(0);
   const [stats, setStats] = useState({ ...EMPTY_MATCH_STATS });
   const [statsMessage, setStatsMessage] = useState("");
+  const [homeKitColor, setHomeKitColor] = useState("");
+  const [awayKitColor, setAwayKitColor] = useState("");
+  const kitInitializedFor = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -105,9 +134,30 @@ export default function Scorer() {
     };
   }, [id, load]);
 
+  useEffect(() => {
+    if (!m) return;
+    const homeTeam = teams[m.home_id];
+    const awayTeam = teams[m.away_id];
+    if (!homeTeam || !awayTeam) return;
+    const nextHome = normalizeKitColor(m.home_kit_color || homeTeam.color, "#18A558");
+    const preferredAway = normalizeKitColor(m.away_kit_color || awayTeam.color, "#2563EB");
+    if (m.status !== "scheduled") {
+      setHomeKitColor(nextHome);
+      setAwayKitColor(suggestedAwayKit(nextHome, preferredAway));
+      kitInitializedFor.current = m.id;
+      return;
+    }
+    if (kitInitializedFor.current === m.id) return;
+    setHomeKitColor(nextHome);
+    setAwayKitColor(suggestedAwayKit(nextHome, preferredAway));
+    kitInitializedFor.current = m.id;
+  }, [m, teams]);
+
   if (!m) return <AdminMatchShell error={error} onRetry={load} />;
-  const home = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
-  const away = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
+  const homeTeam = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
+  const awayTeam = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
+  const home = { ...homeTeam, color: homeKitColor || m.home_kit_color || homeTeam.color };
+  const away = { ...awayTeam, color: awayKitColor || m.away_kit_color || awayTeam.color };
   const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
   const storedAway = m.away_score ?? events.filter((e) => e.type === "goal" && e.side === "away").length;
   const displayedHome = storedHome + (pending?.type === "goal" && pending.side === "home" ? 1 : 0);
@@ -159,6 +209,14 @@ export default function Scorer() {
   }
 
   async function changeStatus(status) {
+    if (m.status === "scheduled" && status === "live") {
+      if (!kitsAreDistinct(homeKitColor, awayKitColor)) {
+        setError("The home and away kits clash. Choose a clearly different away kit before kick-off.");
+        return;
+      }
+      await run(() => startMatchWithKits(id, homeKitColor, awayKitColor));
+      return;
+    }
     await run(() => transitionMatchStatus(id, status));
   }
 
@@ -223,6 +281,24 @@ export default function Scorer() {
       </div>
 
       {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+      {m.status === "scheduled" && (
+        <div style={card}>
+          <div style={label}>MATCH KITS</div>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+            Confirm both match kits before kick-off. If the team colours clash, the away team must change kit.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+            <KitPicker label="Home kit" team={homeTeam} color={homeKitColor} onChange={setHomeKitColor} />
+            <KitPicker label="Away kit" team={awayTeam} color={awayKitColor} onChange={setAwayKitColor} />
+          </div>
+          {!kitsAreDistinct(homeKitColor, awayKitColor) && (
+            <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 9, padding: 10, fontSize: 12, marginTop: 12 }}>
+              Kit clash detected. Select a different away kit to enable kick-off.
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={card}>
         <div style={label}>MATCH STATUS</div>
@@ -371,6 +447,32 @@ function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave })
       <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "#0E0F11", color: "#fff" }}>{busy ? "Saving…" : "Save stats"}</button>
       {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: 12, marginTop: 8 }}>{message}</div>}
     </div>
+  );
+}
+
+function KitPicker({ label: kitLabel, team, color, onChange }) {
+  const selectedColor = normalizeKitColor(color, team.color || "#18A558");
+  return (
+    <label style={{ display: "block", background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, cursor: "pointer" }}>
+      <span style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <KitShirt color={selectedColor} />
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
+        </span>
+        <input aria-label={`${team.name} ${kitLabel}`} type="color" value={selectedColor} onChange={(event) => onChange(event.target.value.toUpperCase())} style={{ width: 38, height: 38, padding: 2, border: "1px solid #3A3D42", borderRadius: 9, background: "#161719", cursor: "pointer" }} />
+      </span>
+    </label>
+  );
+}
+
+function KitShirt({ color }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 64 64" width="46" height="46" style={{ flex: "0 0 auto", filter: "drop-shadow(0 3px 5px rgba(0,0,0,.35))" }}>
+      <path d="M21 8 9 14 3 28l10 5 5-8v31h28V25l5 8 10-5-6-14-12-6c-2 5-6 8-11 8S23 13 21 8Z" fill={color} stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M21 8c2 5 6 8 11 8s9-3 11-8" fill="none" stroke="#FFFFFF" strokeOpacity="0.55" strokeWidth="2" />
+    </svg>
   );
 }
 

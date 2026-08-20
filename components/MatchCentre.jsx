@@ -280,14 +280,38 @@ function StatsTab({ t, stats, homeColor, awayColor }) {
         <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: homeColor, color: homeTextColor, fontSize: 15, fontWeight: 850 }}>{s.home_possession}%</div>
         <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: awayColor, color: awayTextColor, fontSize: 15, fontWeight: 850 }}>{s.away_possession}%</div>
       </div>
-      {rows.map(([label, home, away]) => (
-        <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>
-          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "start", minWidth: 30, height: 24, padding: "0 7px", background: homeColor, color: homeTextColor, fontSize: 13, fontWeight: 800 }}>{home}</span>
-          <span className="text-center" style={{ color: t.text, fontSize: 13 }}>{label}</span>
-          <span className="inline-flex items-center justify-center rounded-full" style={{ justifySelf: "end", minWidth: 30, height: 24, padding: "0 7px", background: awayColor, color: awayTextColor, fontSize: 13, fontWeight: 800 }}>{away}</span>
-        </div>
-      ))}
+      {rows.map(([label, home, away]) => {
+        const homeLeads = Number(home) > Number(away);
+        const awayLeads = Number(away) > Number(home);
+        return (
+          <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>
+            <StatValue value={home} leading={homeLeads} color={homeColor} textColor={homeTextColor} side="home" theme={t} />
+            <span className="text-center" style={{ color: t.text, fontSize: 13 }}>{label}</span>
+            <StatValue value={away} leading={awayLeads} color={awayColor} textColor={awayTextColor} side="away" theme={t} />
+          </div>
+        );
+      })}
     </Card>
+  );
+}
+
+function StatValue({ value, leading, color, textColor, side, theme }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full"
+      style={{
+        justifySelf: side === "home" ? "start" : "end",
+        minWidth: 30,
+        height: 24,
+        padding: "0 7px",
+        background: leading ? color : "transparent",
+        color: leading ? textColor : theme.text,
+        fontSize: 13,
+        fontWeight: leading ? 800 : 700,
+      }}
+    >
+      {value}
+    </span>
   );
 }
 

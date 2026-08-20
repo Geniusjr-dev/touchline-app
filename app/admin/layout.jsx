@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function AdminLayout({ children }) {
-  const { user, profile, memberships, activeOrganizationId, role, loading, signOut, setActiveOrganization } = useAuth();
+  const { user, profile, memberships, activeOrganizationId, role, loading, accessError, signOut, setActiveOrganization, retryAccess } = useAuth();
   const router = useRouter();
   const path = usePathname();
   const isLogin = path === "/admin/login";
@@ -19,6 +19,11 @@ export default function AdminLayout({ children }) {
   if (loading) return <Shell><div style={{ width: 220, height: 12, borderRadius: 6, background: "#161719" }} /></Shell>;
   if (!user) return <Shell><div style={{ width: 220, height: 12, borderRadius: 6, background: "#161719" }} /></Shell>;
   if (profile?.status === "suspended") return <Shell><div style={{ color: "#F04444", padding: 24, textAlign: "center" }}>This Touchline account has been suspended.</div></Shell>;
+  if (accessError) return <Shell><div style={{ width: "min(360px, calc(100% - 32px))", background: "#161719", border: "1px solid #2A2C30", borderRadius: 14, padding: 20, textAlign: "center" }}>
+    <div style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 750 }}>Organization access could not be verified.</div>
+    <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.5, marginTop: 7 }}>Your membership has not been removed. Check the connection and try again.</div>
+    <button onClick={retryAccess} style={{ marginTop: 14, background: "#4FC263", color: "#07130B", border: 0, borderRadius: 9, padding: "9px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Try again</button>
+  </div></Shell>;
   if (!activeOrganizationId || !role) return <Shell><div style={{ color: "#8E939B", padding: 24, textAlign: "center" }}>Your account has not been added to a Touchline organization yet. Ask an administrator to grant access.</div></Shell>;
   if (role === "scorer" && path.startsWith("/admin/teams")) return <Shell><div style={{ width: 220, height: 12, borderRadius: 6, background: "#161719" }} /></Shell>;
 

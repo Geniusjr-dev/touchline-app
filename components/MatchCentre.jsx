@@ -95,7 +95,7 @@ function scorerSummary(events, side) {
 }
 
 export default function MatchCentre({ id }) {
-  const { t } = useTheme();
+  const { t, mode } = useTheme();
   const router = useRouter();
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
@@ -264,10 +264,10 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
-      {activeTab === "Lineup" && <LineupTab t={t} m={m} h={h} a={a} lineups={d?.lineups || {}} homeColor={homeKitColor} awayColor={awayKitColor} />}
+      {activeTab === "Lineup" && <LineupTab t={t} mode={mode} m={m} h={h} a={a} lineups={d?.lineups || {}} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
-      {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
+      {activeTab === "H2H" && <H2H t={t} h={h} a={a} homeId={m.home} awayId={m.away} meetings={d?.h2h || []} />}
 
       <BottomNav t={t} active="Matches" />
     </div>
@@ -365,19 +365,21 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
   );
 }
 
-function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
+function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
   const homeLineup = lineups[m.home] || { formation: null, starters: [], substitutes: [] };
   const awayLineup = lineups[m.away] || { formation: null, starters: [], substitutes: [] };
   const hasStarters = homeLineup.starters.length || awayLineup.starters.length;
   const hasSubstitutes = homeLineup.substitutes.length || awayLineup.substitutes.length;
+  const pitchHeader = mode === "light" ? "#0B9D62" : "#242424";
+  const pitchBackground = `linear-gradient(180deg, ${t.pitch1} 0%, ${t.pitch2} 50%, ${t.pitch1} 100%)`;
   if (!hasStarters && !hasSubstitutes) return null;
   return (
     <div>
       {hasStarters ? (
-        <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
-          <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} t={t} side="home" />
-          <div style={{ position: "relative", height: 820, background: "#181A1D", overflow: "hidden", borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }}>
-            <PublicPitchMarkings />
+        <div style={{ overflow: "hidden", marginTop: 8, background: pitchHeader }}>
+          <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
+          <div style={{ position: "relative", height: 820, background: pitchBackground, overflow: "hidden", borderTop: `1px solid ${t.pitchLine}`, borderBottom: `1px solid ${t.pitchLine}` }}>
+            <PublicPitchMarkings line={t.pitchLine} />
             {homeLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer
                 key={`home-${player.id}`}
@@ -386,7 +388,7 @@ function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
                 formation={homeLineup.formation}
                 side="home"
                 color={homeColor}
-                t={t}
+                mode={mode}
               />
             ))}
             {awayLineup.starters.map((player, fallbackIndex) => (
@@ -397,12 +399,12 @@ function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
                 formation={awayLineup.formation}
                 side="away"
                 color={awayColor}
-                t={t}
+                mode={mode}
               />
             ))}
           </div>
-          <LineupTeamHeading team={a} formation={awayLineup.formation} color={awayColor} t={t} side="away" />
-        </Card>
+          <LineupTeamHeading team={a} formation={awayLineup.formation} color={awayColor} background={pitchHeader} side="away" />
+        </div>
       ) : null}
 
       {hasSubstitutes ? (
@@ -418,21 +420,18 @@ function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
   );
 }
 
-function LineupTeamHeading({ team, formation, color, t, side }) {
+function LineupTeamHeading({ team, formation, color, background, side }) {
   const away = side === "away";
   return (
-    <div className={`flex items-center gap-2.5 px-3 py-3 ${away ? "flex-row-reverse text-right" : ""}`} style={{ background: t.groupHead }}>
-      <Crest short={team.short} color={color} logo={team.logoUrl} size={28} ring={t.divider} />
-      <span style={{ minWidth: 0, flex: 1 }}>
-        <strong className="block truncate" style={{ color: t.text, fontSize: 12.5 }}>{team.name}</strong>
-        <span style={{ display: "block", color: t.dim, fontSize: 10.5 }}>{formation || DEFAULT_FORMATION}</span>
-      </span>
+    <div className={`flex items-center gap-2.5 px-4 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 54, background }}>
+      <Crest short={team.short} color={color} logo={team.logoUrl} size={25} ring="rgba(255,255,255,.22)" />
+      <strong className="truncate" style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 800 }}>{team.name}</strong>
+      <span style={{ color: "rgba(255,255,255,.72)", fontSize: 13.5, fontWeight: 700 }}>{formation || DEFAULT_FORMATION}</span>
     </div>
   );
 }
 
-function PublicPitchMarkings() {
-  const line = "rgba(255,255,255,.10)";
+function PublicPitchMarkings({ line }) {
   return (
     <div aria-hidden="true" style={{ position: "absolute", inset: "10px 8px", border: `1px solid ${line}`, pointerEvents: "none" }}>
       <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: `1px solid ${line}` }} />
@@ -445,7 +444,7 @@ function PublicPitchMarkings() {
   );
 }
 
-function TacticalLineupPlayer({ player, fallbackIndex, formation, side, color, t }) {
+function TacticalLineupPlayer({ player, fallbackIndex, formation, side, color, mode }) {
   const slots = getFormationSlots(formation || DEFAULT_FORMATION);
   const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
   const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
@@ -453,19 +452,19 @@ function TacticalLineupPlayer({ player, fallbackIndex, formation, side, color, t
     ? 2.5 + (100 - slot.y) * 0.44
     : 53.5 + slot.y * 0.44;
   return (
-    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 86, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
+    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 90, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
       {player.photoUrl ? (
-        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 42, height: 42, background: t.chip, border: "2px solid rgba(255,255,255,.28)", boxShadow: "0 3px 8px rgba(0,0,0,.45)" }}>
+        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 48, height: 48, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
           {/* Supabase public media URLs are administrator controlled player assets. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </span>
       ) : (
-        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 42, height: 42, background: color, color: readableTextColor(color), border: "2px solid rgba(255,255,255,.28)", boxShadow: "0 3px 8px rgba(0,0,0,.45)", fontSize: 11, fontWeight: 850 }}>
+        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: color, color: readableTextColor(color), border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)", fontSize: 12, fontWeight: 850 }}>
           {player.number ?? "•"}
         </span>
       )}
-      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 3, color: t.text, fontSize: 10.5, lineHeight: 1.12, fontWeight: 750, textShadow: "0 1px 3px #000" }}>
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 11.5, lineHeight: 1.14, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.name}
       </strong>
     </div>
@@ -962,6 +961,77 @@ function TableTab({ t, m, rows }) {
 }
 
 // ---------- H2H ----------
-function H2H() {
-  return null;
+function H2H({ t, h, a, homeId, awayId, meetings }) {
+  if (!meetings.length) return null;
+  const record = meetings.reduce((summary, meeting) => {
+    const homeTeamScore = meeting.homeId === homeId ? meeting.homeScore : meeting.awayScore;
+    const awayTeamScore = meeting.homeId === awayId ? meeting.homeScore : meeting.awayScore;
+    if (homeTeamScore > awayTeamScore) summary.homeWins += 1;
+    else if (homeTeamScore < awayTeamScore) summary.awayWins += 1;
+    else summary.draws += 1;
+    return summary;
+  }, { homeWins: 0, draws: 0, awayWins: 0 });
+  const total = meetings.length;
+  return (
+    <div>
+      <Card t={t} style={{ overflow: "hidden", padding: "18px 14px 16px" }}>
+        <div className="grid grid-cols-3" style={{ gap: 8 }}>
+          <H2HCount value={record.homeWins} label="Won" color={h.color} textColor={readableTextColor(h.color)} t={t} />
+          <H2HCount value={record.draws} label="Drawn" color={t.drawPill} textColor="#FFFFFF" t={t} />
+          <H2HCount value={record.awayWins} label="Won" color={a.color} textColor={readableTextColor(a.color)} t={t} />
+        </div>
+        <div className="flex overflow-hidden" style={{ height: 5, borderRadius: 99, marginTop: 16, background: t.track }}>
+          {record.homeWins > 0 && <span style={{ width: `${record.homeWins / total * 100}%`, background: h.color }} />}
+          {record.draws > 0 && <span style={{ width: `${record.draws / total * 100}%`, background: t.drawPill }} />}
+          {record.awayWins > 0 && <span style={{ width: `${record.awayWins / total * 100}%`, background: a.color }} />}
+        </div>
+      </Card>
+
+      <Card t={t} style={{ overflow: "hidden" }}>
+        {meetings.map((meeting, index) => {
+          const historicalHome = meeting.homeId === homeId ? h : a;
+          const historicalAway = meeting.awayId === awayId ? a : h;
+          return (
+            <Link key={meeting.id} href={`/match/${meeting.id}`} style={{ display: "block", padding: "13px 12px", borderBottom: index === meetings.length - 1 ? "none" : `1px solid ${t.divider}` }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                <span style={{ color: t.dim, fontSize: 10.5, fontWeight: 650 }}>{formatH2HDate(meeting.date)}</span>
+                <span style={{ color: t.dim, background: t.chip, borderRadius: 99, padding: "4px 8px", fontSize: 9.5, fontWeight: 800, textTransform: "uppercase" }}>{meeting.competitionName}</span>
+              </div>
+              <div className="grid items-center" style={{ gridTemplateColumns: "32px minmax(0, 1fr)", columnGap: 5 }}>
+                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 22, background: t.chip, color: t.dim, fontSize: 10, fontWeight: 800 }}>FT</span>
+                <div className="flex items-center justify-center" style={{ gap: 7, minWidth: 0 }}>
+                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{historicalHome.name}</span>
+                  <Crest short={historicalHome.short} color={historicalHome.color} logo={historicalHome.logoUrl} size={27} ring={t.divider} />
+                  <strong style={{ color: t.text, fontSize: 14, minWidth: 39, textAlign: "center", whiteSpace: "nowrap" }}>{meeting.homeScore} - {meeting.awayScore}</strong>
+                  <Crest short={historicalAway.short} color={historicalAway.color} logo={historicalAway.logoUrl} size={27} ring={t.divider} />
+                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "left", fontSize: 12.5, fontWeight: 700 }}>{historicalAway.name}</span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
+function H2HCount({ value, label, color, textColor, t }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="inline-flex items-center justify-center rounded-full" style={{ minWidth: 48, height: 34, padding: "0 12px", background: color, color: textColor, fontSize: 17, fontWeight: 850 }}>{value}</span>
+      <span style={{ color: t.text, fontSize: 12, fontWeight: 650, marginTop: 7 }}>{label}</span>
+    </div>
+  );
+}
+
+function formatH2HDate(value) {
+  if (!value) return "Date unavailable";
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }

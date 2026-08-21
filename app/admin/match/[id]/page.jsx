@@ -12,12 +12,14 @@ import {
   formatMatchClock,
   getEvents,
   getMatchRaw,
+  getMatchLineups,
   getMatchStats,
   listPlayers,
   listTeams,
   recordMatchEvent,
   reopenMatch,
   saveMatchStats,
+  saveMatchLineup,
   setMatchStoppageTime,
   startMatchWithKits,
   transitionMatchStatus,
@@ -25,14 +27,44 @@ import {
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/i;
 const GOAL_TYPES = [
-  { value: "direct_goal", label: "Direct goal" },
-  { value: "penalty", label: "Penalty" },
-  { value: "own_goal", label: "Own goal" },
-  { value: "free_kick", label: "Free kick" },
+  { value: "normal_goal", label: "Normal Goal" },
+  { value: "penalty", label: "Penalty Goal" },
+  { value: "free_kick", label: "Direct Free-Kick Goal" },
+  { value: "own_goal", label: "Own Goal" },
 ];
 
+const YELLOW_CARD_REASONS = [
+  { value: "none", label: "No reason recorded" },
+  { value: "foul", label: "Foul" },
+  { value: "reckless_challenge", label: "Reckless challenge" },
+  { value: "dissent", label: "Dissent" },
+  { value: "time_wasting", label: "Time-wasting" },
+  { value: "simulation", label: "Simulation" },
+  { value: "persistent_fouling", label: "Persistent fouling" },
+  { value: "handball", label: "Handball" },
+  { value: "stopping_promising_attack", label: "Stopping a promising attack" },
+  { value: "delaying_restart", label: "Delaying the restart" },
+  { value: "excessive_celebration", label: "Excessive celebration" },
+];
+
+const RED_CARD_REASONS = [
+  { value: "none", label: "No reason recorded" },
+  { value: "violent_conduct", label: "Violent conduct" },
+  { value: "serious_foul_play", label: "Serious foul play" },
+  { value: "denial_obvious_goal_scoring_opportunity", label: "Denial of an obvious goal-scoring opportunity" },
+  { value: "spitting_or_biting", label: "Spitting or biting" },
+  { value: "offensive_insulting_abusive_language", label: "Offensive, insulting or abusive language or action" },
+];
+
+const FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "3-5-2", "3-4-3", "5-3-2", "Not set"];
+
+const CARD_REASON_LABELS = Object.fromEntries(
+  [...YELLOW_CARD_REASONS, ...RED_CARD_REASONS].map((reason) => [reason.value, reason.label]),
+);
+
 function goalTypeLabel(value) {
-  return GOAL_TYPES.find((item) => item.value === value)?.label || "Direct goal";
+  const normalized = value === "direct_goal" ? "normal_goal" : value;
+  return GOAL_TYPES.find((item) => item.value === normalized)?.label || "Normal Goal";
 }
 
 function normalizeKitColor(color, fallback) {
@@ -80,9 +112,29 @@ export default function Scorer() {
   const [now, setNow] = useState(0);
   const [stats, setStats] = useState({ ...EMPTY_MATCH_STATS });
   const [statsMessage, setStatsMessage] = useState("");
+  const [lineups, setLineups] = useState({});
+  const [lineupBusy, setLineupBusy] = useState(null);
+  const [lineupMessages, setLineupMessages] = useState({});
   const [homeKitColor, setHomeKitColor] = useState("");
   const [awayKitColor, setAwayKitColor] = useState("");
   const kitInitializedFor = useRef(null);
+
+  const loadLineups = useCallback(async () => {
+    try {
+      const savedLineups = await getMatchLineups(id);
+      const editable = {};
+      Object.entries(savedLineups).forEach(([teamId, lineup]) => {
+        editable[teamId] = {
+          formation: lineup.formation || "Not set",
+          starters: lineup.starters.map((player) => player.id),
+          substitutes: lineup.substitutes.map((player) => player.id),
+        };
+      });
+      setLineups(editable);
+    } catch (lineupError) {
+      setLineupMessages((current) => ({ ...current, general: lineupError.message || "Could not load the match lineups." }));
+    }
+  }, [id]);
 
   const load = useCallback(async () => {
     try {
@@ -127,6 +179,7 @@ export default function Scorer() {
       setTeams(cachedTeams);
     }
     load();
+    loadLineups();
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
     const ticker = window.setInterval(() => setNow(Date.now()), 1000);
     let channel;
@@ -135,6 +188,7 @@ export default function Scorer() {
         .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
         .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_lineups", filter: `match_id=eq.${id}` }, loadLineups)
         .subscribe();
     }
     return () => {
@@ -142,7 +196,7 @@ export default function Scorer() {
       window.clearTimeout(firstTick);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [id, load]);
+  }, [id, load, loadLineups]);
 
   useEffect(() => {
     if (!m) return;
@@ -197,7 +251,7 @@ export default function Scorer() {
   function beginEvent(type, side) {
     if (!canRecord || busy) return;
     setError("");
-    setPending({ type, side, goalType: type === "goal" ? "direct_goal" : null });
+    setPending({ type, side, goalType: type === "goal" ? "normal_goal" : null });
   }
 
   async function commitPending(selection) {
@@ -211,8 +265,11 @@ export default function Scorer() {
       player: player?.name || null,
       assist: assist?.name || null,
       goal_type: pending.type === "goal"
-        ? (selection?.goalType || pending.goalType || "direct_goal")
+        ? (selection?.goalType || pending.goalType || "normal_goal")
         : null,
+      card_type: selection?.cardType || null,
+      card_reason: selection?.cardReason || null,
+      recipient_type: selection?.recipientType || null,
     };
     await run(() => recordMatchEvent(id, event), true);
   }
@@ -278,6 +335,53 @@ export default function Scorer() {
     setStatsMessage(saved ? "Stats saved." : "Stats were not saved.");
   }
 
+  function currentLineup(teamId) {
+    return lineups[teamId] || { formation: "Not set", starters: [], substitutes: [] };
+  }
+
+  function changeFormation(teamId, formation) {
+    setLineups((current) => {
+      const lineup = current[teamId] || { formation: "Not set", starters: [], substitutes: [] };
+      return { ...current, [teamId]: { ...lineup, formation } };
+    });
+    setLineupMessages((current) => ({ ...current, [teamId]: "" }));
+  }
+
+  function changePlayerRole(teamId, playerId, role) {
+    const lineup = currentLineup(teamId);
+    const isStarter = lineup.starters.includes(playerId);
+    const isSubstitute = lineup.substitutes.includes(playerId);
+    const roleIsActive = role === "starter" ? isStarter : isSubstitute;
+    if (role === "starter" && !isStarter && lineup.starters.length >= 11) {
+      setLineupMessages((current) => ({ ...current, [teamId]: "A team can have a maximum of 11 starters." }));
+      return;
+    }
+    const starters = lineup.starters.filter((idValue) => idValue !== playerId);
+    const substitutes = lineup.substitutes.filter((idValue) => idValue !== playerId);
+    if (!roleIsActive && role === "starter") starters.push(playerId);
+    if (!roleIsActive && role === "substitute") substitutes.push(playerId);
+    setLineups((current) => ({
+      ...current,
+      [teamId]: { ...lineup, starters, substitutes },
+    }));
+    setLineupMessages((current) => ({ ...current, [teamId]: "" }));
+  }
+
+  async function saveTeamLineup(teamId) {
+    setLineupBusy(teamId);
+    setLineupMessages((current) => ({ ...current, [teamId]: "" }));
+    try {
+      const result = await saveMatchLineup(id, teamId, currentLineup(teamId));
+      if (result?.error) throw result.error;
+      await loadLineups();
+      setLineupMessages((current) => ({ ...current, [teamId]: "Lineup saved and published." }));
+    } catch (lineupError) {
+      setLineupMessages((current) => ({ ...current, [teamId]: lineupError.message || "The lineup could not be saved." }));
+    } finally {
+      setLineupBusy(null);
+    }
+  }
+
   const actions = statusActions(m.status, fullTimeLocked);
 
   return (
@@ -315,6 +419,38 @@ export default function Scorer() {
           )}
         </div>
       )}
+
+      <div style={card}>
+        <div style={label}>MATCH LINEUPS</div>
+        <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+          Select each team’s starters and substitutes. Saving a team lineup publishes it immediately to the public match centre.
+        </div>
+        {lineupMessages.general && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, marginBottom: 12 }}>{lineupMessages.general}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <LineupTeamEditor
+            team={home}
+            squad={squads[m.home_id] || []}
+            lineup={currentLineup(m.home_id)}
+            busy={lineupBusy === m.home_id}
+            disabled={Boolean(lineupBusy) || fullTimeLocked}
+            message={lineupMessages[m.home_id]}
+            onFormationChange={(formation) => changeFormation(m.home_id, formation)}
+            onRoleChange={(playerId, playerRole) => changePlayerRole(m.home_id, playerId, playerRole)}
+            onSave={() => saveTeamLineup(m.home_id)}
+          />
+          <LineupTeamEditor
+            team={away}
+            squad={squads[m.away_id] || []}
+            lineup={currentLineup(m.away_id)}
+            busy={lineupBusy === m.away_id}
+            disabled={Boolean(lineupBusy) || fullTimeLocked}
+            message={lineupMessages[m.away_id]}
+            onFormationChange={(formation) => changeFormation(m.away_id, formation)}
+            onRoleChange={(playerId, playerRole) => changePlayerRole(m.away_id, playerId, playerRole)}
+            onSave={() => saveTeamLineup(m.away_id)}
+          />
+        </div>
+      </div>
 
       <div style={card}>
         <div style={label}>MATCH STATUS</div>
@@ -436,6 +572,72 @@ function AdminMatchShell({ error, onRetry }) {
   </div>;
 }
 
+function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onFormationChange, onRoleChange, onSave }) {
+  const starters = lineup.starters || [];
+  const substitutes = lineup.substitutes || [];
+  const success = message === "Lineup saved and published.";
+  return (
+    <section style={{ background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Badge t={team} size={28} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: 11 }}>{starters.length} starters, {substitutes.length} substitutes</span>
+        </div>
+      </div>
+
+      <label style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
+      <select disabled={disabled} value={lineup.formation || "Not set"} onChange={(event) => onFormationChange(event.target.value)} style={{ ...finp, marginBottom: 10 }}>
+        {FORMATIONS.map((formation) => <option key={formation} value={formation}>{formation}</option>)}
+      </select>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px 58px", gap: 6, padding: "0 4px 6px", color: "#8E939B", fontSize: 10, fontWeight: 700 }}>
+        <span>PLAYER</span><span style={{ textAlign: "center" }}>START</span><span style={{ textAlign: "center" }}>BENCH</span>
+      </div>
+
+      <div style={{ borderTop: "1px solid #24262A" }}>
+        {squad.map((player) => {
+          const isStarter = starters.includes(player.id);
+          const isSubstitute = substitutes.includes(player.id);
+          return (
+            <div key={player.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px 58px", gap: 6, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #24262A" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 28, height: 28, flex: "0 0 auto", background: "#1C1E21", color: "#FFFFFF", fontSize: 11, fontWeight: 800 }}>{player.number ?? "•"}</span>
+                <span style={{ minWidth: 0 }}>
+                  <strong style={{ display: "block", color: "#FFFFFF", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</strong>
+                  <span style={{ display: "block", color: "#8E939B", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.position || "Player"}</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={disabled || (!isStarter && starters.length >= 11)}
+                aria-pressed={isStarter}
+                onClick={() => onRoleChange(player.id, "starter")}
+                style={{ height: 30, borderRadius: 8, background: isStarter ? "#4FC263" : "#1C1E21", color: isStarter ? "#062" : "#AAB0BA", fontSize: 10, fontWeight: 800, opacity: disabled || (!isStarter && starters.length >= 11) ? 0.45 : 1 }}
+              >
+                {isStarter ? "IN" : "ADD"}
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                aria-pressed={isSubstitute}
+                onClick={() => onRoleChange(player.id, "substitute")}
+                style={{ height: 30, borderRadius: 8, background: isSubstitute ? "#64748B" : "#1C1E21", color: isSubstitute ? "#FFFFFF" : "#AAB0BA", fontSize: 10, fontWeight: 800, opacity: disabled ? 0.45 : 1 }}
+              >
+                {isSubstitute ? "IN" : "ADD"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
+      <button type="button" disabled={disabled || busy} onClick={onSave} style={{ ...pill, width: "100%", marginTop: 12, background: "#4FC263", color: "#062", opacity: disabled || busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
+      {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
+    </section>
+  );
+}
+
 function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave }) {
   const rows = [
     ["Ball possession (%)", "home_possession", "away_possession"],
@@ -544,7 +746,14 @@ function scorerEventMinute(event, match) {
 
 function EventRow({ event, match, locked, onRemove }) {
   const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
-  const eventName = event.player || (event.type === "goal" ? "Scorer not recorded" : "Player not recorded");
+  const isCard = event.type === "yellow" || event.type === "red";
+  const eventName = event.player
+    || (event.recipient_type === "team_official" ? "Team official" : event.type === "goal" ? "Scorer not recorded" : "Player not recorded");
+  const cardLabel = event.card_type === "second_yellow" ? "Second yellow"
+    : event.type === "red" ? "Straight red"
+    : event.type === "yellow" ? "Yellow card"
+    : null;
+  const reasonLabel = event.card_reason ? CARD_REASON_LABELS[event.card_reason] : null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
       <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
@@ -553,8 +762,9 @@ function EventRow({ event, match, locked, onRemove }) {
         <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
       ) : (
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#fff" }}>
-          <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : ""}</span>
+          <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : isCard ? ` · ${cardLabel}` : ""}</span>
           {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
+          {isCard && reasonLabel && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>{reasonLabel}</span>}
         </span>
       )}
       <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
@@ -565,37 +775,60 @@ function EventRow({ event, match, locked, onRemove }) {
 
 function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, opponentSquad, busy, onCancel, onChoose }) {
   const [query, setQuery] = useState("");
-  const [goalType, setGoalType] = useState(pending.goalType || "direct_goal");
+  const [goalType, setGoalType] = useState(pending.goalType || "normal_goal");
+  const [cardType, setCardType] = useState(pending.type === "yellow" ? "yellow" : "straight_red");
+  const [cardReason, setCardReason] = useState("");
+  const [recipientType, setRecipientType] = useState("player");
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedAssist, setSelectedAssist] = useState(null);
-  const [hasChosenScorer, setHasChosenScorer] = useState(false);
+  const [hasChosenRecipient, setHasChosenRecipient] = useState(false);
   const isGoal = pending.type === "goal";
+  const isCard = pending.type === "yellow" || pending.type === "red";
   const scorerTeam = isGoal && goalType === "own_goal" ? opponentTeam : scoringTeam;
   const scorerSquad = isGoal && goalType === "own_goal" ? opponentSquad : scoringSquad;
   const filtered = scorerSquad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
   const assistOptions = scoringSquad.filter((player) => player.id !== selectedPlayer?.id);
-  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Who received the yellow card?" : "Who received the red card?";
+  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Record yellow card" : "Record red card";
+  const reasonOptions = pending.type === "yellow" ? YELLOW_CARD_REASONS : RED_CARD_REASONS;
+  const canSubmitCard = isCard && hasChosenRecipient && (cardType === "second_yellow" || cardReason !== "");
 
   function chooseGoalType(nextGoalType) {
     setGoalType(nextGoalType);
     setSelectedPlayer(null);
     setSelectedAssist(null);
-    setHasChosenScorer(false);
+    setHasChosenRecipient(false);
     setQuery("");
   }
 
   function chooseScorer(player) {
     setSelectedPlayer(player);
-    setHasChosenScorer(true);
+    setHasChosenRecipient(true);
     if (player?.id === selectedAssist?.id) setSelectedAssist(null);
   }
 
+  function chooseRecipientType(nextRecipientType) {
+    setRecipientType(nextRecipientType);
+    setSelectedPlayer(null);
+    setHasChosenRecipient(nextRecipientType === "team_official");
+    setQuery("");
+  }
+
   function submitGoal() {
-    if (!hasChosenScorer || busy) return;
+    if (!hasChosenRecipient || busy) return;
     onChoose({
       player: selectedPlayer,
-      assist: goalType === "own_goal" ? null : selectedAssist,
+      assist: goalType === "normal_goal" ? selectedAssist : null,
       goalType,
+    });
+  }
+
+  function submitCard() {
+    if (!canSubmitCard || busy) return;
+    onChoose({
+      player: recipientType === "player" ? selectedPlayer : null,
+      cardType,
+      cardReason: cardType === "second_yellow" || cardReason === "none" ? null : cardReason,
+      recipientType,
     });
   }
 
@@ -608,7 +841,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
             ? goalType === "own_goal"
               ? `The goal benefits ${scoringTeam.name}. Select the scorer from ${opponentTeam.name}.`
               : "The score is shown immediately and is saved after this confirmation."
-            : "Choose a squad player or record the card without a player name."}
+            : "Select the recipient and the official booking reason. Choose no reason recorded only when the reason is unavailable."}
         </div>
 
         {isGoal && (
@@ -624,19 +857,66 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
           </>
         )}
 
-        <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
-        <div style={{ display: "grid", gap: 7 }}>
-          {filtered.map((player) => (
-            <button key={player.id} disabled={busy} onClick={() => isGoal ? chooseScorer(player) : onChoose({ player })} style={{ ...playerButton, borderColor: isGoal && selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30" }}>
-              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
-            </button>
-          ))}
-          {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
-        </div>
+        {pending.type === "red" && (
+          <>
+            <div style={{ ...flabel, marginTop: 0 }}>Dismissal type</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7, marginBottom: 14 }}>
+              {[
+                { value: "straight_red", label: "Straight red" },
+                { value: "second_yellow", label: "Second yellow" },
+              ].map((item) => {
+                const selected = cardType === item.value;
+                return <button key={item.value} disabled={busy} onClick={() => { setCardType(item.value); setCardReason(""); }} style={{ ...playerButton, justifyContent: "center", background: selected ? "#F04444" : "#0E0F11", borderColor: selected ? "#F04444" : "#2A2C30", fontWeight: 800 }}>{item.label}</button>;
+              })}
+            </div>
+          </>
+        )}
 
-        <button disabled={busy} onClick={() => isGoal ? chooseScorer(null) : onChoose({ player: null })} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: isGoal && hasChosenScorer && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
+        {isCard && (
+          <>
+            <div style={flabel}>Recipient</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7, marginBottom: 14 }}>
+              {[
+                { value: "player", label: "Player" },
+                { value: "team_official", label: "Team official" },
+              ].map((item) => {
+                const selected = recipientType === item.value;
+                return <button key={item.value} disabled={busy} onClick={() => chooseRecipientType(item.value)} style={{ ...playerButton, justifyContent: "center", borderColor: selected ? "#4FC263" : "#2A2C30", background: selected ? "#172C1C" : "#0E0F11", fontWeight: 800 }}>{item.label}</button>;
+              })}
+            </div>
+          </>
+        )}
 
-        {isGoal && hasChosenScorer && goalType !== "own_goal" && (
+        {(!isCard || recipientType === "player") && (
+          <>
+            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
+            <div style={{ display: "grid", gap: 7 }}>
+              {filtered.map((player) => (
+                <button key={player.id} disabled={busy} onClick={() => chooseScorer(player)} style={{ ...playerButton, borderColor: selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30" }}>
+                  <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
+                </button>
+              ))}
+              {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
+            </div>
+            <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
+          </>
+        )}
+
+        {isCard && cardType !== "second_yellow" && (
+          <div style={{ marginTop: 14 }}>
+            <label htmlFor="card-reason" style={flabel}>Reason</label>
+            <select id="card-reason" value={cardReason} onChange={(event) => setCardReason(event.target.value)} style={finp}>
+              <option value="" disabled>Select a reason</option>
+              {reasonOptions.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {isCard && cardType === "second_yellow" && (
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: "#0E0F11", border: "1px solid #2A2C30", color: "#C9CDD3", fontSize: 13 }}>Reason: second booking</div>
+        )}
+
+        {isGoal && hasChosenRecipient && goalType === "normal_goal" && (
           <div style={{ marginTop: 14 }}>
             <label htmlFor="goal-assist" style={flabel}>Assist, optional</label>
             <select
@@ -652,7 +932,10 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
         )}
 
         {isGoal && (
-          <button disabled={busy || !hasChosenScorer} onClick={submitGoal} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !hasChosenScorer ? "not-allowed" : "pointer", opacity: busy || !hasChosenScorer ? 0.45 : 1 }}>Record goal</button>
+          <button disabled={busy || !hasChosenRecipient} onClick={submitGoal} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !hasChosenRecipient ? "not-allowed" : "pointer", opacity: busy || !hasChosenRecipient ? 0.45 : 1 }}>Record goal</button>
+        )}
+        {isCard && (
+          <button disabled={busy || !canSubmitCard} onClick={submitCard} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: pending.type === "yellow" ? "#F5C518" : "#F04444", color: pending.type === "yellow" ? "#241D00" : "#fff", fontWeight: 800, cursor: busy || !canSubmitCard ? "not-allowed" : "pointer", opacity: busy || !canSubmitCard ? 0.45 : 1 }}>Record {pending.type === "yellow" ? "yellow card" : "red card"}</button>
         )}
         <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
       </div>

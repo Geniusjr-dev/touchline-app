@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
@@ -9,7 +9,7 @@ import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
-const TABS_PRE = ["Preview", "Stats", "H2H"];
+const TABS_PRE = ["Preview", "Lineup", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
 
 function withDeadline(promise, milliseconds = 6000) {
@@ -68,6 +68,20 @@ function breakClock(match) {
   return `${minute}:00`;
 }
 
+function LiveMatchClock({ match, theme, announcedStoppage }) {
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  useEffect(() => {
+    const ticker = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(ticker);
+  }, []);
+  return (
+    <span className="inline-flex items-center gap-1.5" style={{ color: theme.red, fontSize: 11, fontWeight: 700, marginTop: 3 }}>
+      <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: theme.red }} />
+      {match.status === "et_live" ? "ET " : ""}{formatMatchClock(match, clockNow)}{announcedStoppage ? ` · +${announcedStoppage} added` : ""}
+    </span>
+  );
+}
+
 function scorerSummary(events, side) {
   const grouped = new Map();
   (events || []).filter((event) => event.type === "goal" && event.side === side && hasKnownScorer(event.player)).forEach((event) => {
@@ -84,32 +98,33 @@ export default function MatchCentre({ id }) {
   const router = useRouter();
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
-  const [now, setNow] = useState(0);
   const [following, setFollowing] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const refreshTimerRef = useRef(null);
+  const tableRequestRef = useRef("");
+  const tableRowsRef = useRef(new Map());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
-      const next = await withDeadline(getMatch(id));
+      const next = await withDeadline(getMatch(id, { force }));
       if (!next?.match) {
         setLoadError("This match is unavailable.");
         return;
       }
-      setState(next);
+      const table = tableRowsRef.current.get(next.match.id) || [];
+      const updated = { ...next, detail: { ...(next.detail || {}), table } };
+      setState(updated);
       setLoadError("");
-      cachePublicMatch(next.match, next.teams, next.detail);
-      getMatchTable(next.match).then((table) => {
-        setState((current) => {
-          if (current?.match?.id !== next.match.id) return current;
-          const updated = { ...current, detail: { ...(current.detail || {}), table } };
-          cachePublicMatch(updated.match, updated.teams, updated.detail);
-          return updated;
-        });
-      });
+      cachePublicMatch(updated.match, updated.teams, updated.detail);
     } catch {
       setLoadError("The match could not be refreshed. Check your connection and try again.");
     }
   }, [id]);
+
+  const scheduleRefresh = useCallback(() => {
+    window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => load(true), 140);
+  }, [load]);
 
   async function shareMatch() {
     const shareData = { title: "Touchline match", url: window.location.href };
@@ -124,19 +139,39 @@ export default function MatchCentre({ id }) {
     const cached = readPublicMatch(id);
     if (cached?.match) setState(cached);
     load();
-    const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
-    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
     let ch;
     if (supabase) {
       ch = supabase.channel("m-" + id)
-        .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `match_id=eq.${id}` }, scheduleRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${id}` }, scheduleRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics", filter: `match_id=eq.${id}` }, scheduleRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_lineups", filter: `match_id=eq.${id}` }, scheduleRefresh)
         .subscribe();
     }
-    return () => { window.clearTimeout(firstTick); window.clearInterval(ticker); if (ch) supabase.removeChannel(ch); };
-  }, [id, load]);
+    return () => {
+      window.clearTimeout(refreshTimerRef.current);
+      if (ch) supabase.removeChannel(ch);
+    };
+  }, [id, load, scheduleRefresh]);
+
+  useEffect(() => {
+    const match = state?.match;
+    if (tab !== "Table" || !match || match.competitionType === "friendly") return;
+    const signature = `${match.id}:${match.status}:${match.hs}:${match.as}`;
+    if (tableRequestRef.current === signature) return;
+    tableRequestRef.current = signature;
+    getMatchTable(match).then((table) => {
+      tableRowsRef.current.set(match.id, table);
+      setState((current) => {
+        if (current?.match?.id !== match.id) return current;
+        const updated = { ...current, detail: { ...(current.detail || {}), table } };
+        cachePublicMatch(updated.match, updated.teams, updated.detail);
+        return updated;
+      });
+    }).catch(() => {
+      tableRequestRef.current = "";
+    });
+  }, [tab, state?.match]);
 
   if (!state) return <MatchPageShell t={t} onBack={() => router.push("/")} error={loadError} onRetry={load} />;
   const { match: m, teams, detail: d } = state;
@@ -149,9 +184,11 @@ export default function MatchCentre({ id }) {
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
-  const tabs = started
+  const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
+  const availableTabs = started
     ? TABS_LIVE.filter((item) => item !== "Table" || m.competitionType !== "friendly")
     : TABS_PRE;
+  const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
   const defaultTab = started ? "Facts" : "Preview";
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
@@ -191,10 +228,7 @@ export default function MatchCentre({ id }) {
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && (
-              <span className="inline-flex items-center gap-1.5" style={{ color: t.red, fontSize: 11, fontWeight: 700, marginTop: 3 }}>
-                <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: t.red }} />
-                {m.status === "et_live" ? "ET " : ""}{formatMatchClock(m, now)}{announcedStoppage ? ` · +${announcedStoppage} added` : ""}
-              </span>
+              <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />
             )}
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
@@ -229,6 +263,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
+      {activeTab === "Lineup" && <LineupTab t={t} m={m} h={h} a={a} lineups={d?.lineups || {}} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} />}
@@ -329,6 +364,91 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
   );
 }
 
+function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
+  const homeLineup = lineups[m.home] || { formation: null, starters: [], substitutes: [] };
+  const awayLineup = lineups[m.away] || { formation: null, starters: [], substitutes: [] };
+  const starterRows = Math.max(homeLineup.starters.length, awayLineup.starters.length);
+  const substituteRows = Math.max(homeLineup.substitutes.length, awayLineup.substitutes.length);
+  if (!starterRows && !substituteRows) return null;
+  return (
+    <div>
+      <Card t={t} style={{ overflow: "hidden" }}>
+        <div className="grid grid-cols-2" style={{ background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>
+          <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} t={t} side="home" />
+          <LineupTeamHeading team={a} formation={awayLineup.formation} color={awayColor} t={t} side="away" />
+        </div>
+        {starterRows > 0 && (
+          <LineupSection
+            title="Starting lineups"
+            homePlayers={homeLineup.starters}
+            awayPlayers={awayLineup.starters}
+            homeColor={homeColor}
+            awayColor={awayColor}
+            t={t}
+          />
+        )}
+        {substituteRows > 0 && (
+          <LineupSection
+            title="Substitutes"
+            homePlayers={homeLineup.substitutes}
+            awayPlayers={awayLineup.substitutes}
+            homeColor={homeColor}
+            awayColor={awayColor}
+            t={t}
+          />
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function LineupTeamHeading({ team, formation, color, t, side }) {
+  return (
+    <div className={`flex items-center gap-2 px-3 py-3 ${side === "away" ? "flex-row-reverse text-right" : ""}`}>
+      <Crest short={team.short} color={color} logo={team.logoUrl} size={27} ring={t.divider} />
+      <span style={{ minWidth: 0 }}>
+        <strong className="block truncate" style={{ color: t.text, fontSize: 12.5 }}>{team.name}</strong>
+        {formation && formation !== "Not set" && <span style={{ display: "block", color: t.dim, fontSize: 10.5 }}>{formation}</span>}
+      </span>
+    </div>
+  );
+}
+
+function LineupSection({ title, homePlayers, awayPlayers, homeColor, awayColor, t }) {
+  const count = Math.max(homePlayers.length, awayPlayers.length);
+  return (
+    <section>
+      <div className="px-3 py-2" style={{ color: t.dim, fontSize: 11, fontWeight: 800, borderBottom: `1px solid ${t.divider}`, background: t.chip }}>{title}</div>
+      {Array.from({ length: count }, (_, index) => (
+        <div key={`${title}-${index}`} className="grid grid-cols-2" style={{ minHeight: 48, borderBottom: index === count - 1 ? "none" : `1px solid ${t.divider}` }}>
+          <LineupPlayer player={homePlayers[index]} side="home" color={homeColor} t={t} />
+          <LineupPlayer player={awayPlayers[index]} side="away" color={awayColor} t={t} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function LineupPlayer({ player, side, color, t }) {
+  if (!player) return <span style={{ borderLeft: side === "away" ? `1px solid ${t.divider}` : "none" }} />;
+  const away = side === "away";
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
+      {player.photoUrl
+        ? <span className="inline-flex rounded-full overflow-hidden" style={{ width: 29, height: 29, flex: "0 0 auto", background: t.chip }}>
+          {/* Supabase public media URLs are administrator-controlled player assets. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </span>
+        : <span className="inline-flex items-center justify-center rounded-full" style={{ width: 29, height: 29, flex: "0 0 auto", background: color, color: readableTextColor(color), fontSize: 10.5, fontWeight: 850 }}>{player.number ?? "•"}</span>}
+      <span style={{ minWidth: 0 }}>
+        <strong className="block truncate" style={{ color: t.text, fontSize: 11.5, lineHeight: 1.25 }}>{player.name}</strong>
+        <span className="block truncate" style={{ color: t.dim, fontSize: 9.5, lineHeight: 1.25 }}>{player.number != null ? `#${player.number}` : ""}{player.number != null && player.position ? " · " : ""}{player.position || ""}</span>
+      </span>
+    </div>
+  );
+}
+
 // ---------- Facts / Preview ----------
 function FactsPreview({ t, m, h, a, d, started }) {
   return (
@@ -377,7 +497,7 @@ function FactsPreview({ t, m, h, a, d, started }) {
       )}
 
       {started ? (
-        d ? <Timeline t={t} events={d.events} match={m} /> : <Empty t={t} title="Match started" note="Events will appear here as the scorer records them." />
+        d ? <Timeline t={t} events={d.events} match={m} /> : null
       ) : (
         <Empty t={t} title="Not started yet" note="Line-ups and match events will appear here once the match kicks off." />
       )}
@@ -404,7 +524,7 @@ function Timeline({ t, events = [], match }) {
   if (match.status === "ft" && !hasFullTime) {
     timelineEvents.push({ type: "full", label: "FT", score: `${match.hs} - ${match.as}`, m: 999999 });
   }
-  if (!timelineEvents.length) return <Empty t={t} title="No events yet" note="The timeline fills as the match unfolds." />;
+  if (!timelineEvents.length) return null;
   const sorted = timelineEvents.sort((x, y) => x.m - y.m);
   return (
     <Card t={t} style={{ paddingTop: 4, paddingBottom: 8 }}>

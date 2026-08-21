@@ -6,6 +6,7 @@ import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown 
 import { useTheme } from "@/lib/theme";
 import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable } from "@/lib/db";
 import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
+import { DEFAULT_FORMATION, getFormationSlots } from "@/lib/formations";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 
@@ -367,84 +368,130 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
 function LineupTab({ t, m, h, a, lineups, homeColor, awayColor }) {
   const homeLineup = lineups[m.home] || { formation: null, starters: [], substitutes: [] };
   const awayLineup = lineups[m.away] || { formation: null, starters: [], substitutes: [] };
-  const starterRows = Math.max(homeLineup.starters.length, awayLineup.starters.length);
-  const substituteRows = Math.max(homeLineup.substitutes.length, awayLineup.substitutes.length);
-  if (!starterRows && !substituteRows) return null;
+  const hasStarters = homeLineup.starters.length || awayLineup.starters.length;
+  const hasSubstitutes = homeLineup.substitutes.length || awayLineup.substitutes.length;
+  if (!hasStarters && !hasSubstitutes) return null;
   return (
     <div>
-      <Card t={t} style={{ overflow: "hidden" }}>
-        <div className="grid grid-cols-2" style={{ background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>
+      {hasStarters ? (
+        <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
           <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} t={t} side="home" />
+          <div style={{ position: "relative", height: 820, background: "#181A1D", overflow: "hidden", borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }}>
+            <PublicPitchMarkings />
+            {homeLineup.starters.map((player, fallbackIndex) => (
+              <TacticalLineupPlayer
+                key={`home-${player.id}`}
+                player={player}
+                fallbackIndex={fallbackIndex}
+                formation={homeLineup.formation}
+                side="home"
+                color={homeColor}
+                t={t}
+              />
+            ))}
+            {awayLineup.starters.map((player, fallbackIndex) => (
+              <TacticalLineupPlayer
+                key={`away-${player.id}`}
+                player={player}
+                fallbackIndex={fallbackIndex}
+                formation={awayLineup.formation}
+                side="away"
+                color={awayColor}
+                t={t}
+              />
+            ))}
+          </div>
           <LineupTeamHeading team={a} formation={awayLineup.formation} color={awayColor} t={t} side="away" />
-        </div>
-        {starterRows > 0 && (
-          <LineupSection
-            title="Starting lineups"
-            homePlayers={homeLineup.starters}
-            awayPlayers={awayLineup.starters}
-            homeColor={homeColor}
-            awayColor={awayColor}
-            t={t}
-          />
-        )}
-        {substituteRows > 0 && (
-          <LineupSection
-            title="Substitutes"
-            homePlayers={homeLineup.substitutes}
-            awayPlayers={awayLineup.substitutes}
-            homeColor={homeColor}
-            awayColor={awayColor}
-            t={t}
-          />
-        )}
-      </Card>
+        </Card>
+      ) : null}
+
+      {hasSubstitutes ? (
+        <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
+          <div className="px-3 py-2.5" style={{ color: t.text, fontSize: 12, fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
+          <div className="grid grid-cols-2">
+            <SubstituteList players={homeLineup.substitutes} side="home" color={homeColor} t={t} />
+            <SubstituteList players={awayLineup.substitutes} side="away" color={awayColor} t={t} />
+          </div>
+        </Card>
+      ) : null}
     </div>
   );
 }
 
 function LineupTeamHeading({ team, formation, color, t, side }) {
+  const away = side === "away";
   return (
-    <div className={`flex items-center gap-2 px-3 py-3 ${side === "away" ? "flex-row-reverse text-right" : ""}`}>
-      <Crest short={team.short} color={color} logo={team.logoUrl} size={27} ring={t.divider} />
-      <span style={{ minWidth: 0 }}>
+    <div className={`flex items-center gap-2.5 px-3 py-3 ${away ? "flex-row-reverse text-right" : ""}`} style={{ background: t.groupHead }}>
+      <Crest short={team.short} color={color} logo={team.logoUrl} size={28} ring={t.divider} />
+      <span style={{ minWidth: 0, flex: 1 }}>
         <strong className="block truncate" style={{ color: t.text, fontSize: 12.5 }}>{team.name}</strong>
-        {formation && formation !== "Not set" && <span style={{ display: "block", color: t.dim, fontSize: 10.5 }}>{formation}</span>}
+        <span style={{ display: "block", color: t.dim, fontSize: 10.5 }}>{formation || DEFAULT_FORMATION}</span>
       </span>
     </div>
   );
 }
 
-function LineupSection({ title, homePlayers, awayPlayers, homeColor, awayColor, t }) {
-  const count = Math.max(homePlayers.length, awayPlayers.length);
+function PublicPitchMarkings() {
+  const line = "rgba(255,255,255,.10)";
   return (
-    <section>
-      <div className="px-3 py-2" style={{ color: t.dim, fontSize: 11, fontWeight: 800, borderBottom: `1px solid ${t.divider}`, background: t.chip }}>{title}</div>
-      {Array.from({ length: count }, (_, index) => (
-        <div key={`${title}-${index}`} className="grid grid-cols-2" style={{ minHeight: 48, borderBottom: index === count - 1 ? "none" : `1px solid ${t.divider}` }}>
-          <LineupPlayer player={homePlayers[index]} side="home" color={homeColor} t={t} />
-          <LineupPlayer player={awayPlayers[index]} side="away" color={awayColor} t={t} />
-        </div>
-      ))}
-    </section>
+    <div aria-hidden="true" style={{ position: "absolute", inset: "10px 8px", border: `1px solid ${line}`, pointerEvents: "none" }}>
+      <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: `1px solid ${line}` }} />
+      <span style={{ position: "absolute", width: 96, height: 96, left: "50%", top: "50%", transform: "translate(-50%, -50%)", border: `1px solid ${line}`, borderRadius: "50%" }} />
+      <span style={{ position: "absolute", width: 180, height: 72, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: 82, height: 28, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: 180, height: 72, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
+      <span style={{ position: "absolute", width: 82, height: 28, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
+    </div>
   );
 }
 
-function LineupPlayer({ player, side, color, t }) {
-  if (!player) return <span style={{ borderLeft: side === "away" ? `1px solid ${t.divider}` : "none" }} />;
-  const away = side === "away";
+function TacticalLineupPlayer({ player, fallbackIndex, formation, side, color, t }) {
+  const slots = getFormationSlots(formation || DEFAULT_FORMATION);
+  const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
+  const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
+  const top = side === "home"
+    ? 2.5 + (100 - slot.y) * 0.44
+    : 53.5 + slot.y * 0.44;
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
-      {player.photoUrl
-        ? <span className="inline-flex rounded-full overflow-hidden" style={{ width: 29, height: 29, flex: "0 0 auto", background: t.chip }}>
-          {/* Supabase public media URLs are administrator-controlled player assets. */}
+    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 86, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
+      {player.photoUrl ? (
+        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 42, height: 42, background: t.chip, border: "2px solid rgba(255,255,255,.28)", boxShadow: "0 3px 8px rgba(0,0,0,.45)" }}>
+          {/* Supabase public media URLs are administrator controlled player assets. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </span>
-        : <span className="inline-flex items-center justify-center rounded-full" style={{ width: 29, height: 29, flex: "0 0 auto", background: color, color: readableTextColor(color), fontSize: 10.5, fontWeight: 850 }}>{player.number ?? "•"}</span>}
-      <span style={{ minWidth: 0 }}>
-        <strong className="block truncate" style={{ color: t.text, fontSize: 11.5, lineHeight: 1.25 }}>{player.name}</strong>
-        <span className="block truncate" style={{ color: t.dim, fontSize: 9.5, lineHeight: 1.25 }}>{player.number != null ? `#${player.number}` : ""}{player.number != null && player.position ? " · " : ""}{player.position || ""}</span>
-      </span>
+      ) : (
+        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 42, height: 42, background: color, color: readableTextColor(color), border: "2px solid rgba(255,255,255,.28)", boxShadow: "0 3px 8px rgba(0,0,0,.45)", fontSize: 11, fontWeight: 850 }}>
+          {player.number ?? "•"}
+        </span>
+      )}
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 3, color: t.text, fontSize: 10.5, lineHeight: 1.12, fontWeight: 750, textShadow: "0 1px 3px #000" }}>
+        {player.number != null ? `${player.number} ` : ""}{player.name}
+      </strong>
+    </div>
+  );
+}
+
+function SubstituteList({ players, side, color, t }) {
+  const away = side === "away";
+  return (
+    <div style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
+      {players.map((player, index) => (
+        <div key={player.id} className={`flex items-center gap-2 px-3 py-2.5 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 48, borderBottom: index === players.length - 1 ? "none" : `1px solid ${t.divider}` }}>
+          {player.photoUrl ? (
+            <span className="inline-flex rounded-full overflow-hidden" style={{ width: 30, height: 30, flex: "0 0 auto", background: t.chip }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 30, flex: "0 0 auto", background: color, color: readableTextColor(color), fontSize: 10, fontWeight: 850 }}>{player.number ?? "•"}</span>
+          )}
+          <span style={{ minWidth: 0 }}>
+            <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.name}</strong>
+            <span className="block truncate" style={{ color: t.dim, fontSize: 9.5 }}>{player.position || "Substitute"}</span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

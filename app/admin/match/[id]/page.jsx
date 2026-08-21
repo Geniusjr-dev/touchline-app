@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
+import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
 import {
   announcedStoppageMinutes,
   deleteMatchEvent,
@@ -55,8 +56,6 @@ const RED_CARD_REASONS = [
   { value: "spitting_or_biting", label: "Spitting or biting" },
   { value: "offensive_insulting_abusive_language", label: "Offensive, insulting or abusive language or action" },
 ];
-
-const FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "3-5-2", "3-4-3", "5-3-2", "Not set"];
 
 const CARD_REASON_LABELS = Object.fromEntries(
   [...YELLOW_CARD_REASONS, ...RED_CARD_REASONS].map((reason) => [reason.value, reason.label]),
@@ -124,9 +123,14 @@ export default function Scorer() {
       const savedLineups = await getMatchLineups(id);
       const editable = {};
       Object.entries(savedLineups).forEach(([teamId, lineup]) => {
+        const starters = Array(11).fill(null);
+        lineup.starters.forEach((player, fallbackIndex) => {
+          const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
+          if (slotIndex >= 0 && slotIndex < 11) starters[slotIndex] = player.id;
+        });
         editable[teamId] = {
-          formation: lineup.formation || "Not set",
-          starters: lineup.starters.map((player) => player.id),
+          formation: lineup.formation || DEFAULT_FORMATION,
+          starters,
           substitutes: lineup.substitutes.map((player) => player.id),
         };
       });
@@ -336,30 +340,43 @@ export default function Scorer() {
   }
 
   function currentLineup(teamId) {
-    return lineups[teamId] || { formation: "Not set", starters: [], substitutes: [] };
+    return lineups[teamId] || { formation: DEFAULT_FORMATION, starters: Array(11).fill(null), substitutes: [] };
   }
 
   function changeFormation(teamId, formation) {
     setLineups((current) => {
-      const lineup = current[teamId] || { formation: "Not set", starters: [], substitutes: [] };
+      const lineup = current[teamId] || { formation: DEFAULT_FORMATION, starters: Array(11).fill(null), substitutes: [] };
       return { ...current, [teamId]: { ...lineup, formation } };
     });
     setLineupMessages((current) => ({ ...current, [teamId]: "" }));
   }
 
-  function changePlayerRole(teamId, playerId, role) {
+  function assignStarter(teamId, slotIndex, playerId) {
     const lineup = currentLineup(teamId);
-    const isStarter = lineup.starters.includes(playerId);
+    const starters = [...lineup.starters];
+    const selectedPlayerId = playerId || null;
+    starters.forEach((assignedPlayerId, index) => {
+      if (selectedPlayerId && assignedPlayerId === selectedPlayerId) starters[index] = null;
+    });
+    starters[slotIndex] = selectedPlayerId;
+    setLineups((current) => ({
+      ...current,
+      [teamId]: {
+        ...lineup,
+        starters,
+        substitutes: lineup.substitutes.filter((idValue) => idValue !== selectedPlayerId),
+      },
+    }));
+    setLineupMessages((current) => ({ ...current, [teamId]: "" }));
+  }
+
+  function toggleSubstitute(teamId, playerId) {
+    const lineup = currentLineup(teamId);
     const isSubstitute = lineup.substitutes.includes(playerId);
-    const roleIsActive = role === "starter" ? isStarter : isSubstitute;
-    if (role === "starter" && !isStarter && lineup.starters.length >= 11) {
-      setLineupMessages((current) => ({ ...current, [teamId]: "A team can have a maximum of 11 starters." }));
-      return;
-    }
-    const starters = lineup.starters.filter((idValue) => idValue !== playerId);
-    const substitutes = lineup.substitutes.filter((idValue) => idValue !== playerId);
-    if (!roleIsActive && role === "starter") starters.push(playerId);
-    if (!roleIsActive && role === "substitute") substitutes.push(playerId);
+    const substitutes = isSubstitute
+      ? lineup.substitutes.filter((idValue) => idValue !== playerId)
+      : [...lineup.substitutes, playerId];
+    const starters = lineup.starters.map((idValue) => idValue === playerId ? null : idValue);
     setLineups((current) => ({
       ...current,
       [teamId]: { ...lineup, starters, substitutes },
@@ -435,7 +452,8 @@ export default function Scorer() {
             disabled={Boolean(lineupBusy) || fullTimeLocked}
             message={lineupMessages[m.home_id]}
             onFormationChange={(formation) => changeFormation(m.home_id, formation)}
-            onRoleChange={(playerId, playerRole) => changePlayerRole(m.home_id, playerId, playerRole)}
+            onStarterChange={(slotIndex, playerId) => assignStarter(m.home_id, slotIndex, playerId)}
+            onSubstituteChange={(playerId) => toggleSubstitute(m.home_id, playerId)}
             onSave={() => saveTeamLineup(m.home_id)}
           />
           <LineupTeamEditor
@@ -446,7 +464,8 @@ export default function Scorer() {
             disabled={Boolean(lineupBusy) || fullTimeLocked}
             message={lineupMessages[m.away_id]}
             onFormationChange={(formation) => changeFormation(m.away_id, formation)}
-            onRoleChange={(playerId, playerRole) => changePlayerRole(m.away_id, playerId, playerRole)}
+            onStarterChange={(slotIndex, playerId) => assignStarter(m.away_id, slotIndex, playerId)}
+            onSubstituteChange={(playerId) => toggleSubstitute(m.away_id, playerId)}
             onSave={() => saveTeamLineup(m.away_id)}
           />
         </div>
@@ -572,9 +591,13 @@ function AdminMatchShell({ error, onRetry }) {
   </div>;
 }
 
-function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onFormationChange, onRoleChange, onSave }) {
-  const starters = lineup.starters || [];
+function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onFormationChange, onStarterChange, onSubstituteChange, onSave }) {
+  const starters = lineup.starters || Array(11).fill(null);
   const substitutes = lineup.substitutes || [];
+  const formation = lineup.formation || DEFAULT_FORMATION;
+  const slots = getFormationSlots(formation);
+  const playerById = Object.fromEntries(squad.map((player) => [player.id, player]));
+  const selectedStarterIds = starters.filter(Boolean);
   const success = message === "Lineup saved and published.";
   return (
     <section style={{ background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, minWidth: 0 }}>
@@ -582,51 +605,74 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
         <Badge t={team} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "#8E939B", fontSize: 11 }}>{starters.length} starters, {substitutes.length} substitutes</span>
+          <span style={{ color: "#8E939B", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {substitutes.length} substitutes</span>
         </div>
       </div>
 
       <label style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
-      <select disabled={disabled} value={lineup.formation || "Not set"} onChange={(event) => onFormationChange(event.target.value)} style={{ ...finp, marginBottom: 10 }}>
-        {FORMATIONS.map((formation) => <option key={formation} value={formation}>{formation}</option>)}
+      <select disabled={disabled} value={formation} onChange={(event) => onFormationChange(event.target.value)} style={{ ...finp, marginBottom: 12 }}>
+        {FORMATION_OPTIONS.map((formationOption) => <option key={formationOption} value={formationOption}>{formationOption}</option>)}
       </select>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px 58px", gap: 6, padding: "0 4px 6px", color: "#8E939B", fontSize: 10, fontWeight: 700 }}>
-        <span>PLAYER</span><span style={{ textAlign: "center" }}>START</span><span style={{ textAlign: "center" }}>BENCH</span>
+      <div style={{ color: "#8E939B", fontSize: 10.5, lineHeight: 1.45, marginBottom: 8 }}>
+        Tap a position on the pitch and select the player who will start there.
       </div>
 
-      <div style={{ borderTop: "1px solid #24262A" }}>
-        {squad.map((player) => {
-          const isStarter = starters.includes(player.id);
-          const isSubstitute = substitutes.includes(player.id);
+      <div style={{ position: "relative", height: "clamp(470px, 112vw, 540px)", maxHeight: 540, overflow: "hidden", borderRadius: 12, background: "#171A1D", border: "1px solid #34383D" }}>
+        <PitchMarkings />
+        {slots.map((slot) => {
+          const playerId = starters[slot.index] || "";
+          const player = playerById[playerId];
+          const options = squad.filter((candidate) => (
+            candidate.id === playerId
+            || (!selectedStarterIds.includes(candidate.id) && !substitutes.includes(candidate.id))
+          ));
           return (
-            <div key={player.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px 58px", gap: 6, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #24262A" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 28, height: 28, flex: "0 0 auto", background: "#1C1E21", color: "#FFFFFF", fontSize: 11, fontWeight: 800 }}>{player.number ?? "•"}</span>
-                <span style={{ minWidth: 0 }}>
-                  <strong style={{ display: "block", color: "#FFFFFF", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</strong>
-                  <span style={{ display: "block", color: "#8E939B", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.position || "Player"}</span>
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={disabled || (!isStarter && starters.length >= 11)}
-                aria-pressed={isStarter}
-                onClick={() => onRoleChange(player.id, "starter")}
-                style={{ height: 30, borderRadius: 8, background: isStarter ? "#4FC263" : "#1C1E21", color: isStarter ? "#062" : "#AAB0BA", fontSize: 10, fontWeight: 800, opacity: disabled || (!isStarter && starters.length >= 11) ? 0.45 : 1 }}
-              >
-                {isStarter ? "IN" : "ADD"}
-              </button>
-              <button
-                type="button"
+            <label
+              key={`${formation}-${slot.index}`}
+              style={{
+                position: "absolute",
+                left: `${slot.x}%`,
+                top: `${slot.y}%`,
+                width: 88,
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                zIndex: 2,
+              }}
+            >
+              <span className="inline-flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: "2px solid rgba(255,255,255,.35)", boxShadow: "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850 }}>
+                {player?.number ?? slot.label}
+              </span>
+              <select
                 disabled={disabled}
-                aria-pressed={isSubstitute}
-                onClick={() => onRoleChange(player.id, "substitute")}
-                style={{ height: 30, borderRadius: 8, background: isSubstitute ? "#64748B" : "#1C1E21", color: isSubstitute ? "#FFFFFF" : "#AAB0BA", fontSize: 10, fontWeight: 800, opacity: disabled ? 0.45 : 1 }}
+                aria-label={`${slot.label} player`}
+                value={playerId}
+                onChange={(event) => onStarterChange(slot.index, event.target.value)}
+                style={{ display: "block", width: "100%", height: 27, marginTop: 3, padding: "0 4px", border: "1px solid #3A3E44", borderRadius: 7, background: "rgba(14,15,17,.94)", color: player ? "#FFFFFF" : "#9BA1AA", fontSize: 10, fontWeight: 750, textAlign: "center", outline: "none" }}
               >
-                {isSubstitute ? "IN" : "ADD"}
-              </button>
-            </div>
+                <option value="">{slot.label}</option>
+                {options.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.number != null ? `${candidate.number} ` : ""}{candidate.name}</option>)}
+              </select>
+            </label>
+          );
+        })}
+      </div>
+
+      <div style={{ color: "#8E939B", fontSize: 10.5, fontWeight: 800, margin: "14px 0 7px" }}>SUBSTITUTES</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+        {squad.filter((player) => !selectedStarterIds.includes(player.id)).map((player) => {
+          const selected = substitutes.includes(player.id);
+          return (
+            <button
+              key={player.id}
+              type="button"
+              disabled={disabled}
+              aria-pressed={selected}
+              onClick={() => onSubstituteChange(player.id)}
+              style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: selected ? "1px solid #4FC263" : "1px solid #2E3136", background: selected ? "#14351D" : "#17191C", color: selected ? "#70DB82" : "#C4C8CE", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1 }}
+            >
+              {player.number != null ? `${player.number} ` : ""}{player.name}
+            </button>
           );
         })}
       </div>
@@ -636,6 +682,29 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
       {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
     </section>
   );
+}
+
+function PitchMarkings() {
+  const line = "rgba(255,255,255,.12)";
+  return (
+    <div aria-hidden="true" style={{ position: "absolute", inset: 10, border: `1px solid ${line}`, pointerEvents: "none" }}>
+      <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: `1px solid ${line}` }} />
+      <span style={{ position: "absolute", width: 76, height: 76, left: "50%", top: "50%", transform: "translate(-50%, -50%)", border: `1px solid ${line}`, borderRadius: "50%" }} />
+      <span style={{ position: "absolute", width: 150, height: 62, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: 70, height: 24, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: 150, height: 62, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
+      <span style={{ position: "absolute", width: 70, height: 24, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
+    </div>
+  );
+}
+
+function readableAdminTextColor(color) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return "#FFFFFF";
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 155 ? "#07130B" : "#FFFFFF";
 }
 
 function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave }) {

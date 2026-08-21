@@ -378,7 +378,7 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
       {hasStarters ? (
         <div style={{ overflow: "hidden", marginTop: 8, background: pitchHeader }}>
           <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
-          <div style={{ position: "relative", height: 820, background: pitchBackground, overflow: "hidden", borderTop: `1px solid ${t.pitchLine}`, borderBottom: `1px solid ${t.pitchLine}` }}>
+          <div style={{ position: "relative", height: 1100, background: pitchBackground, overflow: "hidden", borderTop: `3px solid ${t.pitchLine}`, borderBottom: `3px solid ${t.pitchLine}` }}>
             <PublicPitchMarkings line={t.pitchLine} />
             {homeLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer
@@ -387,7 +387,6 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
                 fallbackIndex={fallbackIndex}
                 formation={homeLineup.formation}
                 side="home"
-                color={homeColor}
                 mode={mode}
               />
             ))}
@@ -398,7 +397,6 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
                 fallbackIndex={fallbackIndex}
                 formation={awayLineup.formation}
                 side="away"
-                color={awayColor}
                 mode={mode}
               />
             ))}
@@ -411,8 +409,8 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
         <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
           <div className="px-3 py-2.5" style={{ color: t.text, fontSize: 12, fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
           <div className="grid grid-cols-2">
-            <SubstituteList players={homeLineup.substitutes} side="home" color={homeColor} t={t} />
-            <SubstituteList players={awayLineup.substitutes} side="away" color={awayColor} t={t} />
+            <SubstituteList players={homeLineup.substitutes} side="home" t={t} />
+            <SubstituteList players={awayLineup.substitutes} side="away" t={t} />
           </div>
         </Card>
       ) : null}
@@ -432,46 +430,58 @@ function LineupTeamHeading({ team, formation, color, background, side }) {
 }
 
 function PublicPitchMarkings({ line }) {
+  const pitchBorder = `3px solid ${line}`;
   return (
-    <div aria-hidden="true" style={{ position: "absolute", inset: "10px 8px", border: `1px solid ${line}`, pointerEvents: "none" }}>
-      <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: `1px solid ${line}` }} />
-      <span style={{ position: "absolute", width: 96, height: 96, left: "50%", top: "50%", transform: "translate(-50%, -50%)", border: `1px solid ${line}`, borderRadius: "50%" }} />
-      <span style={{ position: "absolute", width: 180, height: 72, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
-      <span style={{ position: "absolute", width: 82, height: 28, left: "50%", top: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderTop: 0 }} />
-      <span style={{ position: "absolute", width: 180, height: 72, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
-      <span style={{ position: "absolute", width: 82, height: 28, left: "50%", bottom: 0, transform: "translateX(-50%)", border: `1px solid ${line}`, borderBottom: 0 }} />
+    <div aria-hidden="true" style={{ position: "absolute", inset: "12px 8px", border: pitchBorder, pointerEvents: "none" }}>
+      <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: pitchBorder }} />
+      <span style={{ position: "absolute", width: 112, height: 112, left: "50%", top: "50%", transform: "translate(-50%, -50%)", border: pitchBorder, borderRadius: "50%" }} />
+      <span style={{ position: "absolute", width: 7, height: 7, left: "50%", top: "50%", transform: "translate(-50%, -50%)", background: line, borderRadius: "50%" }} />
+      <span style={{ position: "absolute", width: "48%", height: 100, left: "50%", top: -3, transform: "translateX(-50%)", border: pitchBorder, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: "23%", height: 42, left: "50%", top: -3, transform: "translateX(-50%)", border: pitchBorder, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: "48%", height: 100, left: "50%", bottom: -3, transform: "translateX(-50%)", border: pitchBorder, borderBottom: 0 }} />
+      <span style={{ position: "absolute", width: "23%", height: 42, left: "50%", bottom: -3, transform: "translateX(-50%)", border: pitchBorder, borderBottom: 0 }} />
     </div>
   );
 }
 
-function TacticalLineupPlayer({ player, fallbackIndex, formation, side, color, mode }) {
+function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode }) {
   const slots = getFormationSlots(formation || DEFAULT_FORMATION);
   const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
   const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
   const top = side === "home"
-    ? 2.5 + (100 - slot.y) * 0.44
-    : 53.5 + slot.y * 0.44;
+    ? 2.5 + (100 - slot.y) * 0.455
+    : 52.5 + slot.y * 0.455;
   return (
-    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 90, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
+    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 76, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
       {player.photoUrl ? (
-        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 48, height: 48, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
+        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 50, height: 50, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
           {/* Supabase public media URLs are administrator controlled player assets. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </span>
       ) : (
-        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: color, color: readableTextColor(color), border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)", fontSize: 12, fontWeight: 850 }}>
-          {player.number ?? "•"}
-        </span>
+        <NeutralPlayerAvatar size={50} />
       )}
-      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 11.5, lineHeight: 1.14, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 10.5, lineHeight: 1.15, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.name}
       </strong>
     </div>
   );
 }
 
-function SubstituteList({ players, side, color, t }) {
+function NeutralPlayerAvatar({ size = 50 }) {
+  return (
+    <span className="inline-flex rounded-full overflow-hidden" style={{ width: size, height: size, background: "#E5E6E8", border: "1px solid rgba(255,255,255,.50)", boxShadow: "0 3px 8px rgba(0,0,0,.28)" }}>
+      <svg aria-hidden="true" viewBox="0 0 50 50" width={size} height={size}>
+        <circle cx="25" cy="25" r="25" fill="#E5E6E8" />
+        <circle cx="25" cy="18" r="9" fill="#C9CBCE" />
+        <path d="M8 48c1.5-11 8-17 17-17s15.5 6 17 17H8z" fill="#C9CBCE" />
+      </svg>
+    </span>
+  );
+}
+
+function SubstituteList({ players, side, t }) {
   const away = side === "away";
   return (
     <div style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
@@ -483,7 +493,7 @@ function SubstituteList({ players, side, color, t }) {
               <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </span>
           ) : (
-            <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 30, flex: "0 0 auto", background: color, color: readableTextColor(color), fontSize: 10, fontWeight: 850 }}>{player.number ?? "•"}</span>
+            <NeutralPlayerAvatar size={30} />
           )}
           <span style={{ minWidth: 0 }}>
             <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.name}</strong>

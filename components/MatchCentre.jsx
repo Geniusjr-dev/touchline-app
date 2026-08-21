@@ -469,9 +469,12 @@ function Ev({ e, t }) {
         {playerOff && <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{playerOff}</div>}
       </div>;
     }
-    return hasKnownScorer(e.player)
-      ? <div style={{ color: t.text, fontSize: 14, fontWeight: 600, textAlign: align }}>{e.player}</div>
-      : null;
+    const cardRecipient = hasKnownScorer(e.player) ? e.player : e.recipientType === "team_official" ? "Team official" : null;
+    const cardReason = e.cardType === "second_yellow" ? "Second booking" : CARD_REASON_PHRASES[e.cardReason];
+    return cardRecipient || cardReason ? <div style={{ textAlign: align }}>
+      {cardRecipient && <div style={{ color: t.text, fontSize: 14, fontWeight: 600 }}>{cardRecipient}</div>}
+      {cardReason && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: cardRecipient ? 2 : 0 }}>{cardReason}</div>}
+    </div> : null;
   };
   const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{fotMobMinuteLabel(e.min)}</span></div>;
   if (e.side === "home") return <div className="flex items-start gap-2 py-2.5" style={{ paddingRight: 12 }}>{minute}<span className="shrink-0 mt-0.5">{icon}</span><div className="flex-1">{body("left")}</div></div>;
@@ -514,114 +517,221 @@ function finalWhistleMinute(match) {
   return added > 0 ? `${endMinute}'+${added}` : `${endMinute}'`;
 }
 
-function goalCommentary(event, match, home, away) {
-  const [homeScore = "0", awayScore = "0"] = (event.score || "0 - 0").split(" - ").map((score) => score.trim());
-  const scoringTeam = event.side === "away" ? away : home;
-  const concedingTeam = event.side === "away" ? home : away;
-  const scoringTeamScore = Number(event.side === "away" ? awayScore : homeScore);
-  const concedingTeamScore = Number(event.side === "away" ? homeScore : awayScore);
-  const scoreline = `${scoringTeam.name} ${scoringTeamScore}, ${concedingTeam.name} ${concedingTeamScore}.`;
-  const knownScorer = hasKnownScorer(event.player);
-  const scorer = event.goalType === "own_goal"
-    ? knownScorer ? ` Own goal by: ${event.player}.` : " Own goal."
-    : event.goalType === "penalty"
-      ? knownScorer ? ` Penalty scored by: ${event.player}.` : " Penalty."
-      : event.goalType === "free_kick"
-        ? knownScorer ? ` Free kick scored by: ${event.player}.` : " Direct free kick."
-        : knownScorer ? ` Scored by: ${event.player}.` : "";
-  const assist = event.goalType !== "own_goal" && hasKnownScorer(event.assist) ? ` Assisted by: ${event.assist}.` : "";
-  const duration = Number(match.matchDurationMinutes || 90);
-  const extraTime = Number(match.extraTimeMinutes || 30);
-  const displayedMinute = Number(event.displayMinute || Math.max(1, Math.ceil(rawEventSeconds(event) / 60)));
-  const period = Number(event.period || (displayedMinute > duration / 2 ? 2 : 1));
-  const lateInRegulation = period === 2 && displayedMinute >= Math.max(duration - 10, duration / 2 + 1);
-  const lateInExtraTime = period === 4 && displayedMinute >= duration + Math.max(extraTime - 5, 1);
-  const late = lateInRegulation || lateInExtraTime;
-  const equaliser = scoringTeamScore === concedingTeamScore;
-  const takesLead = scoringTeamScore > concedingTeamScore && scoringTeamScore - 1 <= concedingTeamScore;
-  const friendly = match.competitionType === "friendly"
-    || /friend(?:ly|lies)|exhibition|warm[ -]?up/i.test(match.compName || "");
-  const inAddedTime = String(event.min || "").includes("+");
-  const moment = inAddedTime ? "deep into stoppage time" : "in the dying moments";
-
-  if (late && equaliser) {
-    return friendly
-      ? `GOALLLLLL! ${scoringTeam.name} find a late equaliser. ${scoreline}${scorer}${assist}`
-      : `GOALLLLLLLLLLLLLL! Late drama! ${scoringTeam.name} draw level ${moment}! ${scoreline}${scorer}${assist}`;
-  }
-  if (late && takesLead) {
-    return friendly
-      ? `GOALLLLLL! A late goal puts ${scoringTeam.name} in front. ${scoreline}${scorer}${assist}`
-      : `GOALLLLLLLLLLLLLL! Incredible late drama! ${scoringTeam.name} take the lead ${moment}. Could this be the winner? ${scoreline}${scorer}${assist}`;
-  }
-  return `GOAL! ${scoreline}${scorer}${assist}`;
+function commentaryVariant(event) {
+  const match = String(event.commentaryVariantKey || "").match(/_(\d+)$/);
+  return Math.max(0, Number(match?.[1] || 1) - 1);
 }
 
-function commentaryMilestones(match, includeHalfTime = true) {
+function selectedDescription(event, descriptions) {
+  return descriptions[commentaryVariant(event) % descriptions.length];
+}
+
+function goalCommentary(event, home, away) {
+  const [homeScore = "0", awayScore = "0"] = (event.score || "0 - 0").split(" - ").map((score) => score.trim());
+  const scoringTeam = event.side === "away" ? away : home;
+  const scoreline = `${home.name} ${homeScore}-${awayScore} ${away.name}.`;
+  const knownScorer = hasKnownScorer(event.player);
+  const goalType = event.goalType === "direct_goal" ? "normal_goal" : event.goalType || "normal_goal";
+  const heading = goalType === "own_goal" ? "OWN GOAL!" : "GOAL!";
+  if (!knownScorer) return `${heading} ${scoreline}`;
+
+  let descriptions;
+  if (goalType === "penalty") {
+    descriptions = [
+      `${event.player} converts the penalty.`,
+      `${event.player} scores from the penalty spot.`,
+      `${event.player} makes no mistake from the spot.`,
+      `The penalty is converted by ${event.player}.`,
+    ];
+  } else if (goalType === "free_kick") {
+    descriptions = [
+      `${event.player} scores directly from the free kick.`,
+      `${event.player} finds the net from the free kick.`,
+      `The free kick is converted by ${event.player}.`,
+      `${event.player} turns the free kick into a goal.`,
+    ];
+  } else if (goalType === "own_goal") {
+    descriptions = [
+      `${event.player} turns the ball into their own net.`,
+      `${event.player} puts through their own goal.`,
+      `The goal goes down against ${event.player}.`,
+      `${event.player} is credited with the own goal.`,
+    ];
+  } else if (String(event.commentaryVariantKey || "").startsWith("normal_lead_")) {
+    descriptions = [
+      `${event.player} puts ${scoringTeam.name} ahead.`,
+      `${event.player} gives ${scoringTeam.name} the lead.`,
+      `${event.player} moves ${scoringTeam.name} in front.`,
+      `${event.player} scores to put ${scoringTeam.name} ahead.`,
+    ];
+  } else if (String(event.commentaryVariantKey || "").startsWith("normal_equaliser_")) {
+    descriptions = [
+      `${event.player} brings ${scoringTeam.name} level.`,
+      `${event.player} equalises for ${scoringTeam.name}.`,
+      `${event.player} restores parity for ${scoringTeam.name}.`,
+      `${event.player} scores the equaliser for ${scoringTeam.name}.`,
+    ];
+  } else if (String(event.commentaryVariantKey || "").startsWith("normal_extend_")) {
+    descriptions = [
+      `${event.player} extends ${scoringTeam.name}'s lead.`,
+      `${event.player} adds another for ${scoringTeam.name}.`,
+      `${event.player} increases ${scoringTeam.name}'s advantage.`,
+      `${event.player} scores again for ${scoringTeam.name}.`,
+    ];
+  } else if (String(event.commentaryVariantKey || "").startsWith("normal_pullback_")) {
+    descriptions = [
+      `${event.player} pulls one back for ${scoringTeam.name}.`,
+      `${event.player} reduces the deficit for ${scoringTeam.name}.`,
+      `${event.player} gets ${scoringTeam.name} back into the match.`,
+      `${event.player} closes the gap for ${scoringTeam.name}.`,
+    ];
+  } else {
+    descriptions = [
+      `${event.player} scores for ${scoringTeam.name}.`,
+      `${event.player} finds the net.`,
+      `The goal belongs to ${event.player}.`,
+      `${event.player} gets the goal for ${scoringTeam.name}.`,
+    ];
+  }
+
+  const assist = goalType === "normal_goal" && hasKnownScorer(event.assist) ? ` Assisted by ${event.assist}.` : "";
+  return `${heading} ${scoreline} ${selectedDescription(event, descriptions)}${assist}`;
+}
+
+const CARD_REASON_PHRASES = {
+  foul: "a foul",
+  reckless_challenge: "a reckless challenge",
+  dissent: "dissent",
+  time_wasting: "time-wasting",
+  simulation: "simulation",
+  persistent_fouling: "persistent fouling",
+  handball: "handball",
+  stopping_promising_attack: "stopping a promising attack",
+  delaying_restart: "delaying the restart",
+  excessive_celebration: "excessive celebration",
+  violent_conduct: "violent conduct",
+  serious_foul_play: "serious foul play",
+  denial_obvious_goal_scoring_opportunity: "denying an obvious goal-scoring opportunity",
+  spitting_or_biting: "spitting or biting",
+  offensive_insulting_abusive_language: "offensive, insulting or abusive language or actions",
+};
+
+function cardCommentary(event, team) {
+  const playerKnown = hasKnownScorer(event.player);
+  const subject = event.recipientType === "team_official"
+    ? `A ${team.name} official`
+    : playerKnown ? `${event.player} (${team.name})`
+    : `A ${team.name} player`;
+  const reason = CARD_REASON_PHRASES[event.cardReason];
+
+  if (event.type === "yellow") {
+    const descriptions = reason ? [
+      `${subject} is booked for ${reason}.`,
+      `${subject} goes into the referee's book for ${reason}.`,
+      `${subject} is shown a yellow card for ${reason}.`,
+      `${subject} receives a booking for ${reason}.`,
+    ] : [
+      `${subject} is booked.`,
+      `${subject} goes into the referee's book.`,
+      `${subject} is shown a yellow card.`,
+      `A booking for ${subject}.`,
+    ];
+    return `YELLOW CARD! ${selectedDescription(event, descriptions)}`;
+  }
+
+  if (event.cardType === "second_yellow") {
+    const descriptions = [
+      `${subject} is sent off after a second booking.`,
+      `${subject} receives another booking and is sent off.`,
+      `${subject} is dismissed after receiving a second yellow.`,
+      `A second yellow card ends the match for ${subject}.`,
+    ];
+    return `RED CARD! ${selectedDescription(event, descriptions)}`;
+  }
+
+  const descriptions = reason ? [
+    `${subject} is sent off for ${reason}.`,
+    `${subject} is dismissed for ${reason}.`,
+    `${subject} is shown a straight red for ${reason}.`,
+    `${subject} receives a red card for ${reason}.`,
+  ] : [
+    `${subject} is sent off.`,
+    `${subject} is dismissed.`,
+    `${subject} is shown a straight red.`,
+    `${subject} receives a red card.`,
+  ];
+  return `RED CARD! ${selectedDescription(event, descriptions)}`;
+}
+
+function addedTimeWords(minutes) {
+  const words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+  return words[minutes] || String(minutes);
+}
+
+function commentaryMilestones(match, home, away, halfScore, includeHalfTime = true) {
   const duration = Number(match.matchDurationMinutes || 90);
   const extraTime = Number(match.extraTimeMinutes || 30);
   const half = duration / 2;
   const currentPeriod = Number(match.current_period || 1);
   const lines = [{ sort: 100000, m: "1'", text: "First half begins." }];
-  const addStoppage = (minutes, endMinute, period, periodName) => {
+  const addStoppage = (minutes, endMinute, period) => {
     if (minutes > 0) lines.push({
       sort: period * 100000 + endMinute * 60,
       m: `${endMinute}'`,
-      text: `A minimum of ${minutes} minute${minutes === 1 ? "" : "s"} will be added at the end of ${periodName}.`,
+      text: `${addedTimeWords(minutes)} minute${minutes === 1 ? "" : "s"} of added time.`,
     });
   };
 
-  addStoppage(Number(match.first_half_stoppage_minutes || 0), half, 1, "the first half");
+  addStoppage(Number(match.first_half_stoppage_minutes || 0), half, 1);
   if (includeHalfTime && (match.status === "ht" || currentPeriod >= 2 || match.status === "ft")) {
-    lines.push({ sort: 100000 + (half + Number(match.first_half_stoppage_minutes || 0)) * 60 + 1, m: `${half}'`, text: "Half time." });
+    lines.push({ sort: 100000 + (half + Number(match.first_half_stoppage_minutes || 0)) * 60 + 1, m: `${half}'`, text: `Half-time: ${home.name} ${halfScore.home}-${halfScore.away} ${away.name}.` });
   }
   if (currentPeriod >= 2) lines.push({ sort: 200000 + half * 60 + 1, m: `${half + 1}'`, text: "Second half begins." });
-  addStoppage(Number(match.second_half_stoppage_minutes || 0), duration, 2, "the second half");
+  addStoppage(Number(match.second_half_stoppage_minutes || 0), duration, 2);
   if (currentPeriod >= 3) lines.push({ sort: 300000 + duration * 60 + 1, m: `${duration + 1}'`, text: "First half of extra time begins." });
-  addStoppage(Number(match.extra_time_first_half_stoppage_minutes || 0), duration + extraTime / 2, 3, "the first half of extra time");
+  addStoppage(Number(match.extra_time_first_half_stoppage_minutes || 0), duration + extraTime / 2, 3);
   if (currentPeriod >= 4) lines.push({ sort: 400000 + (duration + extraTime / 2) * 60 + 1, m: `${duration + extraTime / 2 + 1}'`, text: "Second half of extra time begins." });
-  addStoppage(Number(match.extra_time_second_half_stoppage_minutes || 0), duration + extraTime, 4, "the second half of extra time");
+  addStoppage(Number(match.extra_time_second_half_stoppage_minutes || 0), duration + extraTime, 4);
   return lines;
 }
 
 function Commentary({ t, m, d, h, a }) {
   if (!d) return <Empty t={t} title="Commentary" note="Commentary is generated from match events as they are recorded." />;
+  const firstHalfEvents = d.events.filter((event) => Number(event.period || 1) === 1);
+  const halfScore = {
+    home: goalsBySide(firstHalfEvents, "home"),
+    away: goalsBySide(firstHalfEvents, "away"),
+  };
   const eventLines = [...d.events].map((e) => {
     const sort = eventSortSeconds(e, m);
-    if (e.type === "half") return { sort, m: e.min || "HT", text: `Half time. ${h.name} ${e.score} ${a.name}.` };
-    if (e.type === "goal") return { sort, m: e.min, text: goalCommentary(e, m, h, a) };
-    if (e.type === "yellow") {
+    if (e.type === "half") return { sort, m: e.min || `${Number(m.matchDurationMinutes || 90) / 2}'`, text: `Half-time: ${h.name} ${halfScore.home}-${halfScore.away} ${a.name}.` };
+    if (e.type === "goal") return { sort, m: e.min, text: goalCommentary(e, h, a) };
+    if (e.type === "yellow" || e.type === "red") {
       const team = e.side === "away" ? a : h;
-      return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Yellow card shown to ${e.player} (${team.name}).` : `Yellow card for ${team.name}.` };
-    }
-    if (e.type === "red") {
-      const team = e.side === "away" ? a : h;
-      return { sort, m: e.min, text: hasKnownScorer(e.player) ? `Red card! ${e.player} (${team.name}) is sent off.` : `Red card for ${team.name}.` };
+      return { sort, m: e.min, text: cardCommentary(e, team) };
     }
     if (e.type === "sub") {
+      const team = e.side === "away" ? a : h;
       const playerOn = hasKnownScorer(e.player) ? e.player : null;
       const playerOff = hasKnownScorer(e.assist) ? e.assist : null;
-      const text = playerOn && playerOff ? `Substitution: ${playerOn} replaces ${playerOff}.`
-        : playerOn ? `Substitution: ${playerOn} comes on.`
-        : playerOff ? `Substitution: ${playerOff} leaves the field.`
-        : "Substitution.";
+      const text = playerOn && playerOff ? `SUBSTITUTION! ${team.name}. ${selectedDescription(e, [
+        `${playerOn} replaces ${playerOff}.`,
+        `${playerOn} comes on for ${playerOff}.`,
+        `${playerOff} makes way for ${playerOn}.`,
+        `${team.name} bring on ${playerOn} for ${playerOff}.`,
+      ])}` : playerOn ? `SUBSTITUTION! ${team.name}. ${playerOn} comes on.`
+        : playerOff ? `SUBSTITUTION! ${team.name}. ${playerOff} leaves the field.`
+        : `SUBSTITUTION! ${team.name}.`;
       return { sort, m: e.min, text };
     }
     return { sort, m: e.min, text: "" };
   });
-  const fullTimeLines = m.status === "ft" ? [
-    {
-      sort: 900000002,
-      m: null,
-      text: `Match ends, ${h.name} ${m.hs}, ${a.name} ${m.as}.`,
-    },
-    {
-      sort: 900000001,
-      m: finalWhistleMinute(m),
-      text: `${Number(m.current_period || 2) >= 3 ? "Second half of extra time" : "Second half"} ends, ${h.name} ${m.hs}, ${a.name} ${m.as}.`,
-    },
-  ] : [];
-  const lines = [...eventLines, ...commentaryMilestones(m, !d.events.some((event) => event.type === "half")), ...fullTimeLines]
+  const fullTimeLines = m.status === "ft" ? [{
+    sort: 900000001,
+    m: finalWhistleMinute(m),
+    text: `Full-time: ${h.name} ${m.hs}-${m.as} ${a.name}.`,
+  }] : [];
+  const lines = [...eventLines, ...commentaryMilestones(m, h, a, halfScore, !d.events.some((event) => event.type === "half")), ...fullTimeLines]
     .filter((line) => line.text)
     .sort((x, y) => y.sort - x.sort);
   return <div className="px-2 py-1">

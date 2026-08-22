@@ -179,7 +179,7 @@ function TeamEditor({ team, onSaved }) {
 
 function Squad({ teamId }) {
   const [players, setPlayers] = useState([]);
-  const [values, setValues] = useState({ name: "", number: "", position: "Goalkeeper", country: "Ghana", date_of_birth: "", photo_url: "" });
+  const [values, setValues] = useState({ name: "", display_name: "", number: "", position: "Goalkeeper", country: "Ghana", date_of_birth: "", photo_url: "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const load = useCallback(() => listPlayers(teamId).then(setPlayers).catch(() => {}), [teamId]);
@@ -195,19 +195,23 @@ function Squad({ teamId }) {
   }
   async function add(event) {
     event.preventDefault();
-    if (!values.name.trim()) return;
+    if (!values.name.trim() || !values.display_name.trim()) {
+      setMessage("Enter both the full name and lineup display name.");
+      return;
+    }
     setBusy(true); setMessage("");
     const { error } = await addPlayer(teamId, values.name.trim(), values.number ? Number(values.number) : null, values.position, values);
     setBusy(false);
     if (error) { setMessage(error.message); return; }
-    setValues({ name: "", number: "", position: "Goalkeeper", country: "Ghana", date_of_birth: "", photo_url: "" }); await load();
+    setValues({ name: "", display_name: "", number: "", position: "Goalkeeper", country: "Ghana", date_of_birth: "", photo_url: "" }); await load();
   }
   return (
     <div style={editor}>
       <AdminHeading>Add player</AdminHeading>
       <form onSubmit={add} style={formGrid}>
         <Field label="Squad number"><input type="number" value={values.number} onChange={(event) => set("number", event.target.value)} style={inp} /></Field>
-        <Field label="Player name"><input value={values.name} onChange={(event) => set("name", event.target.value)} style={inp} /></Field>
+        <Field label="Full name"><input required value={values.name} onChange={(event) => set("name", event.target.value)} placeholder="Official player name" style={inp} /></Field>
+        <Field label="Lineup display name"><input required value={values.display_name} onChange={(event) => set("display_name", event.target.value)} placeholder="Short name, such as Mensah" maxLength={24} style={inp} /></Field>
         <Field label="Position"><PositionSelect value={values.position} onChange={(value) => set("position", value)} /></Field>
         <Field label="Country"><input value={values.country} onChange={(event) => set("country", event.target.value)} style={inp} /></Field>
         <Field label="Date of birth"><input type="date" value={values.date_of_birth} onChange={(event) => set("date_of_birth", event.target.value)} style={inp} /></Field>
@@ -232,7 +236,7 @@ function Squad({ teamId }) {
 
 function PlayerEditor({ player, teamId, refresh }) {
   const [open, setOpen] = useState(false);
-  const [values, setValues] = useState({ name: player.name || "", number: player.number ?? "", position: player.position || "Goalkeeper", country: player.country || "Ghana", date_of_birth: player.date_of_birth || "", photo_url: player.photo_url || "" });
+  const [values, setValues] = useState({ name: player.name || "", display_name: player.display_name || "", number: player.number ?? "", position: player.position || "Goalkeeper", country: player.country || "Ghana", date_of_birth: player.date_of_birth || "", photo_url: player.photo_url || "" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const set = (key, value) => setValues((current) => ({ ...current, [key]: value }));
@@ -244,6 +248,10 @@ function PlayerEditor({ player, teamId, refresh }) {
     finally { setBusy(false); }
   }
   async function save() {
+    if (!values.name.trim() || !values.display_name.trim()) {
+      setMessage("Enter both the full name and lineup display name.");
+      return;
+    }
     setBusy(true); setMessage("");
     const { error } = await updatePlayer(player.id, { ...values, number: values.number ? Number(values.number) : null });
     setBusy(false);
@@ -255,12 +263,17 @@ function PlayerEditor({ player, teamId, refresh }) {
     <div style={{ borderTop: "1px solid #26282B", padding: "10px 0" }}>
       <button onClick={() => setOpen((value) => !value)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, background: "none", border: 0, color: "#fff", cursor: "pointer", textAlign: "left" }}>
         <AdminImage src={values.photo_url} fallback={String(values.number || "PL")} />
-        <span style={{ flex: 1 }}><strong>{values.number ? `${values.number} ` : ""}{values.name}</strong><span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 3 }}>{values.position} · {values.country}</span></span>
+        <span style={{ flex: 1 }}>
+          <strong>{values.number ? `${values.number} ` : ""}{values.name}</strong>
+          <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 3 }}>{values.position} · {values.country}</span>
+          {values.display_name && <span style={{ display: "block", color: "#6F757E", fontSize: 11, marginTop: 2 }}>Lineup name: {values.display_name}</span>}
+        </span>
         <span style={{ color: "#8E939B", fontSize: 12 }}>{open ? "Close ▲" : "Edit ▼"}</span>
       </button>
       {open && <div style={{ ...formGrid, marginTop: 12 }}>
         <Field label="Number"><input type="number" value={values.number} onChange={(event) => set("number", event.target.value)} style={inp} /></Field>
-        <Field label="Name"><input value={values.name} onChange={(event) => set("name", event.target.value)} style={inp} /></Field>
+        <Field label="Full name"><input required value={values.name} onChange={(event) => set("name", event.target.value)} style={inp} /></Field>
+        <Field label="Lineup display name"><input required value={values.display_name} onChange={(event) => set("display_name", event.target.value)} placeholder="Short name" maxLength={24} style={inp} /></Field>
         <Field label="Position"><PositionSelect value={values.position} onChange={(value) => set("position", value)} /></Field>
         <Field label="Country"><input value={values.country} onChange={(event) => set("country", event.target.value)} style={inp} /></Field>
         <Field label="Date of birth"><input type="date" value={values.date_of_birth} onChange={(event) => set("date_of_birth", event.target.value)} style={inp} /></Field>

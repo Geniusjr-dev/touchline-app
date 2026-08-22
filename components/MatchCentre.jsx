@@ -472,7 +472,7 @@ function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode, ev
         <LineupEventBadges player={player} side={side} events={events} />
       </span>
       <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 10.5, lineHeight: 1.15, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
-        {player.number != null ? `${player.number} ` : ""}{player.name}
+        {player.number != null ? `${player.number} ` : ""}{player.displayName || player.name}
       </strong>
     </div>
   );
@@ -574,7 +574,7 @@ function SubstituteList({ players, side, events, t }) {
             <LineupEventBadges player={player} side={side} events={events} compact />
           </span>
           <span style={{ minWidth: 0 }}>
-            <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.name}</strong>
+            <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.displayName || player.name}</strong>
             <span className="block truncate" style={{ color: t.dim, fontSize: 9.5 }}>{player.position || "Substitute"}</span>
           </span>
         </div>

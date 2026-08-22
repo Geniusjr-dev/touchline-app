@@ -264,7 +264,7 @@ export default function MatchCentre({ id }) {
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
-      {activeTab === "Lineup" && <LineupTab t={t} mode={mode} m={m} h={h} a={a} lineups={d?.lineups || {}} homeColor={homeKitColor} awayColor={awayKitColor} />}
+      {activeTab === "Lineup" && <LineupTab t={t} mode={mode} m={m} h={h} a={a} lineups={d?.lineups || {}} events={d?.events || []} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} homeId={m.home} awayId={m.away} meetings={d?.h2h || []} />}
@@ -365,7 +365,7 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
   );
 }
 
-function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
+function LineupTab({ t, mode, m, h, a, lineups, events, homeColor, awayColor }) {
   const homeLineup = lineups[m.home] || { formation: null, starters: [], substitutes: [] };
   const awayLineup = lineups[m.away] || { formation: null, starters: [], substitutes: [] };
   const hasStarters = homeLineup.starters.length || awayLineup.starters.length;
@@ -378,7 +378,7 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
       {hasStarters ? (
         <div style={{ overflow: "hidden", marginTop: 8, background: pitchHeader }}>
           <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
-          <div style={{ position: "relative", height: 1100, background: pitchBackground, overflow: "hidden", borderTop: `3px solid ${t.pitchLine}`, borderBottom: `3px solid ${t.pitchLine}` }}>
+          <div style={{ position: "relative", height: 1100, background: pitchBackground, overflow: "hidden" }}>
             <PublicPitchMarkings line={t.pitchLine} />
             {homeLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer
@@ -388,6 +388,7 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
                 formation={homeLineup.formation}
                 side="home"
                 mode={mode}
+                events={events}
               />
             ))}
             {awayLineup.starters.map((player, fallbackIndex) => (
@@ -398,6 +399,7 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
                 formation={awayLineup.formation}
                 side="away"
                 mode={mode}
+                events={events}
               />
             ))}
           </div>
@@ -409,8 +411,8 @@ function LineupTab({ t, mode, m, h, a, lineups, homeColor, awayColor }) {
         <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
           <div className="px-3 py-2.5" style={{ color: t.text, fontSize: 12, fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
           <div className="grid grid-cols-2">
-            <SubstituteList players={homeLineup.substitutes} side="home" t={t} />
-            <SubstituteList players={awayLineup.substitutes} side="away" t={t} />
+            <SubstituteList players={homeLineup.substitutes} side="home" events={events} t={t} />
+            <SubstituteList players={awayLineup.substitutes} side="away" events={events} t={t} />
           </div>
         </Card>
       ) : null}
@@ -432,19 +434,23 @@ function LineupTeamHeading({ team, formation, color, background, side }) {
 function PublicPitchMarkings({ line }) {
   const pitchBorder = `3px solid ${line}`;
   return (
-    <div aria-hidden="true" style={{ position: "absolute", inset: "12px 8px", border: pitchBorder, pointerEvents: "none" }}>
+    <div aria-hidden="true" style={{ position: "absolute", inset: "12px 8px", borderLeft: pitchBorder, borderRight: pitchBorder, pointerEvents: "none" }}>
       <span style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: pitchBorder }} />
       <span style={{ position: "absolute", width: 112, height: 112, left: "50%", top: "50%", transform: "translate(-50%, -50%)", border: pitchBorder, borderRadius: "50%" }} />
       <span style={{ position: "absolute", width: 7, height: 7, left: "50%", top: "50%", transform: "translate(-50%, -50%)", background: line, borderRadius: "50%" }} />
       <span style={{ position: "absolute", width: "48%", height: 100, left: "50%", top: -3, transform: "translateX(-50%)", border: pitchBorder, borderTop: 0 }} />
       <span style={{ position: "absolute", width: "23%", height: 42, left: "50%", top: -3, transform: "translateX(-50%)", border: pitchBorder, borderTop: 0 }} />
+      <span style={{ position: "absolute", width: 112, height: 56, left: "50%", top: 98, transform: "translateX(-50%)", border: pitchBorder, borderTop: 0, borderRadius: "0 0 60px 60px" }} />
+      <span style={{ position: "absolute", width: 6, height: 6, left: "50%", top: 76, transform: "translateX(-50%)", background: line, borderRadius: "50%" }} />
       <span style={{ position: "absolute", width: "48%", height: 100, left: "50%", bottom: -3, transform: "translateX(-50%)", border: pitchBorder, borderBottom: 0 }} />
       <span style={{ position: "absolute", width: "23%", height: 42, left: "50%", bottom: -3, transform: "translateX(-50%)", border: pitchBorder, borderBottom: 0 }} />
+      <span style={{ position: "absolute", width: 112, height: 56, left: "50%", bottom: 98, transform: "translateX(-50%)", border: pitchBorder, borderBottom: 0, borderRadius: "60px 60px 0 0" }} />
+      <span style={{ position: "absolute", width: 6, height: 6, left: "50%", bottom: 76, transform: "translateX(-50%)", background: line, borderRadius: "50%" }} />
     </div>
   );
 }
 
-function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode }) {
+function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode, events }) {
   const slots = getFormationSlots(formation || DEFAULT_FORMATION);
   const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
   const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
@@ -453,15 +459,18 @@ function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode }) 
     : 52.5 + slot.y * 0.455;
   return (
     <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 76, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
-      {player.photoUrl ? (
-        <span className="inline-flex rounded-full overflow-hidden" style={{ width: 50, height: 50, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
-          {/* Supabase public media URLs are administrator controlled player assets. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        </span>
-      ) : (
-        <NeutralPlayerAvatar size={50} />
-      )}
+      <span className="inline-flex relative">
+        {player.photoUrl ? (
+          <span className="inline-flex rounded-full overflow-hidden" style={{ width: 50, height: 50, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
+            {/* Supabase public media URLs are administrator controlled player assets. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </span>
+        ) : (
+          <NeutralPlayerAvatar size={50} />
+        )}
+        <LineupEventBadges player={player} side={side} events={events} />
+      </span>
       <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 10.5, lineHeight: 1.15, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.name}
       </strong>
@@ -481,20 +490,89 @@ function NeutralPlayerAvatar({ size = 50 }) {
   );
 }
 
-function SubstituteList({ players, side, t }) {
+function normalizedLineupName(value) {
+  return String(value || "").trim().toLocaleLowerCase();
+}
+
+function lineupEventCounts(events, player, side) {
+  const playerName = normalizedLineupName(player.name);
+  return (events || []).reduce((counts, event) => {
+    if (event.type !== "goal") return counts;
+    const scorerSide = event.goalType === "own_goal"
+      ? (event.side === "home" ? "away" : "home")
+      : event.side;
+    const scorerMatches = event.playerId
+      ? event.playerId === player.id
+      : scorerSide === side && normalizedLineupName(event.player) === playerName;
+    if (scorerMatches && scorerSide === side) {
+      if (event.goalType === "own_goal") counts.ownGoals += 1;
+      else counts.goals += 1;
+    }
+    if (event.side === side && normalizedLineupName(event.assist) === playerName) counts.assists += 1;
+    return counts;
+  }, { goals: 0, ownGoals: 0, assists: 0 });
+}
+
+function FootballBoot({ size = 12 }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size}>
+      <path fill="currentColor" d="M5.2 3.2h6.1l1.1 6.1c.2 1 1 1.8 2 2.1l5.1 1.7c1 .3 1.7 1.3 1.7 2.4v2.1H4.8c-1.1 0-2-.9-2-2v-1.8c0-.8.5-1.5 1.2-1.8l2.6-1.1-1.4-7.7Zm2.4 8.5 4.1-1.8-.5-2.2-4.1 1.8.5 2.2Zm4.9 6.9h2.2v2.2h-2.2v-2.2Zm-5 0h2.2v2.2H7.5v-2.2Zm10 0h2.2v2.2h-2.2v-2.2Z" />
+    </svg>
+  );
+}
+
+function LineupEventBadges({ player, side, events, compact = false }) {
+  const counts = lineupEventCounts(events, player, side);
+  const markers = [
+    ...Array.from({ length: counts.assists }, (_, index) => ({ type: "assist", key: `assist-${index}` })),
+    ...Array.from({ length: counts.goals }, (_, index) => ({ type: "goal", key: `goal-${index}` })),
+    ...Array.from({ length: counts.ownGoals }, (_, index) => ({ type: "own_goal", key: `own-goal-${index}` })),
+  ];
+  if (!markers.length) return null;
+  const markerSize = compact ? 15 : 19;
+  return (
+    <span className="absolute inline-flex items-center" style={{ right: compact ? -5 : -7, bottom: compact ? -4 : -5, zIndex: 3 }}>
+      {markers.map((marker, index) => (
+        <span
+          key={marker.key}
+          className="inline-flex items-center justify-center rounded-full"
+          title={marker.type === "assist" ? "Assist" : marker.type === "own_goal" ? "Own goal" : "Goal"}
+          style={{
+            width: markerSize,
+            height: markerSize,
+            marginLeft: index ? -3 : 0,
+            background: "#FFFFFF",
+            border: marker.type === "own_goal" ? "1px solid #F05D66" : "1px solid rgba(0,0,0,.22)",
+            color: marker.type === "own_goal" ? "#F05D66" : "#151515",
+            boxShadow: "0 1px 3px rgba(0,0,0,.34)",
+          }}
+        >
+          {marker.type === "assist"
+            ? <FootballBoot size={compact ? 10 : 12} />
+            : <MonoFootball size={compact ? 9 : 11} color="currentColor" />}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function SubstituteList({ players, side, events, t }) {
   const away = side === "away";
   return (
     <div style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
       {players.map((player, index) => (
         <div key={player.id} className={`flex items-center gap-2 px-3 py-2.5 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 48, borderBottom: index === players.length - 1 ? "none" : `1px solid ${t.divider}` }}>
-          {player.photoUrl ? (
-            <span className="inline-flex rounded-full overflow-hidden" style={{ width: 30, height: 30, flex: "0 0 auto", background: t.chip }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            </span>
-          ) : (
-            <NeutralPlayerAvatar size={30} />
-          )}
+          <span className="inline-flex relative" style={{ flex: "0 0 auto" }}>
+            {player.photoUrl ? (
+              <span className="inline-flex rounded-full overflow-hidden" style={{ width: 30, height: 30, background: t.chip }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </span>
+            ) : (
+              <NeutralPlayerAvatar size={30} />
+            )}
+            <LineupEventBadges player={player} side={side} events={events} compact />
+          </span>
           <span style={{ minWidth: 0 }}>
             <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.name}</strong>
             <span className="block truncate" style={{ color: t.dim, fontSize: 9.5 }}>{player.position || "Substitute"}</span>

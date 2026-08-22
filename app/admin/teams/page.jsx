@@ -7,6 +7,7 @@ import {
   uploadTeamMedia,
 } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
+import { groupPlayersByPosition } from "@/lib/playerPositions";
 
 const COLORS = ["#18A558", "#2563EB", "#DC2626", "#7C3AED", "#EA580C", "#0891B2", "#DB2777", "#CA8A04"];
 const POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward"];
@@ -215,7 +216,16 @@ function Squad({ teamId }) {
       </form>
       {message && <Message error>{message}</Message>}
       <AdminHeading style={{ marginTop: 24 }}>Current squad</AdminHeading>
-      {players.map((player) => <PlayerEditor key={player.id} player={player} teamId={teamId} refresh={load} />)}
+      {groupPlayersByPosition(players).map((group) => (
+        <section key={group.key} style={{ marginTop: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 7, borderBottom: "1px solid #2A2C30" }}>
+            <strong style={{ color: "#FFFFFF", fontSize: 13 }}>{group.label}</strong>
+            <span style={{ color: "#8E939B", fontSize: 11, fontWeight: 700 }}>{group.players.length}</span>
+          </div>
+          {group.players.map((player) => <PlayerEditor key={player.id} player={player} teamId={teamId} refresh={load} />)}
+        </section>
+      ))}
+      {players.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "10px 0" }}>No players have been added.</div>}
     </div>
   );
 }

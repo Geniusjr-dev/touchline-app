@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
 import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
+import { groupPlayersByPosition } from "@/lib/playerPositions";
 import {
   announcedStoppageMinutes,
   deleteMatchEvent,
@@ -311,8 +312,14 @@ export default function Scorer() {
     await run(() => deleteMatchEvent(eventId));
   }
 
-  async function saveSub(side, on, off) {
-    const saved = await run(() => recordMatchEvent(id, { type: "sub", side, player: on, assist: off }));
+  async function saveSub(side, incomingPlayer, outgoingPlayer) {
+    const saved = await run(() => recordMatchEvent(id, {
+      type: "sub",
+      side,
+      player_id: incomingPlayer.id,
+      player: incomingPlayer.name,
+      assist: outgoingPlayer.name,
+    }));
     if (saved) setSubFor(null);
   }
 
@@ -397,6 +404,41 @@ export default function Scorer() {
     } finally {
       setLineupBusy(null);
     }
+  }
+
+  function substitutionPools(side) {
+    const teamId = sideTeamId(side);
+    const squad = squads[teamId] || [];
+    const lineup = currentLineup(teamId);
+    const playerById = Object.fromEntries(squad.map((player) => [player.id, player]));
+    const onFieldIds = new Set((lineup.starters || []).filter(Boolean));
+    const availableSubstituteIds = new Set(lineup.substitutes || []);
+    const substitutions = events
+      .filter((event) => event.type === "sub" && event.side === side)
+      .sort(eventOrder);
+
+    substitutions.forEach((event) => {
+      const outgoingPlayer = squad.find((player) => (
+        onFieldIds.has(player.id)
+        && player.name.trim().toLowerCase() === String(event.assist || "").trim().toLowerCase()
+      ));
+      const incomingPlayer = event.player_id && playerById[event.player_id]
+        ? playerById[event.player_id]
+        : squad.find((player) => (
+          availableSubstituteIds.has(player.id)
+          && player.name.trim().toLowerCase() === String(event.player || "").trim().toLowerCase()
+        ));
+      if (outgoingPlayer) onFieldIds.delete(outgoingPlayer.id);
+      if (incomingPlayer && availableSubstituteIds.has(incomingPlayer.id)) {
+        availableSubstituteIds.delete(incomingPlayer.id);
+        onFieldIds.add(incomingPlayer.id);
+      }
+    });
+
+    return {
+      onFieldPlayers: squad.filter((player) => onFieldIds.has(player.id)),
+      availableSubstitutes: squad.filter((player) => availableSubstituteIds.has(player.id)),
+    };
   }
 
   const actions = statusActions(m.status, fullTimeLocked);
@@ -569,7 +611,16 @@ export default function Scorer() {
           onChoose={commitPending}
         />
       )}
-      {subFor && <SubForm side={subFor} team={subFor === "home" ? home : away} squad={squads[sideTeamId(subFor)] || []} busy={busy} onCancel={() => !busy && setSubFor(null)} onSave={saveSub} />}
+      {subFor && (
+        <SubForm
+          side={subFor}
+          team={subFor === "home" ? home : away}
+          pools={substitutionPools(subFor)}
+          busy={busy}
+          onCancel={() => !busy && setSubFor(null)}
+          onSave={saveSub}
+        />
+      )}
     </div>
   );
 }
@@ -598,6 +649,8 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
   const slots = getFormationSlots(formation);
   const playerById = Object.fromEntries(squad.map((player) => [player.id, player]));
   const selectedStarterIds = starters.filter(Boolean);
+  const selectedSubstitutes = squad.filter((player) => substitutes.includes(player.id));
+  const reserves = squad.filter((player) => !selectedStarterIds.includes(player.id) && !substitutes.includes(player.id));
   const success = message === "Lineup saved and published.";
   return (
     <section style={{ background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, minWidth: 0 }}>
@@ -605,7 +658,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
         <Badge t={team} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "#8E939B", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {substitutes.length} substitutes</span>
+          <span style={{ color: "#8E939B", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {selectedSubstitutes.length} substitutes, {reserves.length} reserves</span>
         </div>
       </div>
 
@@ -658,29 +711,64 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
         })}
       </div>
 
-      <div style={{ color: "#8E939B", fontSize: 10.5, fontWeight: 800, margin: "14px 0 7px" }}>SUBSTITUTES</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-        {squad.filter((player) => !selectedStarterIds.includes(player.id)).map((player) => {
-          const selected = substitutes.includes(player.id);
-          return (
-            <button
-              key={player.id}
-              type="button"
-              disabled={disabled}
-              aria-pressed={selected}
-              onClick={() => onSubstituteChange(player.id)}
-              style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: selected ? "1px solid #4FC263" : "1px solid #2E3136", background: selected ? "#14351D" : "#17191C", color: selected ? "#70DB82" : "#C4C8CE", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1 }}
-            >
-              {player.number != null ? `${player.number} ` : ""}{player.name}
-            </button>
-          );
-        })}
-      </div>
+      <LineupRoleGroup
+        title="SUBSTITUTES"
+        count={selectedSubstitutes.length}
+        players={selectedSubstitutes}
+        disabled={disabled}
+        actionLabel="Move to reserves"
+        tone="substitute"
+        emptyText="No substitutes selected. Add eligible players from the reserves below."
+        onPlayerAction={onSubstituteChange}
+      />
+      <LineupRoleGroup
+        title="RESERVES"
+        count={reserves.length}
+        players={reserves}
+        disabled={disabled}
+        actionLabel="Add to substitutes"
+        tone="reserve"
+        emptyText="No reserve players available."
+        onPlayerAction={onSubstituteChange}
+      />
 
       {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
       <button type="button" disabled={disabled || busy} onClick={onSave} style={{ ...pill, width: "100%", marginTop: 12, background: "#4FC263", color: "#062", opacity: disabled || busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
       {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
     </section>
+  );
+}
+
+function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, emptyText, onPlayerAction }) {
+  const groupedPlayers = groupPlayersByPosition(players);
+  const isSubstitute = tone === "substitute";
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
+        <span style={{ color: "#8E939B", fontSize: 10.5, fontWeight: 800 }}>{title}</span>
+        <span style={{ color: "#6F757E", fontSize: 10.5, fontWeight: 750 }}>{count}</span>
+      </div>
+      {groupedPlayers.map((group) => (
+        <div key={group.key} style={{ marginTop: 9 }}>
+          <div style={{ color: "#737982", fontSize: 9.5, fontWeight: 800, marginBottom: 5 }}>{group.label.toUpperCase()}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {group.players.map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                disabled={disabled}
+                aria-label={`${actionLabel}: ${player.name}`}
+                onClick={() => onPlayerAction(player.id)}
+                style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: isSubstitute ? "1px solid #4FC263" : "1px solid #2E3136", background: isSubstitute ? "#14351D" : "#17191C", color: isSubstitute ? "#70DB82" : "#C4C8CE", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+              >
+                {player.number != null ? `${player.number} ` : ""}{player.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      {players.length === 0 && <div style={{ color: "#737982", fontSize: 10.5, lineHeight: 1.45, padding: "4px 0" }}>{emptyText}</div>}
+    </div>
   );
 }
 
@@ -1012,22 +1100,42 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
   );
 }
 
-function SubForm({ side, team, squad, busy, onCancel, onSave }) {
-  const [on, setOn] = useState("");
-  const [off, setOff] = useState("");
+function SubForm({ side, team, pools, busy, onCancel, onSave }) {
+  const [incomingId, setIncomingId] = useState("");
+  const [outgoingId, setOutgoingId] = useState("");
+  const incomingPlayer = pools.availableSubstitutes.find((player) => player.id === incomingId);
+  const outgoingPlayer = pools.onFieldPlayers.find((player) => player.id === outgoingId);
+  const canSubmit = Boolean(incomingPlayer && outgoingPlayer);
   return (
     <div style={overlay} onClick={onCancel}>
       <div role="dialog" aria-modal="true" style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
         <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution · {team.name}</div>
-        <label style={flabel}>Player coming ON</label>
-        <input list="sub-on" value={on} onChange={(event) => setOn(event.target.value)} style={finp} />
-        <label style={flabel}>Player going OFF</label>
-        <input list="sub-off" value={off} onChange={(event) => setOff(event.target.value)} style={finp} />
-        <datalist id="sub-on">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
-        <datalist id="sub-off">{squad.map((player) => <option key={player.id} value={player.name} />)}</datalist>
+        <div style={{ color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
+          Only current on-field players can leave. Only announced substitutes can enter.
+        </div>
+        <label style={flabel}>Player going off</label>
+        <select value={outgoingId} onChange={(event) => setOutgoingId(event.target.value)} style={finp}>
+          <option value="">Select an on-field player</option>
+          {groupPlayersByPosition(pools.onFieldPlayers).map((group) => (
+            <optgroup key={group.key} label={group.label}>
+              {group.players.map((player) => <option key={player.id} value={player.id}>{player.number != null ? `${player.number} ` : ""}{player.name}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <label style={flabel}>Player coming on</label>
+        <select value={incomingId} onChange={(event) => setIncomingId(event.target.value)} style={finp}>
+          <option value="">Select an announced substitute</option>
+          {groupPlayersByPosition(pools.availableSubstitutes).map((group) => (
+            <optgroup key={group.key} label={group.label}>
+              {group.players.map((player) => <option key={player.id} value={player.id}>{player.number != null ? `${player.number} ` : ""}{player.name}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        {pools.onFieldPlayers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>Save the starting eleven before recording a substitution.</div>}
+        {pools.onFieldPlayers.length > 0 && pools.availableSubstitutes.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>No announced substitutes are available for this team.</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
-          <button disabled={busy || !on.trim() || !off.trim()} onClick={() => onSave(side, on.trim(), off.trim())} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" }}>Add</button>
+          <button disabled={busy || !canSubmit} onClick={() => onSave(side, incomingPlayer, outgoingPlayer)} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !canSubmit ? "not-allowed" : "pointer", opacity: busy || !canSubmit ? 0.45 : 1 }}>Add</button>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   updateCompetition,
 } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
+import { readableTextColor } from "@/lib/teamColors";
 
 const groupName = (number) => `Group ${String.fromCharCode(64 + Number(number))}`;
 
@@ -193,7 +194,7 @@ function CompetitionEditor({ competition, teams, onSaved }) {
           {teams.map((team) => {
             const entry = entryByTeam[team.id];
             return <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderTop: "1px solid #26282B" }}>
-              <span style={{ width: 28, height: 28, borderRadius: "50%", background: team.color, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>{team.short}</span>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", background: team.color, color: readableTextColor(team.color), border: "1px solid rgba(127,127,127,.28)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>{team.short}</span>
               <span style={{ flex: 1, fontSize: 13 }}>{team.display_name || team.name}</span>
               {format === "tournament" ? (
                 <select value={entry?.group_number || ""} onChange={(e) => changeRegistration(team.id, e.target.value)} style={{ ...inp, width: 140, padding: "7px 8px" }}>

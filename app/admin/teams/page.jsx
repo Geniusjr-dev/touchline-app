@@ -8,8 +8,8 @@ import {
 } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 import { groupPlayersByPosition } from "@/lib/playerPositions";
+import { readableTextColor, TEAM_COLOURS } from "@/lib/teamColors";
 
-const COLORS = ["#18A558", "#2563EB", "#DC2626", "#7C3AED", "#EA580C", "#0891B2", "#DB2777", "#CA8A04"];
 const POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward"];
 
 export default function Teams() {
@@ -18,7 +18,7 @@ export default function Teams() {
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [short, setShort] = useState("");
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState(TEAM_COLOURS[0].value);
   const [logoFile, setLogoFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -122,7 +122,7 @@ function TeamWorkspace({ team, refreshTeams }) {
 
 function TeamEditor({ team, onSaved }) {
   const [values, setValues] = useState({
-    name: team.name || "", display_name: team.display_name || "", short: team.short || "", color: team.color || COLORS[0],
+    name: team.name || "", display_name: team.display_name || "", short: team.short || "", color: team.color || TEAM_COLOURS[0].value,
     country: team.country || "Ghana", logo_url: team.logo_url || "", coach_name: team.coach_name || "",
     coach_country: team.coach_country || "Ghana", coach_date_of_birth: team.coach_date_of_birth || "", coach_photo_url: team.coach_photo_url || "",
   });
@@ -345,7 +345,35 @@ function TrophyEditor({ trophy, teamId, refresh }) {
 }
 
 function ColourPicker({ value, onChange }) {
-  return <Field label="Fallback badge colour"><div style={{ display: "flex", gap: 5 }}>{COLORS.map((color) => <button type="button" key={color} onClick={() => onChange(color)} aria-label={`Use colour ${color}`} style={{ width: 25, height: 25, borderRadius: "50%", background: color, border: value === color ? "2px solid #fff" : "2px solid transparent", cursor: "pointer" }} />)}</div></Field>;
+  return (
+    <Field label="Fallback badge colour">
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", maxWidth: 310 }}>
+        {TEAM_COLOURS.map((option) => {
+          const selected = value?.toUpperCase() === option.value;
+          return (
+            <button
+              type="button"
+              key={option.value}
+              onClick={() => onChange(option.value)}
+              aria-label={`Use ${option.name.toLowerCase()}`}
+              aria-pressed={selected}
+              title={option.name}
+              style={{
+                width: 25,
+                height: 25,
+                borderRadius: "50%",
+                background: option.value,
+                border: option.name === "White" ? "1px solid #7A8089" : "1px solid rgba(255,255,255,.20)",
+                outline: selected ? "2px solid #4FC263" : "none",
+                outlineOffset: 2,
+                cursor: "pointer",
+              }}
+            />
+          );
+        })}
+      </div>
+    </Field>
+  );
 }
 
 function PositionSelect({ value, onChange }) {
@@ -384,7 +412,7 @@ function ImageUpload({ label, src, onFile, onRemove, fallback, color }) {
 }
 
 function AdminImage({ src, fallback, color = "#30343A" }) {
-  return <span style={{ width: 38, height: 38, borderRadius: src ? 0 : "50%", background: src ? "transparent" : color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, fontSize: 11, fontWeight: 850 }}>{src ? (
+  return <span style={{ width: 38, height: 38, borderRadius: src ? 0 : "50%", background: src ? "transparent" : color, color: readableTextColor(color), border: src ? 0 : "1px solid rgba(127,127,127,.32)", display: "inline-flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0, fontSize: 11, fontWeight: 850 }}>{src ? (
     // Supabase public media URLs are administrator-controlled team assets.
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />

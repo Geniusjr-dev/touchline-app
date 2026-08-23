@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
 import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
 import { groupPlayersByPosition } from "@/lib/playerPositions";
+import { readableTextColor } from "@/lib/teamColors";
 import {
   announcedStoppageMinutes,
   deleteMatchEvent,
@@ -1143,7 +1144,7 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
 }
 
 function Badge({ t, size = 40 }) {
-  return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
+  return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: readableTextColor(t.color), border: "1px solid rgba(127,127,127,.28)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
 }
 
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };

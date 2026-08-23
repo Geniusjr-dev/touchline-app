@@ -1,6 +1,7 @@
 "use client";
 import { Search, Newspaper, Trophy, Star } from "lucide-react";
 import { liveMinute } from "@/lib/db";
+import { readableTextColor } from "@/lib/teamColors";
 
 export function Crest({ short, color, logo, size = 26, ring }) {
   return (
@@ -10,10 +11,10 @@ export function Crest({ short, color, logo, size = 26, ring }) {
         height: size,
         borderRadius: logo ? 0 : "50%",
         background: logo ? "transparent" : color,
-        color: "#fff",
+        color: readableTextColor(color),
         fontSize: size * 0.36,
         fontWeight: 800,
-        boxShadow: ring && !logo ? `0 0 0 1.5px ${ring}` : "none",
+        boxShadow: !logo ? `${ring ? `0 0 0 1.5px ${ring}, ` : ""}inset 0 0 0 1px rgba(127,127,127,.28)` : "none",
         overflow: "hidden",
       }}>
       {logo ? (

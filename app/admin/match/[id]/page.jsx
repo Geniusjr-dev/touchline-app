@@ -277,7 +277,15 @@ export default function Scorer() {
       card_reason: selection?.cardReason || null,
       recipient_type: selection?.recipientType || null,
     };
-    await run(() => recordMatchEvent(id, event), true);
+    let createdEvent = null;
+    const saved = await run(async () => {
+      const response = await recordMatchEvent(id, event);
+      createdEvent = response?.data || null;
+      return response;
+    }, true);
+    if (saved && createdEvent?.id && ["goal", "red"].includes(createdEvent.type)) {
+      notifyFollowers({ kind: "event", eventId: createdEvent.id });
+    }
   }
 
   async function undoLast(type, side) {
@@ -288,15 +296,37 @@ export default function Scorer() {
   }
 
   async function changeStatus(status) {
+    const previousStatus = m.status;
     if (m.status === "scheduled" && status === "live") {
       if (!kitsAreDistinct(homeKitColor, awayKitColor)) {
         setError("The home and away kits clash. Choose a clearly different away kit before kick-off.");
         return;
       }
-      await run(() => startMatchWithKits(id, homeKitColor, awayKitColor));
+      const saved = await run(() => startMatchWithKits(id, homeKitColor, awayKitColor));
+      if (saved) notifyFollowers({ kind: "status", previousStatus });
       return;
     }
-    await run(() => transitionMatchStatus(id, status));
+    const saved = await run(() => transitionMatchStatus(id, status));
+    if (saved) notifyFollowers({ kind: "status", previousStatus });
+  }
+
+  async function notifyFollowers(payload) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch("/api/push/notify", {
+        method: "POST",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ matchId: id, ...payload }),
+      }).catch(() => {});
+    } catch {
+      // Notification delivery never blocks live scoring.
+    }
   }
 
   async function deliberatelyReopen() {

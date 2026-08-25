@@ -2,13 +2,14 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Share2, Star, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, Share2, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable } from "@/lib/db";
 import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
 import { DEFAULT_FORMATION, getFormationSlots } from "@/lib/formations";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
+import MatchNotificationButton from "@/components/MatchNotificationButton";
 
 const TABS_PRE = ["Preview", "Lineup", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
@@ -99,7 +100,6 @@ export default function MatchCentre({ id }) {
   const router = useRouter();
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
-  const [following, setFollowing] = useState(false);
   const [loadError, setLoadError] = useState("");
   const refreshTimerRef = useRef(null);
   const tableRequestRef = useRef("");
@@ -212,9 +212,7 @@ export default function MatchCentre({ id }) {
               <Share2 size={18} color={t.text} />
             </button>
             <span style={{ width: 1, height: 22, background: t.divider }} />
-            <button aria-label={following ? "Stop following match" : "Follow match"} onClick={() => setFollowing((value) => !value)} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
-              <Star size={19} color={t.text} fill={following ? t.text : "none"} />
-            </button>
+            <MatchNotificationButton matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
         <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>

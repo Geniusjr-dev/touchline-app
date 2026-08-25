@@ -3,10 +3,13 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Menu, ChevronUp, ChevronDown } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { getHome } from "@/lib/db";
+import { getHome, getMatch } from "@/lib/db";
 import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
+import MatchNotificationButton from "@/components/MatchNotificationButton";
+
+const warmedMatches = new Set();
 
 function localDateKey(date) {
   const year = date.getFullYear();
@@ -39,6 +42,16 @@ function MatchRow({ m, teams, t, now }) {
   const showScore = ["live", "ht", "ft", "et_live", "et_ht"].includes(m.status);
   const showStatus = showScore || ["postponed", "cancelled"].includes(m.status);
   const rememberMatch = () => cachePublicMatch(m, teams);
+  const warmMatch = () => {
+    rememberMatch();
+    if (warmedMatches.has(m.id)) return;
+    warmedMatches.add(m.id);
+    getMatch(m.id)
+      .then((next) => {
+        if (next?.match) cachePublicMatch(next.match, next.teams, next.detail);
+      })
+      .catch(() => warmedMatches.delete(m.id));
+  };
   const teamNameStyle = {
     color: t.text,
     fontSize: "clamp(12.5px, 3.5vw, 14px)",
@@ -53,18 +66,21 @@ function MatchRow({ m, teams, t, now }) {
     hyphens: "none",
   };
   return (
-    <Link
-      href={`/match/${m.id}`}
-      onPointerDown={rememberMatch}
-      onClick={rememberMatch}
-      className="relative grid items-center gap-x-2 px-3 py-2 active:opacity-70"
-      style={{
-        gridTemplateColumns: "minmax(0, 1fr) 54px minmax(0, 1fr)",
-        minHeight: 80,
-        borderTop: `1px solid ${t.divider}`,
-        textDecoration: "none",
-      }}
-    >
+    <div className="relative" style={{ borderTop: `1px solid ${t.divider}` }}>
+      <Link
+        href={`/match/${m.id}`}
+        onPointerEnter={warmMatch}
+        onPointerDown={warmMatch}
+        onFocus={warmMatch}
+        onTouchStart={warmMatch}
+        onClick={warmMatch}
+        className="relative grid items-center gap-x-2 px-3 py-2 active:opacity-70"
+        style={{
+          gridTemplateColumns: "minmax(0, 1fr) 54px minmax(0, 1fr)",
+          minHeight: 80,
+          textDecoration: "none",
+        }}
+      >
       {showStatus && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex justify-center">
           <StatusChip m={m} t={t} now={now} />
@@ -79,11 +95,17 @@ function MatchRow({ m, teams, t, now }) {
           ? <span style={{ color: t.text, fontSize: 15, fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
           : <span style={{ color: t.dim, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
       </div>
-      <div className="flex items-center justify-start gap-1.5 min-w-0">
+      <div className="flex items-center justify-start gap-1.5 min-w-0" style={{ paddingRight: m.status === "scheduled" ? 14 : 0 }}>
         <Crest short={a.short} color={a.color} logo={a.logoUrl} size={24} ring={t.divider} />
         <span className="min-w-0 text-left" style={teamNameStyle}>{awayName}</span>
       </div>
-    </Link>
+      </Link>
+      {m.status === "scheduled" && (
+        <div className="absolute right-1 bottom-1 z-20">
+          <MatchNotificationButton matchId={m.id} status={m.status} color={t.dim} size={13} compact />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -125,20 +147,25 @@ export default function MatchesHome() {
 
   useEffect(() => {
     let alive = true;
-    const load = () => getHome().then((next) => { if (alive) setData(next); }).catch(() => {});
+    let refreshTimer;
+    const load = (force = false) => getHome({ force }).then((next) => { if (alive) setData(next); }).catch(() => {});
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => load(true), 140);
+    };
     load();
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0);
-    const ticker = window.setInterval(() => setNow(Date.now()), 1000);
+    const ticker = window.setInterval(() => setNow(Date.now()), 15000);
     let channel;
     if (supabase) {
       channel = supabase.channel("touchline-home")
-        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, scheduleRefresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, scheduleRefresh)
         .subscribe();
     }
     return () => {
       alive = false;
+      window.clearTimeout(refreshTimer);
       window.clearTimeout(firstTick);
       window.clearInterval(ticker);
       if (channel) supabase.removeChannel(channel);

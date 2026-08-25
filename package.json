@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "node scripts/check-no-long-dashes.mjs && eslint ."
+    "lint": "node scripts/check-no-long-dashes.mjs && eslint .",
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

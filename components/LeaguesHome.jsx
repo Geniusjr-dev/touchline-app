@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -101,13 +102,17 @@ export default function LeaguesHome() {
             className="flex items-center rounded-2xl active:opacity-70"
             style={{ minHeight: 88, marginBottom: 9, padding: "13px 14px", background: t.card, border: `1px solid ${t.divider}` }}
           >
-            <span className="inline-flex items-center justify-center rounded-2xl shrink-0" style={{ width: 52, height: 52, background: t.disc }}>
-              <Trophy size={25} color={t.accent} />
+            <span className="inline-flex items-center justify-center rounded-2xl shrink-0 overflow-hidden" style={{ width: 52, height: 52, background: competition.themeColor || t.disc }}>
+              {competition.logoUrl
+                ? <img src={competition.logoUrl} alt="" style={{ width: 40, height: 40, objectFit: "contain" }} />
+                : <Trophy size={25} color="#FFFFFF" />}
             </span>
             <span className="min-w-0" style={{ flex: 1, padding: "0 12px" }}>
               <span className="block truncate" style={{ color: t.text, fontSize: 15, fontWeight: 800 }}>{competition.name}</span>
               {competition.sub && <span className="block truncate" style={{ color: t.dim, fontSize: 12.5, marginTop: 3 }}>{competition.sub}</span>}
               <span className="flex items-center gap-2" style={{ color: t.dim, fontSize: 11.5, marginTop: 6 }}>
+                <span>{competition.country}</span>
+                <span>•</span>
                 <span>{competition.teamCount} teams</span>
                 <span>•</span>
                 <span>{competition.completedCount}/{competition.matchCount} matches completed</span>

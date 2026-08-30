@@ -23,6 +23,9 @@ export default function CompetitionsPage() {
   const [sub, setSub] = useState("");
   const [format, setFormat] = useState("friendly");
   const [duration, setDuration] = useState("90");
+  const [country, setCountry] = useState("Ghana");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [themeColor, setThemeColor] = useState("#4B125F");
   const [groupCount, setGroupCount] = useState("4");
   const [teamsPerGroup, setTeamsPerGroup] = useState("4");
   const [busy, setBusy] = useState(false);
@@ -57,11 +60,12 @@ export default function CompetitionsPage() {
       Number(duration),
       format,
       groups,
-      perGroup
+      perGroup,
+      { country, logoUrl, themeColor }
     );
     setBusy(false);
     if (createError) return setError(createError.message);
-    setName(""); setSub(""); setFormat("friendly"); setDuration("90"); setGroupCount("4"); setTeamsPerGroup("4");
+    setName(""); setSub(""); setFormat("friendly"); setDuration("90"); setCountry("Ghana"); setLogoUrl(""); setThemeColor("#4B125F"); setGroupCount("4"); setTeamsPerGroup("4");
     load();
   }
 
@@ -77,6 +81,14 @@ export default function CompetitionsPage() {
         <div style={grid}>
           <Field label="Competition name"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Community Premier League" style={inp} /></Field>
           <Field label="Sub-label (optional)"><input value={sub} onChange={(e) => setSub(e.target.value)} placeholder="2026 season" style={inp} /></Field>
+          <Field label="Country"><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Ghana" style={inp} /></Field>
+          <Field label="Competition logo URL"><input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." style={inp} /></Field>
+          <Field label="Header colour">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} style={colorInput} />
+              <input value={themeColor} onChange={(e) => setThemeColor(e.target.value)} pattern="#[0-9A-Fa-f]{6}" style={{ ...inp, flex: 1 }} />
+            </div>
+          </Field>
           <Field label="Format">
             <select value={format} onChange={(e) => setFormat(e.target.value)} style={inp}>
               <option value="friendly">Friendly</option>
@@ -113,6 +125,9 @@ function CompetitionEditor({ competition, teams, onSaved }) {
   const [sub, setSub] = useState(competition.sub || "");
   const [format, setFormat] = useState(competition.competition_type || "tournament");
   const [duration, setDuration] = useState(String(competition.match_duration_minutes || 90));
+  const [country, setCountry] = useState(competition.country || "Ghana");
+  const [logoUrl, setLogoUrl] = useState(competition.logo_url || "");
+  const [themeColor, setThemeColor] = useState(competition.theme_color || "#4B125F");
   const [groupCount, setGroupCount] = useState(String(competition.group_count || 1));
   const [teamsPerGroup, setTeamsPerGroup] = useState(String(competition.teams_per_group || 4));
   const [message, setMessage] = useState("");
@@ -130,7 +145,7 @@ function CompetitionEditor({ competition, teams, onSaved }) {
     if (format === "tournament" && entries.some((entry) => Number(entry.group_number) > groups)) {
       return setMessage("Move teams out of groups above the new group limit first.");
     }
-    const { error } = await updateCompetition(competition.id, name.trim(), sub.trim() || null, Number(duration), format, groups, perGroup);
+    const { error } = await updateCompetition(competition.id, name.trim(), sub.trim() || null, Number(duration), format, groups, perGroup, { country, logoUrl, themeColor });
     if (error) return setMessage(error.message);
     if (format !== "tournament") {
       await Promise.all(entries.filter((entry) => entry.group_number).map((entry) => setCompetitionTeam(competition.id, entry.team_id, null)));
@@ -181,6 +196,9 @@ function CompetitionEditor({ competition, teams, onSaved }) {
           <div style={grid}>
             <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} style={inp} /></Field>
             <Field label="Sub-label"><input value={sub} onChange={(e) => setSub(e.target.value)} style={inp} /></Field>
+            <Field label="Country"><input value={country} onChange={(e) => setCountry(e.target.value)} style={inp} /></Field>
+            <Field label="Competition logo URL"><input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." style={inp} /></Field>
+            <Field label="Header colour"><div style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)} style={colorInput} /><input value={themeColor} onChange={(e) => setThemeColor(e.target.value)} pattern="#[0-9A-Fa-f]{6}" style={{ ...inp, flex: 1 }} /></div></Field>
             <Field label="Format"><select value={format} onChange={(e) => setFormat(e.target.value)} style={inp}><option value="friendly">Friendly</option><option value="league">League</option><option value="tournament">Tournament</option></select></Field>
             <Field label="Duration"><select value={duration} onChange={(e) => setDuration(e.target.value)} style={inp}>{[60, 70, 80, 90].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></Field>
             {format === "tournament" && <><Field label="Groups"><input type="number" min="1" max="26" value={groupCount} onChange={(e) => setGroupCount(e.target.value)} style={inp} /></Field><Field label="Teams per group"><input type="number" min="2" max="32" value={teamsPerGroup} onChange={(e) => setTeamsPerGroup(e.target.value)} style={inp} /></Field></>}
@@ -238,6 +256,7 @@ const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(18
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
 const h3 = { fontSize: 15, fontWeight: 750, marginBottom: 12 };
 const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
+const colorInput = { width: 46, height: 42, padding: 3, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
 const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", fontWeight: 800, cursor: "pointer" };
 const errorBox = { color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 };

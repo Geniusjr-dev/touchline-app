@@ -17,6 +17,9 @@ create table if not exists competitions (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   sub text,
+  country text default 'Ghana',
+  logo_url text,
+  theme_color text default '#4B125F',
   created_at timestamptz default now()
 );
 
@@ -156,6 +159,9 @@ create table if not exists public.organization_members (
 alter table public.competitions add column if not exists organization_id uuid references public.organizations(id) on delete cascade;
 alter table public.competitions add column if not exists match_duration_minutes smallint not null default 90;
 alter table public.competitions add column if not exists extra_time_minutes smallint not null default 30;
+alter table public.competitions add column if not exists country text default 'Ghana';
+alter table public.competitions add column if not exists logo_url text;
+alter table public.competitions add column if not exists theme_color text default '#4B125F';
 
 do $$
 begin

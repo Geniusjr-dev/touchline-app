@@ -131,6 +131,7 @@ export default function MatchesHome() {
   const [data, setData] = useState(null);
   const [now, setNow] = useState(0);
   const dateStripRef = useRef(null);
+  const dateInputRef = useRef(null);
   const todayButtonRef = useRef(null);
   const todayKey = now ? localDateKey(new Date(now)) : "";
   const [selectedDateOverride, setSelectedDateOverride] = useState(null);
@@ -186,6 +187,17 @@ export default function MatchesHome() {
     setLiveOnly(false);
   };
 
+  const openDatePicker = (event) => {
+    const input = dateInputRef.current;
+    if (!input || typeof input.showPicker !== "function") return;
+
+    try {
+      input.showPicker();
+    } catch {
+      event.currentTarget.focus({ preventScroll: true });
+    }
+  };
+
   const comps = !data ? [] : data.competitions
     .map((competition) => ({
       ...competition,
@@ -217,11 +229,13 @@ export default function MatchesHome() {
                 <span style={{ paddingTop: 4 }}>{selectedDate ? Number(selectedDate.slice(8, 10)) : ""}</span>
               </span>
               <input
+                ref={dateInputRef}
                 type="date"
                 aria-label="Choose match date"
                 value={selectedDate}
                 min={dateWindow[0]?.key}
                 max={dateWindow[dateWindow.length - 1]?.key}
+                onClick={openDatePicker}
                 onChange={(event) => event.target.value && selectDate(event.target.value)}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 16 }}
               />
@@ -257,6 +271,7 @@ export default function MatchesHome() {
         {dateWindow.map((day) => {
           const active = day.key === selectedDate;
           return <button
+            type="button"
             key={day.key}
             ref={day.offset === 0 ? todayButtonRef : null}
             data-date={day.key}
@@ -266,7 +281,7 @@ export default function MatchesHome() {
             }}
             aria-pressed={active}
             className="shrink-0"
-            style={{ color: active ? t.text : t.faint, fontSize: active ? 16 : 15, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", scrollSnapAlign: "center" }}
+            style={{ color: active ? t.text : t.faint, fontSize: active ? 16 : 15, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", scrollSnapAlign: "center", cursor: "pointer" }}
           >
             {day.label}
           </button>;

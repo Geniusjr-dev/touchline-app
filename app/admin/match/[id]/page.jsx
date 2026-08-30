@@ -26,6 +26,7 @@ import {
   setMatchStoppageTime,
   startMatchWithKits,
   transitionMatchStatus,
+  updateMatchPreviewDetails,
 } from "@/lib/db";
 
 const HEX_COLOR = /^#[0-9A-F]{6}$/i;
@@ -118,7 +119,11 @@ export default function Scorer() {
   const [lineupMessages, setLineupMessages] = useState({});
   const [homeKitColor, setHomeKitColor] = useState("");
   const [awayKitColor, setAwayKitColor] = useState("");
+  const [previewDetails, setPreviewDetails] = useState({ round: "", venueName: "", venueLocation: "", venueCapacity: "", venueSurface: "Grass", weather: "", refereeName: "" });
+  const [previewDetailsBusy, setPreviewDetailsBusy] = useState(false);
+  const [previewDetailsMessage, setPreviewDetailsMessage] = useState("");
   const kitInitializedFor = useRef(null);
+  const previewDetailsInitializedFor = useRef(null);
 
   const loadLineups = useCallback(async () => {
     try {
@@ -147,6 +152,18 @@ export default function Scorer() {
       const mm = await withDeadline(getMatchRaw(id));
       if (!mm) throw new Error("This match was not found.");
       setM(mm);
+      if (previewDetailsInitializedFor.current !== mm.id) {
+        setPreviewDetails({
+          round: mm.match_round || "",
+          venueName: mm.venue_name || "",
+          venueLocation: mm.venue_location || "",
+          venueCapacity: mm.venue_capacity == null ? "" : String(mm.venue_capacity),
+          venueSurface: mm.venue_surface || "Grass",
+          weather: mm.weather || "",
+          refereeName: mm.referee_name || "",
+        });
+        previewDetailsInitializedFor.current = mm.id;
+      }
       setError("");
 
       const [eventsOutcome, teamsOutcome, statsOutcome] = await Promise.allSettled([
@@ -254,6 +271,27 @@ export default function Scorer() {
     }
   }
 
+  function changePreviewDetail(key, value) {
+    setPreviewDetails((current) => ({ ...current, [key]: value }));
+    setPreviewDetailsMessage("");
+  }
+
+  async function savePreviewDetails(event) {
+    event.preventDefault();
+    setPreviewDetailsBusy(true);
+    setPreviewDetailsMessage("");
+    try {
+      const result = await updateMatchPreviewDetails(id, previewDetails);
+      if (result.error) throw result.error;
+      setM((current) => ({ ...current, ...result.data }));
+      setPreviewDetailsMessage("Public match details saved.");
+    } catch (previewError) {
+      setPreviewDetailsMessage(previewError.message || "The public match details could not be saved.");
+    } finally {
+      setPreviewDetailsBusy(false);
+    }
+  }
+
   function beginEvent(type, side) {
     if (!canRecord || busy) return;
     setError("");
@@ -315,7 +353,7 @@ export default function Scorer() {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) return;
-      fetch("/api/push/notify", {
+      const response = await fetch("/api/push/notify", {
         method: "POST",
         keepalive: true,
         headers: {
@@ -323,9 +361,13 @@ export default function Scorer() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ matchId: id, ...payload }),
-      }).catch(() => {});
-    } catch {
-      // Notification delivery never blocks live scoring.
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(`The match update was saved, but notifications were not delivered. ${result.error || "Please try again."}`);
+      }
+    } catch (notificationError) {
+      setError(`The match update was saved, but notifications were not delivered. ${notificationError.message || "Please try again."}`);
     }
   }
 
@@ -491,6 +533,26 @@ export default function Scorer() {
       </div>
 
       {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+      {role === "admin" && (
+        <form onSubmit={savePreviewDetails} style={card}>
+          <div style={label}>PUBLIC MATCH DETAILS</div>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+            These details appear in the public Preview tab before and during the match.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
+            <PreviewField label="Round or stage"><input value={previewDetails.round} onChange={(event) => changePreviewDetail("round", event.target.value)} placeholder="Round 2" maxLength={80} style={finp} /></PreviewField>
+            <PreviewField label="Venue name"><input value={previewDetails.venueName} onChange={(event) => changePreviewDetail("venueName", event.target.value)} placeholder="Buya Community Park" maxLength={120} style={finp} /></PreviewField>
+            <PreviewField label="Venue location"><input value={previewDetails.venueLocation} onChange={(event) => changePreviewDetail("venueLocation", event.target.value)} placeholder="Buya, Kpandai District" maxLength={160} style={finp} /></PreviewField>
+            <PreviewField label="Venue capacity"><input type="number" min="0" value={previewDetails.venueCapacity} onChange={(event) => changePreviewDetail("venueCapacity", event.target.value)} placeholder="3000" style={finp} /></PreviewField>
+            <PreviewField label="Playing surface"><input value={previewDetails.venueSurface} onChange={(event) => changePreviewDetail("venueSurface", event.target.value)} placeholder="Grass" maxLength={60} style={finp} /></PreviewField>
+            <PreviewField label="Weather"><input value={previewDetails.weather} onChange={(event) => changePreviewDetail("weather", event.target.value)} placeholder="27°C · Clear" maxLength={100} style={finp} /></PreviewField>
+            <PreviewField label="Referee"><input value={previewDetails.refereeName} onChange={(event) => changePreviewDetail("refereeName", event.target.value)} placeholder="Referee's full name" maxLength={120} style={finp} /></PreviewField>
+          </div>
+          <button type="submit" disabled={previewDetailsBusy} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062", opacity: previewDetailsBusy ? 0.5 : 1 }}>{previewDetailsBusy ? "Saving…" : "Save public details"}</button>
+          {previewDetailsMessage && <div style={{ color: /saved/i.test(previewDetailsMessage) ? "#4FC263" : "#F5C518", fontSize: 12, marginTop: 10 }}>{previewDetailsMessage}</div>}
+        </form>
+      )}
 
       {m.status === "scheduled" && (
         <div style={card}>
@@ -1175,6 +1237,10 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
 
 function Badge({ t, size = 40 }) {
   return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: readableTextColor(t.color), border: "1px solid rgba(127,127,127,.28)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
+}
+
+function PreviewField({ label: fieldLabel, children }) {
+  return <label style={{ display: "flex", flexDirection: "column", gap: 5 }}><span style={{ color: "#8E939B", fontSize: 11.5, fontWeight: 650 }}>{fieldLabel}</span>{children}</label>;
 }
 
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };

@@ -19,6 +19,13 @@ export default function Matches() {
   const [competitionTeams, setCompetitionTeams] = useState([]);
   const [matchDate, setMatchDate] = useState("");
   const [kickoff, setKickoff] = useState("");
+  const [matchRound, setMatchRound] = useState("");
+  const [venueName, setVenueName] = useState("");
+  const [venueLocation, setVenueLocation] = useState("");
+  const [venueCapacity, setVenueCapacity] = useState("");
+  const [venueSurface, setVenueSurface] = useState("Grass");
+  const [weather, setWeather] = useState("");
+  const [refereeName, setRefereeName] = useState("");
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
@@ -63,9 +70,18 @@ export default function Matches() {
     if (!matchDate) return setErr("Choose the match date.");
     if (!kickoff) return setErr("Choose the kick-off time.");
     if (selectedCompetition?.competition_type === "tournament" && !groupNumber) return setErr("Choose the tournament group for this match.");
-    const { error } = await createMatch(activeOrganizationId, comp, home, away, kickoff, matchDate, groupNumber ? Number(groupNumber) : null);
+    const { error } = await createMatch(
+      activeOrganizationId,
+      comp,
+      home,
+      away,
+      kickoff,
+      matchDate,
+      groupNumber ? Number(groupNumber) : null,
+      { round: matchRound, venueName, venueLocation, venueCapacity, venueSurface, weather, refereeName }
+    );
     if (error) return setErr(error.message);
-    setHome(""); setAway(""); setKickoff(""); load();
+    setHome(""); setAway(""); setKickoff(""); setMatchRound(""); setVenueName(""); setVenueLocation(""); setVenueCapacity(""); setVenueSurface("Grass"); setWeather(""); setRefereeName(""); load();
   }
   async function assignScorer(matchId, scorerId) {
     setErr("");
@@ -140,6 +156,14 @@ export default function Matches() {
               style={pickerInput}
             />
           </Field>
+          <div style={{ ...h3, marginTop: 18 }}>Public preview details</div>
+          <Field label="Round or stage (optional)"><input value={matchRound} onChange={(event) => setMatchRound(event.target.value)} placeholder="Round 2" maxLength={80} style={inp} /></Field>
+          <Field label="Venue name (optional)"><input value={venueName} onChange={(event) => setVenueName(event.target.value)} placeholder="Buya Community Park" maxLength={120} style={inp} /></Field>
+          <Field label="Venue location (optional)"><input value={venueLocation} onChange={(event) => setVenueLocation(event.target.value)} placeholder="Buya, Kpandai District" maxLength={160} style={inp} /></Field>
+          <Field label="Venue capacity (optional)"><input type="number" min="0" value={venueCapacity} onChange={(event) => setVenueCapacity(event.target.value)} placeholder="3000" style={inp} /></Field>
+          <Field label="Playing surface (optional)"><input value={venueSurface} onChange={(event) => setVenueSurface(event.target.value)} placeholder="Grass" maxLength={60} style={inp} /></Field>
+          <Field label="Weather (optional)"><input value={weather} onChange={(event) => setWeather(event.target.value)} placeholder="27°C · Clear" maxLength={100} style={inp} /></Field>
+          <Field label="Referee (optional)"><input value={refereeName} onChange={(event) => setRefereeName(event.target.value)} placeholder="Referee's full name" maxLength={120} style={inp} /></Field>
           <button type="submit" style={btn}>Create match</button>
           {selectedCompetition && selectedCompetition.competition_type !== "friendly" && eligibleTeams.length === 0 && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 8 }}>No teams are registered for {selectedCompetition.competition_type === "tournament" ? "this group" : "this league"}. Configure them under Competitions first.</div>}
           <div style={{ marginTop: 10 }}><Link href="/admin/competitions" style={{ color: "#4FC263", fontSize: 12, fontWeight: 700 }}>Manage competition formats and teams →</Link></div>

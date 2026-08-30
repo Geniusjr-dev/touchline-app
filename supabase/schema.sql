@@ -35,6 +35,13 @@ create table if not exists matches (
   away_id uuid references teams on delete set null,
   status text not null default 'scheduled',   -- scheduled|live|ht|ft
   kickoff text,
+  match_round text,
+  venue_name text,
+  venue_location text,
+  venue_capacity integer,
+  venue_surface text,
+  weather text,
+  referee_name text,
   clock_base int default 0,
   clock_started_at timestamptz,
   created_at timestamptz default now()
@@ -172,6 +179,13 @@ alter table public.matches add column if not exists locked_at timestamptz;
 alter table public.matches add column if not exists reopened_at timestamptz;
 alter table public.matches add column if not exists reopened_by uuid references public.profiles(id) on delete set null;
 alter table public.matches add column if not exists reopen_reason text;
+alter table public.matches add column if not exists match_round text;
+alter table public.matches add column if not exists venue_name text;
+alter table public.matches add column if not exists venue_location text;
+alter table public.matches add column if not exists venue_capacity integer;
+alter table public.matches add column if not exists venue_surface text;
+alter table public.matches add column if not exists weather text;
+alter table public.matches add column if not exists referee_name text;
 
 do $$
 begin
@@ -183,6 +197,9 @@ begin
   end if;
   if not exists (select 1 from pg_constraint where conname = 'matches_elapsed_check') then
     alter table public.matches add constraint matches_elapsed_check check (clock_elapsed_seconds >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'matches_venue_capacity_check') then
+    alter table public.matches add constraint matches_venue_capacity_check check (venue_capacity is null or venue_capacity >= 0);
   end if;
 end $$;
 

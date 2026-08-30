@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 import MatchNotificationButton from "@/components/MatchNotificationButton";
 
-const TABS_PRE = ["Preview", "Lineup", "Stats", "H2H"];
+const TABS_PRE = ["Preview", "Lineup", "Table", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
 
 function withDeadline(promise, milliseconds = 6000) {
@@ -68,6 +68,31 @@ function breakClock(match) {
   const extraTime = Number(match.extraTimeMinutes || 30);
   const minute = match.status === "et_ht" ? duration + extraTime / 2 : duration / 2;
   return `${minute}:00`;
+}
+
+function matchDateLabel(dateKey, kickoff) {
+  if (!dateKey) return kickoff || "Date to be confirmed";
+  const matchDate = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(matchDate.getTime())) return [dateKey, kickoff].filter(Boolean).join(" · ");
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const difference = Math.round((matchDate.getTime() - today.getTime()) / 86400000);
+  const day = difference === 0
+    ? "Today"
+    : difference === 1
+      ? "Tomorrow"
+      : difference === -1
+        ? "Yesterday"
+        : matchDate.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: matchDate.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+  return [day, kickoff].filter(Boolean).join(" · ");
+}
+
+function matchStageLabel(match) {
+  if (match.round) return match.round;
+  if (match.competitionType === "tournament" && match.groupNumber) {
+    return `Group ${String.fromCharCode(64 + Number(match.groupNumber))}`;
+  }
+  return "";
 }
 
 function LiveMatchClock({ match, theme, announcedStoppage }) {
@@ -157,7 +182,7 @@ export default function MatchCentre({ id }) {
 
   useEffect(() => {
     const match = state?.match;
-    if (tab !== "Table" || !match || match.competitionType === "friendly") return;
+    if (!match || match.competitionType === "friendly") return;
     const signature = `${match.id}:${match.status}:${match.hs}:${match.as}`;
     if (tableRequestRef.current === signature) return;
     tableRequestRef.current = signature;
@@ -172,7 +197,7 @@ export default function MatchCentre({ id }) {
     }).catch(() => {
       tableRequestRef.current = "";
     });
-  }, [tab, state?.match]);
+  }, [state?.match]);
 
   if (!state) return <MatchPageShell t={t} onBack={() => router.push("/")} error={loadError} onRetry={load} />;
   const { match: m, teams, detail: d } = state;
@@ -186,9 +211,8 @@ export default function MatchCentre({ id }) {
   const ended = m.status === "ft";
   const started = live || ended;
   const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
-  const availableTabs = started
-    ? TABS_LIVE.filter((item) => item !== "Table" || m.competitionType !== "friendly")
-    : TABS_PRE;
+  const availableTabs = (started ? TABS_LIVE : TABS_PRE)
+    .filter((item) => item !== "Table" || m.competitionType !== "friendly");
   const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
   const defaultTab = started ? "Facts" : "Preview";
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
@@ -260,7 +284,7 @@ export default function MatchCentre({ id }) {
       </div>
 
       {/* content */}
-      {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} h={h} a={a} d={d} started={started} />}
+      {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
       {activeTab === "Lineup" && <LineupTab t={t} mode={mode} m={m} h={h} a={a} lineups={d?.lineups || {}} events={d?.events || []} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
@@ -582,57 +606,46 @@ function SubstituteList({ players, side, events, t }) {
 }
 
 // ---------- Facts / Preview ----------
-function FactsPreview({ t, m, h, a, d, started }) {
+function FactsPreview({ t, m, d, started }) {
+  const hasVenue = Boolean(m.venueName || m.venueLocation || m.venueCapacity || m.venueSurface || m.weather);
+  const stage = matchStageLabel(m);
+  const competition = [m.compName || "Match", stage].filter(Boolean).join(" · ");
+  const capacity = Number(m.venueCapacity);
   return (
     <div>
-      {d && d.venue && d.details && (
-        <>
-          <Card t={t}>
-            <div className="flex items-center justify-between px-4 pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <Disc3 size={20} color={t.dim} />
-                <div>
-                  <div style={{ color: t.text, fontSize: 16, fontWeight: 700 }}>{d.venue.name}</div>
-                  <div style={{ color: t.dim, fontSize: 13 }}>{d.venue.loc}</div>
-                </div>
+      {hasVenue && (
+        <Card t={t}>
+          <div className="flex items-center justify-between px-4 pt-4 pb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Disc3 size={20} color={t.dim} />
+              <div className="min-w-0">
+                <div className="truncate" style={{ color: t.text, fontSize: 16, fontWeight: 750 }}>{m.venueName || "Match venue"}</div>
+                {m.venueLocation && <div className="truncate" style={{ color: t.dim, fontSize: 13 }}>{m.venueLocation}</div>}
               </div>
-              <span className="inline-flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: t.chip }}><MapPin size={16} color={t.accent} /></span>
             </div>
-            <div style={{ height: 1, background: t.divider }} />
-            {started ? (
-              <div className="px-4 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span style={{ color: t.text, fontSize: 14 }}><b>Attendance</b> <span style={{ color: t.dim }}>{d.venue.att}</span></span>
-                  <span style={{ color: t.text, fontSize: 14 }}><b>Capacity</b> <span style={{ color: t.dim }}>{d.venue.cap}</span></span>
-                </div>
-                <div className="rounded-full relative" style={{ height: 6, background: t.divider }}>
-                  <div className="rounded-full absolute left-0 top-0" style={{ height: 6, width: `${d.venue.pct}%`, background: t.accent }} />
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 py-3" style={{ color: t.text, fontSize: 14 }}><b>Capacity</b> <span style={{ color: t.dim }}>{d.venue.cap}</span></div>
-            )}
-            <div style={{ height: 1, background: t.divider }} />
-            <div className="px-4 py-3" style={{ color: t.text, fontSize: 14 }}><b>Surface</b> <span style={{ color: t.dim }}>{d.venue.surface}</span></div>
-            <div style={{ height: 1, background: t.divider }} />
-            <div className="px-4 py-3" style={{ color: t.text, fontSize: 14 }}><b>Weather</b> <span style={{ color: t.dim }}>{d.venue.weather}</span></div>
-          </Card>
-
-          <Card t={t}>
-            <div className="px-4 py-3 flex items-center gap-3"><Calendar size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14, fontWeight: 600 }}>{d.details.date}</span></div>
-            <div style={{ height: 1, background: t.divider }} />
-            <div className="px-4 py-3 flex items-center gap-3"><span className="rounded-full px-3 py-1" style={{ background: t.chip, color: t.text, fontSize: 13, fontWeight: 600 }}>{d.details.comp}</span></div>
-            <div style={{ height: 1, background: t.divider }} />
-            <div className="px-4 py-3 flex items-center gap-3"><Disc3 size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14 }}>Referee {d.details.ref}</span></div>
-          </Card>
-        </>
+            <span className="inline-flex items-center justify-center rounded-full shrink-0" style={{ width: 34, height: 34, background: t.chip }}><MapPin size={16} color={t.accent} /></span>
+          </div>
+          {(m.venueCapacity || m.venueSurface) && <div style={{ height: 1, background: t.divider }} />}
+          {(m.venueCapacity || m.venueSurface) && (
+            <div className="flex items-center gap-8 px-4 py-3">
+              {m.venueCapacity && <span style={{ color: t.text, fontSize: 14 }}><b>Capacity</b> <span style={{ color: t.dim }}>{Number.isFinite(capacity) ? capacity.toLocaleString() : m.venueCapacity}</span></span>}
+              {m.venueSurface && <span style={{ color: t.text, fontSize: 14 }}><b>Surface</b> <span style={{ color: t.dim }}>{m.venueSurface}</span></span>}
+            </div>
+          )}
+          {m.weather && <div style={{ height: 1, background: t.divider }} />}
+          {m.weather && <div className="px-4 py-3" style={{ color: t.text, fontSize: 14 }}><b>Weather</b> <span style={{ color: t.dim }}>{m.weather}</span></div>}
+        </Card>
       )}
 
-      {started ? (
-        d ? <Timeline t={t} events={d.events} match={m} /> : null
-      ) : (
-        <Empty t={t} title="Not started yet" note="Line-ups and match events will appear here once the match kicks off." />
-      )}
+      <Card t={t}>
+        <div className="px-4 py-3 flex items-center gap-3"><Calendar size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14, fontWeight: 650 }}>{matchDateLabel(m.date, m.time)}</span></div>
+        <div style={{ height: 1, background: t.divider }} />
+        <div className="px-4 py-3 flex items-center gap-3"><span className="rounded-full px-3 py-1" style={{ background: t.chip, color: t.text, fontSize: 13, fontWeight: 650 }}>{competition}</span></div>
+        {m.refereeName && <div style={{ height: 1, background: t.divider }} />}
+        {m.refereeName && <div className="px-4 py-3 flex items-center gap-3"><Disc3 size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14 }}>Referee <b>{m.refereeName}</b></span></div>}
+      </Card>
+
+      {started && d ? <Timeline t={t} events={d.events} match={m} /> : null}
     </div>
   );
 }
@@ -1016,7 +1029,7 @@ function TableTab({ t, m, rows }) {
         </div>
         <div style={{ height: 1, background: t.divider }} />
         {rows.map((tm, i) => {
-          const gd = tm.gf - tm.ga; const on = hi.includes(tm.id); const q = i < Math.min(4, rows.length);
+          const gd = tm.gf - tm.ga; const on = hi.includes(tm.id); const q = m.competitionType === "tournament" && i < Math.min(4, rows.length);
           return <div key={tm.id} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
             <div className="flex items-center" style={{ width: 22 }}>
               <span style={{ width: 3, height: 22, borderRadius: 2, background: q ? t.accent : "transparent", marginRight: 5 }} />
@@ -1038,10 +1051,12 @@ function TableTab({ t, m, rows }) {
           </div>;
         })}
       </div>
-      <div className="flex items-center gap-2 px-4 py-2">
-        <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
-        <span style={{ color: t.dim, fontSize: 12 }}>Advances to the knockout stage</span>
-      </div>
+      {m.competitionType === "tournament" && (
+        <div className="flex items-center gap-2 px-4 py-2">
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
+          <span style={{ color: t.dim, fontSize: 12 }}>Advances to the knockout stage</span>
+        </div>
+      )}
     </>
   );
 }

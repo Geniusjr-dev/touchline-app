@@ -95,6 +95,15 @@ function matchStageLabel(match) {
   return "";
 }
 
+function statsAvailableForMatch(match, now) {
+  if (!match) return false;
+  if (["live", "ht", "et_live", "et_ht", "ft"].includes(match.status)) return true;
+  if (match.status !== "scheduled" || !match.date || !match.time || !now) return false;
+  const kickoffTime = new Date(`${match.date}T${match.time}`).getTime();
+  if (!Number.isFinite(kickoffTime)) return false;
+  return now >= kickoffTime - 30 * 60 * 1000;
+}
+
 function LiveMatchClock({ match, theme, announcedStoppage }) {
   const [clockNow, setClockNow] = useState(() => Date.now());
   useEffect(() => {
@@ -126,6 +135,7 @@ export default function MatchCentre({ id }) {
   const [state, setState] = useState(null);
   const [tab, setTab] = useState(null);
   const [loadError, setLoadError] = useState("");
+  const [availabilityNow, setAvailabilityNow] = useState(0);
   const refreshTimerRef = useRef(null);
   const tableRequestRef = useRef("");
   const tableRowsRef = useRef(new Map());
@@ -181,6 +191,13 @@ export default function MatchCentre({ id }) {
   }, [id, load, scheduleRefresh]);
 
   useEffect(() => {
+    const updateAvailability = () => setAvailabilityNow(Date.now());
+    updateAvailability();
+    const ticker = window.setInterval(updateAvailability, 30000);
+    return () => window.clearInterval(ticker);
+  }, []);
+
+  useEffect(() => {
     const match = state?.match;
     if (!match || match.competitionType === "friendly") return;
     const signature = `${match.id}:${match.status}:${match.hs}:${match.as}`;
@@ -210,9 +227,11 @@ export default function MatchCentre({ id }) {
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = m.status === "ft";
   const started = live || ended;
+  const statsAvailable = statsAvailableForMatch(m, availabilityNow);
   const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
   const availableTabs = (started ? TABS_LIVE : TABS_PRE)
-    .filter((item) => item !== "Table" || m.competitionType !== "friendly");
+    .filter((item) => item !== "Table" || m.competitionType !== "friendly")
+    .filter((item) => item !== "Stats" || statsAvailable);
   const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
   const defaultTab = started ? "Facts" : "Preview";
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
@@ -1015,7 +1034,7 @@ function Commentary({ t, m, d, h, a }) {
 
 // ---------- Table ----------
 function TableTab({ t, m, rows }) {
-  const [view, setView] = useState("short");
+  const [view, setView] = useState("full");
   const [scope, setScope] = useState("overall");
   if (!rows.length) return <Empty t={t} title="Competition table" note="The table will appear when this competition has fixtures." />;
 
@@ -1126,11 +1145,12 @@ function TableTab({ t, m, rows }) {
           const goalDifference = tm.gf - tm.ga;
           const highlighted = hi.includes(tm.id);
           const qualifies = m.competitionType === "tournament" && index < Math.min(4, scopedRows.length);
+          const championPosition = m.competitionType === "league" && index === 0;
           const form = (tm.form || []).slice(-5);
           return (
             <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
               <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
-                <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: qualifies ? t.accent : "transparent", marginRight: 6 }} />
+                <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : qualifies ? t.accent : "transparent", marginRight: 6 }} />
                 <span style={{ color: t.dim, fontSize: 13, fontWeight: 750 }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
@@ -1185,6 +1205,12 @@ function TableTab({ t, m, rows }) {
         <div className="flex items-center gap-2 px-4 py-2">
           <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
           <span style={{ color: t.dim, fontSize: 12 }}>Advances to the knockout stage</span>
+        </div>
+      )}
+      {m.competitionType === "league" && (
+        <div className="flex items-center gap-2 px-4 py-2">
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: t.yellow }} />
+          <span style={{ color: t.dim, fontSize: 12 }}>Champion position</span>
         </div>
       )}
     </>

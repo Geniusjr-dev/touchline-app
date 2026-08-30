@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Search, Newspaper, Trophy, Star } from "lucide-react";
 import { liveMinute } from "@/lib/db";
 import { readableTextColor } from "@/lib/teamColors";
@@ -37,10 +38,10 @@ export function PitchIcon({ color }) {
 
 export function BottomNav({ t, active = "Matches" }) {
   const items = [
-    ["Matches", <PitchIcon key="m" color={active === "Matches" ? t.accent : t.navText} />],
-    ["News", <Newspaper key="n" size={19} color={t.navText} />],
-    ["Leagues", <Trophy key="l" size={19} color={t.navText} />],
-    ["Following", <Star key="f" size={19} color={t.navText} />],
+    { label: "Matches", href: "/", icon: (color) => <PitchIcon color={color} /> },
+    { label: "News", href: null, icon: (color) => <Newspaper size={19} color={color} /> },
+    { label: "Leagues", href: "/leagues", icon: (color) => <Trophy size={19} color={color} /> },
+    { label: "Following", href: null, icon: (color) => <Star size={19} color={color} /> },
   ];
   return (
     <div
@@ -48,16 +49,33 @@ export function BottomNav({ t, active = "Matches" }) {
       style={{ maxWidth: 480, margin: "0 auto", bottom: "max(7px, env(safe-area-inset-bottom))" }}
     >
       <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 58, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
-        {items.map(([l, ic]) => {
-          const selected = active === l;
-          return (
-            <button
-              key={l}
+        {items.map((item) => {
+          const selected = active === item.label;
+          const color = selected ? t.accent : t.navText;
+          const contents = <>
+            {item.icon(color)}
+            <span style={{ fontSize: 11, fontWeight: selected ? 750 : 600, color }}>{item.label}</span>
+          </>;
+          const styles = { background: selected ? t.pill : "transparent" };
+          return item.href ? (
+            <Link
+              key={item.label}
+              href={item.href}
+              aria-current={selected ? "page" : undefined}
               className="flex-1 h-full flex flex-col items-center justify-center gap-1 rounded-full"
-              style={{ background: selected ? t.pill : "transparent" }}
+              style={styles}
             >
-              {ic}
-              <span style={{ fontSize: 11, fontWeight: selected ? 750 : 600, color: selected ? t.accent : t.navText }}>{l}</span>
+              {contents}
+            </Link>
+          ) : (
+            <button
+              key={item.label}
+              type="button"
+              aria-disabled="true"
+              className="flex-1 h-full flex flex-col items-center justify-center gap-1 rounded-full"
+              style={styles}
+            >
+              {contents}
             </button>
           );
         })}

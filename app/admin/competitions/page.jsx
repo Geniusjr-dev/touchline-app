@@ -68,6 +68,9 @@ export default function CompetitionsPage() {
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Competitions</h1>
+      <div style={{ color: "#8E939B", fontSize: 13, lineHeight: 1.5 }}>
+        Create competitions, then use Edit to update their details and registered teams.
+      </div>
 
       <form onSubmit={create} style={{ ...card, marginTop: 16, marginBottom: 18 }}>
         <div style={h3}>New competition</div>
@@ -168,10 +171,10 @@ function CompetitionEditor({ competition, teams, onSaved }) {
   const entryByTeam = Object.fromEntries(entries.map((entry) => [entry.team_id, entry]));
   return (
     <div style={{ ...card, padding: 0, marginBottom: 12, overflow: "hidden" }}>
-      <button type="button" onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "#fff", cursor: "pointer" }}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "#fff", cursor: "pointer" }}>
         <span style={{ fontSize: 15, fontWeight: 750, textAlign: "left", flex: 1 }}>{competition.name}</span>
         <span style={formatPill(competition.competition_type)}>{competition.competition_type || "tournament"}</span>
-        <span style={{ color: "#8E939B" }}>{open ? "▲" : "▼"}</span>
+        <span style={editPill(open)}>{open ? "Close" : "Edit"}</span>
       </button>
       {open && <div style={{ padding: 16, borderTop: "1px solid #26282B" }}>
         <form onSubmit={saveSettings}>
@@ -216,6 +219,19 @@ function CompetitionEditor({ competition, teams, onSaved }) {
 function formatPill(format) {
   const colors = { friendly: "#58708A", league: "#2563EB", tournament: "#7C3AED" };
   return { color: "#fff", background: colors[format] || colors.tournament, borderRadius: 999, padding: "4px 8px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" };
+}
+function editPill(open) {
+  return {
+    minWidth: 48,
+    color: open ? "#B7BBC2" : "#4FC263",
+    background: open ? "#24262A" : "#17271C",
+    border: `1px solid ${open ? "#34373C" : "#285B35"}`,
+    borderRadius: 999,
+    padding: "5px 9px",
+    fontSize: 11,
+    fontWeight: 800,
+    textAlign: "center",
+  };
 }
 function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 650 }}>{label}</span>{children}</label>; }
 const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12 };

@@ -1015,40 +1015,170 @@ function Commentary({ t, m, d, h, a }) {
 
 // ---------- Table ----------
 function TableTab({ t, m, rows }) {
+  const [view, setView] = useState("short");
+  const [scope, setScope] = useState("overall");
   if (!rows.length) return <Empty t={t} title="Competition table" note="The table will appear when this competition has fixtures." />;
+
   const hi = [m.home, m.away];
+  const isLive = ["live", "ht", "et_live", "et_ht"].includes(m.status);
+  const scopedRows = rows
+    .map((team) => {
+      const record = scope === "home"
+        ? team.homeRecord || team
+        : scope === "away"
+          ? team.awayRecord || team
+          : team;
+      return { ...team, ...record };
+    })
+    .sort((a, b) => b.pts - a.pts
+      || (b.gf - b.ga) - (a.gf - a.ga)
+      || b.gf - a.gf
+      || a.name.localeCompare(b.name));
+
   return (
     <>
+      <div className="flex items-center gap-2 px-2 pt-2">
+        <div className="grid grid-cols-3 flex-1 rounded-full p-1" style={{ background: t.seg }}>
+          {["short", "full", "form"].map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setView(option)}
+              aria-pressed={view === option}
+              className="rounded-full"
+              style={{
+                minHeight: 38,
+                border: 0,
+                background: view === option ? t.segActive : "transparent",
+                color: view === option ? t.text : t.dim,
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: "pointer",
+                textTransform: "capitalize",
+              }}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+        <select
+          aria-label="Table scope"
+          value={scope}
+          onChange={(event) => setScope(event.target.value)}
+          style={{
+            width: 112,
+            minHeight: 46,
+            borderRadius: 999,
+            border: `1px solid ${t.pillBorder}`,
+            background: t.pill,
+            color: t.text,
+            padding: "0 12px",
+            fontSize: 13,
+            fontWeight: 800,
+            outline: "none",
+            cursor: "pointer",
+          }}
+        >
+          <option value="overall">Overall</option>
+          <option value="home">Home</option>
+          <option value="away">Away</option>
+        </select>
+      </div>
+
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-        <div className="flex items-center px-3 py-2" style={{ color: t.dim, fontSize: 11, fontWeight: 700 }}>
-          <span style={{ width: 22 }} /><span className="flex-1 pl-1">Team</span>
-          <span style={{ width: 22, textAlign: "center" }}>PL</span><span style={{ width: 20, textAlign: "center" }}>W</span>
-          <span style={{ width: 20, textAlign: "center" }}>D</span><span style={{ width: 20, textAlign: "center" }}>L</span>
-          <span style={{ width: 30, textAlign: "center" }}>GD</span><span style={{ width: 30, textAlign: "center" }}>PTS</span>
-          <span style={{ width: 92, textAlign: "right", paddingRight: 4 }}>Form</span>
+        <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: `1px solid ${t.divider}` }}>
+          <span aria-hidden="true" style={{ fontSize: 18 }}>🏆</span>
+          <span className="truncate" style={{ color: t.text, fontSize: 15, fontWeight: 850 }}>{m.compName || "Competition table"}</span>
+          {isLive && (
+            <span className="inline-flex items-center gap-1" style={{ color: t.accent, fontSize: 10, fontWeight: 850, marginLeft: "auto", textTransform: "uppercase" }}>
+              <span className="rounded-full" style={{ width: 7, height: 7, background: t.accent }} />
+              Live
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center px-3 py-3" style={{ color: t.dim, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase" }}>
+          <span style={{ width: 28 }} />
+          <span className="flex-1 pl-1">Team</span>
+          {view === "form" ? (
+            <span style={{ width: 126, textAlign: "right", paddingRight: 3 }}>Last matches</span>
+          ) : view === "short" ? (
+            <>
+              <TableHeading width={28}>PL</TableHeading>
+              <TableHeading width={38}>GD</TableHeading>
+              <TableHeading width={38}>PTS</TableHeading>
+            </>
+          ) : (
+            <>
+              <TableHeading width={26}>PL</TableHeading>
+              <TableHeading width={22}>W</TableHeading>
+              <TableHeading width={22}>D</TableHeading>
+              <TableHeading width={22}>L</TableHeading>
+              <TableHeading width={42}>+/-</TableHeading>
+              <TableHeading width={34}>GD</TableHeading>
+              <TableHeading width={34}>PTS</TableHeading>
+            </>
+          )}
         </div>
         <div style={{ height: 1, background: t.divider }} />
-        {rows.map((tm, i) => {
-          const gd = tm.gf - tm.ga; const on = hi.includes(tm.id); const q = m.competitionType === "tournament" && i < Math.min(4, rows.length);
-          return <div key={tm.id} className="flex items-center px-3 py-2.5" style={{ background: on ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
-            <div className="flex items-center" style={{ width: 22 }}>
-              <span style={{ width: 3, height: 22, borderRadius: 2, background: q ? t.accent : "transparent", marginRight: 5 }} />
-              <span style={{ color: t.dim, fontSize: 13, fontWeight: 600 }}>{i + 1}</span>
+
+        {scopedRows.map((tm, index) => {
+          const goalDifference = tm.gf - tm.ga;
+          const highlighted = hi.includes(tm.id);
+          const qualifies = m.competitionType === "tournament" && index < Math.min(4, scopedRows.length);
+          const form = (tm.form || []).slice(-5);
+          return (
+            <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
+              <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
+                <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: qualifies ? t.accent : "transparent", marginRight: 6 }} />
+                <span style={{ color: t.dim, fontSize: 13, fontWeight: 750 }}>{index + 1}</span>
+              </div>
+              <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
+                <Crest short={tm.short} color={tm.color} logo={tm.logoUrl} size={24} ring={t.divider} />
+                <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 700 }}>{tm.name}</span>
+                {isLive && highlighted && <span className="rounded-full" title="Playing now" style={{ width: 7, height: 7, background: t.accent, flex: "0 0 auto" }} />}
+              </div>
+
+              {view === "form" ? (
+                <span style={{ width: 126 }} className="flex gap-1.5 justify-end">
+                  {form.length ? form.map((result, resultIndex) => (
+                    <span
+                      key={`${result}-${resultIndex}`}
+                      title={result === "W" ? "Win" : result === "D" ? "Draw" : "Loss"}
+                      className="inline-flex items-center justify-center rounded-md"
+                      style={{
+                        width: 20,
+                        height: 22,
+                        background: result === "W" ? t.win : result === "D" ? t.drawPill : t.loss,
+                        color: "#FFFFFF",
+                        fontSize: 10,
+                        fontWeight: 850,
+                        boxShadow: resultIndex === form.length - 1 ? `inset 0 -2px 0 ${t.accent}` : "none",
+                      }}
+                    >
+                      {result}
+                    </span>
+                  )) : <span style={{ color: t.faint, fontSize: 12 }}>No results</span>}
+                </span>
+              ) : view === "short" ? (
+                <>
+                  <TableValue width={28} color={t.text}>{tm.pl}</TableValue>
+                  <TableValue width={38} color={t.dim}>{signedNumber(goalDifference)}</TableValue>
+                  <TableValue width={38} color={t.text} strong>{tm.pts}</TableValue>
+                </>
+              ) : (
+                <>
+                  <TableValue width={26} color={t.text}>{tm.pl}</TableValue>
+                  <TableValue width={22} color={t.dim}>{tm.w}</TableValue>
+                  <TableValue width={22} color={t.dim}>{tm.d}</TableValue>
+                  <TableValue width={22} color={t.dim}>{tm.l}</TableValue>
+                  <TableValue width={42} color={t.dim}>{tm.gf}-{tm.ga}</TableValue>
+                  <TableValue width={34} color={t.dim}>{signedNumber(goalDifference)}</TableValue>
+                  <TableValue width={34} color={t.text} strong>{tm.pts}</TableValue>
+                </>
+              )}
             </div>
-            <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
-              <Crest short={tm.short} color={tm.color} logo={tm.logoUrl} size={22} ring={t.divider} />
-              <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 600 }}>{tm.name}</span>
-            </div>
-            <span style={{ width: 22, textAlign: "center", color: t.text, fontSize: 13 }}>{tm.pl}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.w}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.d}</span>
-            <span style={{ width: 20, textAlign: "center", color: t.dim, fontSize: 13 }}>{tm.l}</span>
-            <span style={{ width: 30, textAlign: "center", color: t.dim, fontSize: 13 }}>{gd > 0 ? "+" + gd : gd}</span>
-            <span style={{ width: 30, textAlign: "center", color: t.text, fontSize: 14, fontWeight: 800 }}>{tm.pts}</span>
-            <span style={{ width: 92 }} className="flex gap-1 justify-end">
-              {tm.form.slice(-5).map((r, k) => <span key={k} className="inline-flex items-center justify-center rounded-full" style={{ width: 16, height: 16, background: r === "W" ? t.win : r === "D" ? t.drawPill : t.loss, color: "#fff", fontSize: 9, fontWeight: 800 }}>{r}</span>)}
-            </span>
-          </div>;
+          );
         })}
       </div>
       {m.competitionType === "tournament" && (
@@ -1059,6 +1189,18 @@ function TableTab({ t, m, rows }) {
       )}
     </>
   );
+}
+
+function TableHeading({ width, children }) {
+  return <span style={{ width, textAlign: "center", flex: "0 0 auto" }}>{children}</span>;
+}
+
+function TableValue({ width, color, strong = false, children }) {
+  return <span style={{ width, textAlign: "center", color, fontSize: 12.5, fontWeight: strong ? 850 : 600, flex: "0 0 auto" }}>{children}</span>;
+}
+
+function signedNumber(value) {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 // ---------- H2H ----------

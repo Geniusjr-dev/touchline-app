@@ -10,6 +10,7 @@ import { Crest, BottomNav, StatusChip } from "@/components/ui";
 import MatchNotificationButton from "@/components/MatchNotificationButton";
 
 const warmedMatches = new Set();
+const selectedDateStorageKey = "touchline-selected-match-date";
 
 function localDateKey(date) {
   const year = date.getFullYear();
@@ -25,13 +26,20 @@ function addLocalDays(date, amount) {
   return next;
 }
 
-function dateLabel(date, offset) {
-  if (offset === -1) return "Yesterday";
-  if (offset === 0) return "Today";
-  if (offset === 1) return "Tomorrow";
+function dateLabel(date, today) {
+  const difference = Math.round((date.getTime() - today.getTime()) / 86400000);
+  if (difference === -1) return "Yesterday";
+  if (difference === 0) return "Today";
+  if (difference === 1) return "Tomorrow";
   const weekday = date.toLocaleDateString(undefined, { weekday: "short" });
   const month = date.toLocaleDateString(undefined, { month: "short" });
   return `${weekday} ${month} ${date.getDate()}`;
+}
+
+function isValidDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
+  const date = new Date(`${value}T12:00:00`);
+  return !Number.isNaN(date.getTime()) && localDateKey(date) === value;
 }
 
 function MatchRow({ m, teams, t, now }) {
@@ -132,19 +140,19 @@ export default function MatchesHome() {
   const [now, setNow] = useState(0);
   const dateStripRef = useRef(null);
   const dateInputRef = useRef(null);
-  const todayButtonRef = useRef(null);
   const todayKey = now ? localDateKey(new Date(now)) : "";
   const [selectedDateOverride, setSelectedDateOverride] = useState(null);
   const selectedDate = selectedDateOverride || todayKey;
   const dateWindow = useMemo(() => {
-    if (!todayKey) return [];
+    if (!todayKey || !selectedDate) return [];
     const today = new Date(`${todayKey}T12:00:00`);
+    const centreDate = new Date(`${selectedDate}T12:00:00`);
     return Array.from({ length: 13 }, (_, index) => {
       const offset = index - 6;
-      const date = addLocalDays(today, offset);
-      return { key: localDateKey(date), label: dateLabel(date, offset), offset };
+      const date = addLocalDays(centreDate, offset);
+      return { key: localDateKey(date), label: dateLabel(date, today) };
     });
-  }, [todayKey]);
+  }, [selectedDate, todayKey]);
 
   useEffect(() => {
     let alive = true;
@@ -174,6 +182,21 @@ export default function MatchesHome() {
   }, []);
 
   useEffect(() => {
+    if (!todayKey) return;
+
+    try {
+      const savedDate = window.localStorage.getItem(selectedDateStorageKey);
+      if (isValidDateKey(savedDate)) {
+        setSelectedDateOverride(savedDate);
+      } else if (savedDate) {
+        window.localStorage.removeItem(selectedDateStorageKey);
+      }
+    } catch {
+      // Date selection still works when browser storage is unavailable.
+    }
+  }, [todayKey]);
+
+  useEffect(() => {
     if (!selectedDate) return undefined;
     const centreSelectedDate = window.setTimeout(() => {
       const selectedButton = dateStripRef.current?.querySelector(`[data-date="${selectedDate}"]`);
@@ -183,8 +206,19 @@ export default function MatchesHome() {
   }, [selectedDate]);
 
   const selectDate = (dateKey) => {
-    setSelectedDateOverride(dateKey === todayKey ? null : dateKey);
+    const returningToToday = dateKey === todayKey;
+    setSelectedDateOverride(returningToToday ? null : dateKey);
     setLiveOnly(false);
+
+    try {
+      if (returningToToday) {
+        window.localStorage.removeItem(selectedDateStorageKey);
+      } else {
+        window.localStorage.setItem(selectedDateStorageKey, dateKey);
+      }
+    } catch {
+      // Keep the in-memory selection when browser storage is unavailable.
+    }
   };
 
   const openDatePicker = (event) => {
@@ -233,8 +267,6 @@ export default function MatchesHome() {
                 type="date"
                 aria-label="Choose match date"
                 value={selectedDate}
-                min={dateWindow[0]?.key}
-                max={dateWindow[dateWindow.length - 1]?.key}
                 onClick={openDatePicker}
                 onChange={(event) => event.target.value && selectDate(event.target.value)}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 16 }}
@@ -273,7 +305,6 @@ export default function MatchesHome() {
           return <button
             type="button"
             key={day.key}
-            ref={day.offset === 0 ? todayButtonRef : null}
             data-date={day.key}
             onClick={(event) => {
               selectDate(day.key);
@@ -294,6 +325,17 @@ export default function MatchesHome() {
         <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
           {liveOnly ? `No live matches on ${selectedLabel}.` : `No matches scheduled for ${selectedLabel}.`}
         </div>
+      )}
+
+      {selectedDate && selectedDate !== todayKey && (
+        <button
+          type="button"
+          onClick={() => selectDate(todayKey)}
+          className="fixed left-1/2 -translate-x-1/2 rounded-full"
+          style={{ bottom: "max(76px, calc(env(safe-area-inset-bottom) + 70px))", zIndex: 45, minWidth: 118, height: 44, padding: "0 24px", background: t.accent, color: "#07130B", boxShadow: "0 8px 24px rgba(0,0,0,0.38)", fontSize: 15, fontWeight: 850 }}
+        >
+          Today
+        </button>
       )}
 
       <BottomNav t={t} active="Matches" />

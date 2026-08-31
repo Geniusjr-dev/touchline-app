@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChevronLeft, MoreHorizontal, Star, Trophy } from "lucide-react";
+import { ChevronLeft, Star, Trophy } from "lucide-react";
 import CompetitionTable from "@/components/CompetitionTable";
 import { BottomNav, Crest, StatusChip } from "@/components/ui";
 import { getLeagueCentre } from "@/lib/db";
@@ -41,7 +41,6 @@ export default function LeagueCentre({ id }) {
   const [tab, setTab] = useState("Table");
   const [loadError, setLoadError] = useState("");
   const [following, setFollowing] = useState(false);
-  const [compactHeader, setCompactHeader] = useState(false);
   const [now, setNow] = useState(0);
   const tabRefs = useRef({});
 
@@ -85,53 +84,28 @@ export default function LeagueCentre({ id }) {
     tabRefs.current[tab]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [tab]);
 
-  useEffect(() => {
-    const updateHeader = () => setCompactHeader(window.scrollY > 96);
-    updateHeader();
-    window.addEventListener("scroll", updateHeader, { passive: true });
-    return () => window.removeEventListener("scroll", updateHeader);
-  }, []);
-
   if (!state) return <LeagueShell t={t} error={loadError} onRetry={load} />;
   const themeColor = state.competition.themeColor || "#4B125F";
 
   return (
     <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header className="sticky top-0 z-30" style={{ background: themeColor, color: "#FFFFFF", boxShadow: compactHeader ? "0 8px 24px rgba(0,0,0,0.24)" : "none" }}>
-        <div className="flex items-center px-3" style={{ height: compactHeader ? 62 : 70, gap: 10 }}>
+      <header className="sticky top-0 z-30" style={{ background: themeColor, color: "#FFFFFF", boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>
+        <div className="flex items-center px-3" style={{ height: 72, gap: 9 }}>
           <Link href="/leagues" aria-label="Back to leagues" className="flex items-center justify-center rounded-full" style={heroButton}>
             <ChevronLeft size={23} color="#FFFFFF" />
           </Link>
-          {compactHeader && (
-            <div className="min-w-0" style={{ flex: 1 }}>
-              <div className="truncate" style={{ fontSize: 14.5, fontWeight: 900 }}>{state.competition.name}</div>
-              <div className="truncate" style={{ color: "rgba(255,255,255,0.72)", fontSize: 11.5, marginTop: 2 }}>{state.competition.country}</div>
-            </div>
-          )}
-          <div className="flex items-center gap-2" style={{ marginLeft: compactHeader ? 0 : "auto" }}>
-            <select
-              aria-label="Season"
-              value={id}
-              onChange={(event) => router.push(`/league/${event.target.value}`)}
-              style={{ ...heroPill, maxWidth: compactHeader ? 112 : 132 }}
-            >
-              {state.seasons.map((season) => <option key={season.id} value={season.id}>{season.label}</option>)}
-            </select>
-            {!compactHeader && <button type="button" aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="flex items-center gap-2 rounded-full" style={{ ...heroPill, padding: "0 13px" }}>
-              {following ? <Bell size={16} fill="#FFFFFF" /> : <Star size={16} />}
-              {following ? "Following" : "Follow"}
-            </button>}
-            {compactHeader && <button type="button" aria-label="More competition options" className="flex items-center justify-center rounded-full" style={heroButton}><MoreHorizontal size={22} /></button>}
+          <CompetitionLogo competition={state.competition} size={39} />
+          <div className="min-w-0" style={{ flex: 1 }}>
+            <h1 className="truncate" style={{ fontSize: 15, lineHeight: 1.15, fontWeight: 900, margin: 0, letterSpacing: -0.15 }}>{state.competition.name}</h1>
+            <div className="truncate" style={{ color: "rgba(255,255,255,0.76)", fontSize: 11.5, fontWeight: 650, marginTop: 4 }}>{state.competition.country}</div>
           </div>
+          <select aria-label="Season" value={id} onChange={(event) => router.push(`/league/${event.target.value}`)} style={{ ...heroPill, width: 102 }}>
+            {state.seasons.map((season) => <option key={season.id} value={season.id}>{season.label}</option>)}
+          </select>
+          <button type="button" aria-label={following ? "Unfollow competition" : "Follow competition"} aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="flex items-center justify-center rounded-full" style={{ ...heroButton, background: following ? "#FFFFFF" : heroButton.background, color: following ? themeColor : "#FFFFFF" }}>
+            <Star size={18} fill={following ? "currentColor" : "none"} />
+          </button>
         </div>
-
-        {!compactHeader && <div className="flex items-center px-7" style={{ minHeight: 142, paddingBottom: 24, gap: 20 }}>
-          <CompetitionLogo competition={state.competition} size={74} />
-          <div className="min-w-0">
-            <h1 style={{ fontSize: 24, lineHeight: 1.15, fontWeight: 900, margin: 0, letterSpacing: -0.4 }}>{state.competition.name}</h1>
-            <div style={{ color: "rgba(255,255,255,0.76)", fontSize: 14, fontWeight: 700, marginTop: 8 }}>{state.competition.country}</div>
-          </div>
-        </div>}
 
         <nav className="flex overflow-x-auto" style={{ scrollbarWidth: "none", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
           {TABS.map((item) => (
@@ -141,7 +115,7 @@ export default function LeagueCentre({ id }) {
               key={item}
               onClick={() => setTab(item)}
               className="relative shrink-0"
-              style={{ minWidth: item.length > 8 ? 104 : 78, height: 50, padding: "0 12px", color: tab === item ? "#FFFFFF" : "rgba(255,255,255,0.66)", fontSize: 13, fontWeight: tab === item ? 850 : 700 }}
+              style={{ minWidth: item.length > 8 ? 104 : 78, height: 46, padding: "0 12px", color: tab === item ? "#FFFFFF" : "rgba(255,255,255,0.68)", fontSize: 13, fontWeight: tab === item ? 850 : 700 }}
             >
               {item}
               {tab === item && <span className="absolute left-4 right-4 bottom-0 rounded-full" style={{ height: 4, background: "#FFFFFF" }} />}
@@ -168,7 +142,7 @@ export default function LeagueCentre({ id }) {
 
 function CompetitionLogo({ competition, size = 64 }) {
   return (
-    <span className="inline-flex items-center justify-center rounded-2xl overflow-hidden" style={{ width: size, height: size, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "0 10px 28px rgba(0,0,0,0.18)" }}>
+    <span className="inline-flex items-center justify-center rounded-xl overflow-hidden shrink-0" style={{ width: size, height: size, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.2)" }}>
       {competition.logoUrl ? (
         <img src={competition.logoUrl} alt="" style={{ width: size * 0.78, height: size * 0.78, objectFit: "contain" }} />
       ) : <Trophy size={size * 0.46} color="#FFFFFF" />}
@@ -247,37 +221,56 @@ function LeagueMatchRow({ match, teams, t, now, first }) {
 }
 
 function PlayerStatistics({ records, t }) {
+  const [selected, setSelected] = useState(null);
   const enriched = records.map((record) => ({ ...record, goalContributions: record.goals + record.assists }));
   const sections = [
     { title: "Top stats", cards: [["Top scorer", "goals", "#D81018"], ["Assists", "assists", "#64A9DD"], ["Goals + Assists", "goalContributions", "#D81018"]] },
     { title: "Goalkeeping", cards: [["Clean sheets", "cleanSheets", "#F29B05"]] },
     { title: "Discipline", cards: [["Yellow cards", "yellowCards", "#D91C3D"], ["Red cards", "redCards", "#8D115F"]] },
   ];
-  return <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => {
-    return <StatSection key={section.title} title={section.title} t={t}>{section.cards.map(([title, key, accent]) => <RankingCard key={key} title={title} records={rank(enriched, key)} valueKey={key} accent={accent} kind="player" t={t} />)}</StatSection>;
-  })}</div>;
+  return <>
+    <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => (
+      <StatSection key={section.title} title={section.title} t={t}>
+        {section.cards.map(([title, key, accent]) => {
+          const rankedRecords = rank(enriched.filter((record) => record.appearances > 0 && Number(record[key]) > 0), key);
+          return <RankingCard key={key} title={title} records={rankedRecords} valueKey={key} accent={accent} kind="player" t={t} onOpen={() => setSelected({ title, records: rankedRecords, valueKey: key, accent, kind: "player" })} />;
+        })}
+      </StatSection>
+    ))}</div>
+    {selected && <StatRankingSheet {...selected} t={t} onClose={() => setSelected(null)} />}
+  </>;
 }
 
 function TeamStatistics({ records, t }) {
+  const [selected, setSelected] = useState(null);
   const sections = [
     { title: "Top stats", cards: [["Goals per match", "goalsPerMatch", "Goals", "desc"], ["Goals conceded per match", "concededPerMatch", "Conceded", "asc"], ["Average possession", "averagePossession", "Possession", "desc", "%"]] },
     { title: "Attack", cards: [["Total goals", "goals", "Goals", "desc"], ["Shots on target per match", "shotsOnTargetPerMatch", "On target", "desc"], ["Corners per match", "cornersPerMatch", "Corners", "desc"], ["Penalties scored", "penaltyGoals", "Penalties", "desc"], ["Set piece goals", "setPieceGoals", "Set pieces", "desc"]] },
     { title: "Defence", cards: [["Clean sheets", "cleanSheets", "Clean sheets", "desc"]] },
     { title: "Discipline", cards: [["Fouls per match", "foulsPerMatch", "Fouls", "desc"], ["Yellow cards", "yellowCards", "Yellow cards", "desc"], ["Red cards", "redCards", "Red cards", "desc"]] },
   ];
-  return <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => {
-    return <StatSection key={section.title} title={section.title} t={t}>{section.cards.map(([title, key, , direction, suffix]) => <RankingCard key={key} title={title} records={rank(records, key, direction)} valueKey={key} suffix={suffix} accent={t.blue} kind="team" t={t} />)}</StatSection>;
-  })}</div>;
+  return <>
+    <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => (
+      <StatSection key={section.title} title={section.title} t={t}>
+        {section.cards.map(([title, key, , direction, suffix]) => {
+          const needsRecordedStatistics = ["averagePossession", "shotsOnTargetPerMatch", "cornersPerMatch", "foulsPerMatch"].includes(key);
+          const rankedRecords = rank(records.filter((record) => record.played > 0 && (!needsRecordedStatistics || record.statMatches > 0)), key, direction);
+          return <RankingCard key={key} title={title} records={rankedRecords} valueKey={key} suffix={suffix} accent={t.blue} kind="team" t={t} onOpen={() => setSelected({ title, records: rankedRecords, valueKey: key, suffix, accent: t.blue, kind: "team" })} />;
+        })}
+      </StatSection>
+    ))}</div>
+    {selected && <StatRankingSheet {...selected} t={t} onClose={() => setSelected(null)} />}
+  </>;
 }
 
 function StatSection({ title, t, children }) {
   return <section style={{ marginTop: 22 }}><h2 style={{ fontSize: 21, fontWeight: 900, margin: "0 8px 14px" }}>{title}</h2><div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>{children}</div></section>;
 }
 
-function RankingCard({ title, records, valueKey, suffix = "", accent, kind, t }) {
+function RankingCard({ title, records, valueKey, suffix = "", accent, kind, t, onOpen }) {
   const visible = records.slice(0, 3);
   return (
-    <article className="rounded-2xl overflow-hidden" style={{ background: t.card, border: `1px solid ${t.divider}`, minHeight: 192, paddingBottom: visible.length ? 8 : 0 }}>
+    <button type="button" onClick={onOpen} className="block w-full rounded-2xl overflow-hidden text-left active:opacity-75" style={{ background: t.card, border: `1px solid ${t.divider}`, minHeight: visible.length ? 192 : 62, paddingBottom: visible.length ? 8 : 0 }} aria-label={`View all ${title.toLowerCase()}`}>
       <div className="flex items-center justify-between" style={{ padding: "16px 18px 12px" }}>
         <h3 style={{ fontSize: 16, fontWeight: 900, margin: 0 }}>{title}</h3>
         <span style={{ color: t.faint, fontSize: 23, lineHeight: 1 }}>›</span>
@@ -291,7 +284,36 @@ function RankingCard({ title, records, valueKey, suffix = "", accent, kind, t })
           <span className={index === 0 ? "rounded-full" : ""} style={{ minWidth: 42, textAlign: "center", background: index === 0 ? accent : "transparent", color: index === 0 ? "#FFFFFF" : t.text, padding: index === 0 ? "6px 9px" : "6px 2px", fontSize: 14, fontWeight: index === 0 ? 900 : 700 }}>{formatMetric(record[valueKey])}{suffix}</span>
         </div>
       ))}
-    </article>
+    </button>
+  );
+}
+
+function StatRankingSheet({ title, records, valueKey, suffix = "", accent, kind, t, onClose }) {
+  return (
+    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 overflow-y-auto" style={{ zIndex: 70, maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text }}>
+      <div className="sticky top-0 z-10 flex items-center gap-3 px-3" style={{ height: 62, background: t.card, borderBottom: `1px solid ${t.divider}` }}>
+        <button type="button" onClick={onClose} aria-label="Back to statistics" className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <ChevronLeft size={23} color={t.text} />
+        </button>
+        <div className="min-w-0">
+          <h2 className="truncate" style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{title}</h2>
+          <div style={{ color: t.dim, fontSize: 11.5, marginTop: 2 }}>{kind === "player" ? "Player rankings" : "Team rankings"}</div>
+        </div>
+      </div>
+      <div className="mx-2 my-3 rounded-2xl overflow-hidden" style={{ background: t.card }}>
+        {records.map((record, index) => (
+          <div key={record.id} className="flex items-center gap-3" style={{ minHeight: 62, padding: "8px 14px", borderTop: index ? `1px solid ${t.divider}` : "none" }}>
+            <span className="shrink-0" style={{ width: 22, color: t.dim, textAlign: "center", fontSize: 13, fontWeight: 800 }}>{index + 1}</span>
+            {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={40} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest short={record.team.short} color={record.team.color} logo={record.team.logoUrl} size={16} ring={t.card} /></span>}</span> : <Crest short={record.short} color={record.color} logo={record.logoUrl} size={40} ring={t.divider} />}
+            <span className="min-w-0" style={{ flex: 1 }}>
+              <span className="block truncate" style={{ fontSize: 14.5, fontWeight: 800 }}>{record.name}</span>
+              {kind === "player" && record.team && <span className="block truncate" style={{ color: t.dim, fontSize: 11.5, marginTop: 3 }}>{record.team.name}</span>}
+            </span>
+            <span className={index === 0 ? "rounded-full" : ""} style={{ minWidth: 46, textAlign: "center", background: index === 0 ? accent : "transparent", color: index === 0 ? "#FFFFFF" : t.text, padding: "7px 8px", fontSize: 14, fontWeight: 900 }}>{formatMetric(record[valueKey])}{suffix}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -393,7 +415,7 @@ function EmptyCard({ t, children }) {
 }
 
 function LeagueShell({ t, error, onRetry }) {
-  return <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}><div style={{ height: 270, background: "#4B125F" }} />{error ? <div className="mx-3 mt-4 rounded-2xl text-center" style={{ padding: 22, background: t.card }}><div style={{ fontSize: 14, fontWeight: 750 }}>{error}</div><button type="button" onClick={onRetry} className="rounded-full" style={{ marginTop: 12, padding: "9px 16px", background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button></div> : <div className="mx-2 mt-3 rounded-2xl" style={{ height: 360, background: t.card }} />}<BottomNav t={t} active="Leagues" /></div>;
+  return <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}><div style={{ height: 118, background: "#4B125F" }} />{error ? <div className="mx-3 mt-4 rounded-2xl text-center" style={{ padding: 22, background: t.card }}><div style={{ fontSize: 14, fontWeight: 750 }}>{error}</div><button type="button" onClick={onRetry} className="rounded-full" style={{ marginTop: 12, padding: "9px 16px", background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button></div> : <div className="mx-2 mt-3 rounded-2xl" style={{ height: 360, background: t.card }} />}<BottomNav t={t} active="Leagues" /></div>;
 }
 
 const heroButton = { width: 39, height: 39, background: "rgba(255,255,255,0.13)", border: "1px solid rgba(255,255,255,0.18)", color: "#FFFFFF" };

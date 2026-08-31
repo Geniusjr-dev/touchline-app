@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
 import { useState } from "react";
@@ -82,13 +81,6 @@ export default function CompetitionTable({ t, competition, rows }) {
       </div>
 
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-        <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: `1px solid ${t.divider}` }}>
-          {competition.logoUrl
-            ? <img src={competition.logoUrl} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
-            : <span aria-hidden="true" style={{ fontSize: 18 }}>🏆</span>}
-          <span className="truncate" style={{ color: t.text, fontSize: 15, fontWeight: 850 }}>{competition.name}</span>
-        </div>
-
         <div className="flex items-center px-3 py-3" style={{ color: t.dim, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase" }}>
           <span style={{ width: 28 }} />
           <span className="flex-1 pl-1">Team</span>

@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, MoreHorizontal, Newspaper, Star, Trophy } from "lucide-react";
+import { Bell, ChevronLeft, MoreHorizontal, Star, Trophy } from "lucide-react";
 import CompetitionTable from "@/components/CompetitionTable";
 import { BottomNav, Crest, StatusChip } from "@/components/ui";
 import { getLeagueCentre } from "@/lib/db";
@@ -41,6 +41,7 @@ export default function LeagueCentre({ id }) {
   const [tab, setTab] = useState("Table");
   const [loadError, setLoadError] = useState("");
   const [following, setFollowing] = useState(false);
+  const [compactHeader, setCompactHeader] = useState(false);
   const [now, setNow] = useState(0);
   const tabRefs = useRef({});
 
@@ -84,42 +85,53 @@ export default function LeagueCentre({ id }) {
     tabRefs.current[tab]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   }, [tab]);
 
+  useEffect(() => {
+    const updateHeader = () => setCompactHeader(window.scrollY > 96);
+    updateHeader();
+    window.addEventListener("scroll", updateHeader, { passive: true });
+    return () => window.removeEventListener("scroll", updateHeader);
+  }, []);
+
   if (!state) return <LeagueShell t={t} error={loadError} onRetry={load} />;
   const themeColor = state.competition.themeColor || "#4B125F";
 
   return (
     <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header style={{ background: themeColor, color: "#FFFFFF" }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 58 }}>
+      <header className="sticky top-0 z-30" style={{ background: themeColor, color: "#FFFFFF", boxShadow: compactHeader ? "0 8px 24px rgba(0,0,0,0.24)" : "none" }}>
+        <div className="flex items-center px-3" style={{ height: compactHeader ? 62 : 70, gap: 10 }}>
           <Link href="/leagues" aria-label="Back to leagues" className="flex items-center justify-center rounded-full" style={heroButton}>
             <ChevronLeft size={23} color="#FFFFFF" />
           </Link>
-          <div className="flex items-center gap-2">
+          {compactHeader && (
+            <div className="min-w-0" style={{ flex: 1 }}>
+              <div className="truncate" style={{ fontSize: 14.5, fontWeight: 900 }}>{state.competition.name}</div>
+              <div className="truncate" style={{ color: "rgba(255,255,255,0.72)", fontSize: 11.5, marginTop: 2 }}>{state.competition.country}</div>
+            </div>
+          )}
+          <div className="flex items-center gap-2" style={{ marginLeft: compactHeader ? 0 : "auto" }}>
             <select
               aria-label="Season"
               value={id}
               onChange={(event) => router.push(`/league/${event.target.value}`)}
-              style={{ ...heroPill, maxWidth: 126 }}
+              style={{ ...heroPill, maxWidth: compactHeader ? 112 : 132 }}
             >
               {state.seasons.map((season) => <option key={season.id} value={season.id}>{season.label}</option>)}
             </select>
-            <button type="button" aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="flex items-center gap-1.5 rounded-full" style={heroPill}>
-              <Star size={15} fill={following ? "#FFFFFF" : "none"} />
+            {!compactHeader && <button type="button" aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="flex items-center gap-2 rounded-full" style={{ ...heroPill, padding: "0 13px" }}>
+              {following ? <Bell size={16} fill="#FFFFFF" /> : <Star size={16} />}
               {following ? "Following" : "Follow"}
-            </button>
-            <button type="button" aria-label="More competition options" className="flex items-center justify-center rounded-full" style={heroButton}>
-              <MoreHorizontal size={22} />
-            </button>
+            </button>}
+            {compactHeader && <button type="button" aria-label="More competition options" className="flex items-center justify-center rounded-full" style={heroButton}><MoreHorizontal size={22} /></button>}
           </div>
         </div>
 
-        <div className="flex flex-col items-center text-center px-5" style={{ paddingTop: 16, paddingBottom: 20 }}>
-          <CompetitionLogo competition={state.competition} size={76} />
-          <h1 style={{ fontSize: 25, lineHeight: 1.12, fontWeight: 900, margin: "13px 0 0", letterSpacing: -0.4 }}>{state.competition.name}</h1>
-          <div style={{ color: "rgba(255,255,255,0.82)", fontSize: 13, fontWeight: 650, marginTop: 7 }}>
-            {state.competition.country}{state.competition.sub ? ` • ${state.competition.sub}` : ""}
+        {!compactHeader && <div className="flex items-center px-7" style={{ minHeight: 142, paddingBottom: 24, gap: 20 }}>
+          <CompetitionLogo competition={state.competition} size={74} />
+          <div className="min-w-0">
+            <h1 style={{ fontSize: 24, lineHeight: 1.15, fontWeight: 900, margin: 0, letterSpacing: -0.4 }}>{state.competition.name}</h1>
+            <div style={{ color: "rgba(255,255,255,0.76)", fontSize: 14, fontWeight: 700, marginTop: 8 }}>{state.competition.country}</div>
           </div>
-        </div>
+        </div>}
 
         <nav className="flex overflow-x-auto" style={{ scrollbarWidth: "none", borderTop: "1px solid rgba(255,255,255,0.16)" }}>
           {TABS.map((item) => (
@@ -141,10 +153,10 @@ export default function LeagueCentre({ id }) {
       <main style={{ paddingTop: 6 }}>
         {tab === "Table" && <CompetitionTable t={t} competition={state.competition} rows={state.table} />}
         {tab === "Fixtures" && <Fixtures matches={state.matches} teams={state.teams} t={t} now={now} />}
-        {tab === "News" && <EditorialEmpty t={t} type="News" competition={state.competition} />}
+        {tab === "News" && <div style={{ minHeight: "64vh" }} />}
         {tab === "Player stats" && <PlayerStatistics records={state.playerStats} t={t} />}
         {tab === "Team stats" && <TeamStatistics records={state.teamStats} t={t} />}
-        {tab === "Transfers" && <EditorialEmpty t={t} type="Transfers" competition={state.competition} />}
+        {tab === "Transfers" && <div style={{ minHeight: "64vh" }} />}
         {tab === "TOTW" && <TeamOfWeek rounds={state.teamOfWeek} t={t} />}
         {tab === "Seasons" && <Seasons seasons={state.seasons} competition={state.competition} t={t} />}
       </main>
@@ -237,22 +249,16 @@ function LeagueMatchRow({ match, teams, t, now, first }) {
 function PlayerStatistics({ records, t }) {
   const enriched = records.map((record) => ({ ...record, goalContributions: record.goals + record.assists }));
   const sections = [
-    { title: "Top stats", cards: [["Top scorer", "goals", "Goals"], ["Most assists", "assists", "Assists"], ["Goals + assists", "goalContributions", "G + A"]] },
-    { title: "Goalkeeping", cards: [["Clean sheets", "cleanSheets", "Clean sheets"]] },
-    { title: "Discipline", cards: [["Yellow cards", "yellowCards", "Yellow cards"], ["Red cards", "redCards", "Red cards"]] },
+    { title: "Top stats", cards: [["Top scorer", "goals", "#D81018"], ["Assists", "assists", "#64A9DD"], ["Goals + Assists", "goalContributions", "#D81018"]] },
+    { title: "Goalkeeping", cards: [["Clean sheets", "cleanSheets", "#F29B05"]] },
+    { title: "Discipline", cards: [["Yellow cards", "yellowCards", "#D91C3D"], ["Red cards", "redCards", "#8D115F"]] },
   ];
-  const hasStats = sections.some((section) => section.cards.some(([, key]) => enriched.some((record) => Number(record[key]) > 0)));
-  if (!hasStats) return <EmptyCard t={t}>Player leaders will appear after match lineups and events are recorded.</EmptyCard>;
   return <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => {
-    const cards = section.cards.filter(([, key]) => enriched.some((record) => Number(record[key]) > 0));
-    if (!cards.length) return null;
-    return <StatSection key={section.title} title={section.title} t={t}>{cards.map(([title, key, unit]) => <RankingCard key={key} title={title} records={rank(enriched, key)} valueKey={key} unit={unit} kind="player" t={t} />)}</StatSection>;
+    return <StatSection key={section.title} title={section.title} t={t}>{section.cards.map(([title, key, accent]) => <RankingCard key={key} title={title} records={rank(enriched, key)} valueKey={key} accent={accent} kind="player" t={t} />)}</StatSection>;
   })}</div>;
 }
 
 function TeamStatistics({ records, t }) {
-  const played = records.filter((record) => record.played > 0);
-  if (!played.length) return <EmptyCard t={t}>Team statistics will appear after the first completed league match.</EmptyCard>;
   const sections = [
     { title: "Top stats", cards: [["Goals per match", "goalsPerMatch", "Goals", "desc"], ["Goals conceded per match", "concededPerMatch", "Conceded", "asc"], ["Average possession", "averagePossession", "Possession", "desc", "%"]] },
     { title: "Attack", cards: [["Total goals", "goals", "Goals", "desc"], ["Shots on target per match", "shotsOnTargetPerMatch", "On target", "desc"], ["Corners per match", "cornersPerMatch", "Corners", "desc"], ["Penalties scored", "penaltyGoals", "Penalties", "desc"], ["Set piece goals", "setPieceGoals", "Set pieces", "desc"]] },
@@ -260,34 +266,29 @@ function TeamStatistics({ records, t }) {
     { title: "Discipline", cards: [["Fouls per match", "foulsPerMatch", "Fouls", "desc"], ["Yellow cards", "yellowCards", "Yellow cards", "desc"], ["Red cards", "redCards", "Red cards", "desc"]] },
   ];
   return <div style={{ padding: "2px 8px 8px" }}>{sections.map((section) => {
-    const cards = section.cards.filter(([, key]) => played.some((record) => Number(record[key]) > 0));
-    if (!cards.length) return null;
-    return <StatSection key={section.title} title={section.title} t={t}>{cards.map(([title, key, unit, direction, suffix]) => <RankingCard key={key} title={title} records={rank(played, key, direction)} valueKey={key} unit={unit} suffix={suffix} kind="team" t={t} />)}</StatSection>;
+    return <StatSection key={section.title} title={section.title} t={t}>{section.cards.map(([title, key, , direction, suffix]) => <RankingCard key={key} title={title} records={rank(records, key, direction)} valueKey={key} suffix={suffix} accent={t.blue} kind="team" t={t} />)}</StatSection>;
   })}</div>;
 }
 
 function StatSection({ title, t, children }) {
-  return <section style={{ marginTop: 15 }}><h2 style={{ fontSize: 19, fontWeight: 900, margin: "0 5px 9px" }}>{title}</h2><div className="grid gap-2" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>{children}</div></section>;
+  return <section style={{ marginTop: 22 }}><h2 style={{ fontSize: 21, fontWeight: 900, margin: "0 8px 14px" }}>{title}</h2><div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>{children}</div></section>;
 }
 
-function RankingCard({ title, records, valueKey, unit, suffix = "", kind, t }) {
-  const visible = records.filter((record) => Number(record[valueKey]) > 0).slice(0, 3);
-  if (!visible.length) return null;
+function RankingCard({ title, records, valueKey, suffix = "", accent, kind, t }) {
+  const visible = records.slice(0, 3);
   return (
-    <article className="rounded-2xl overflow-hidden" style={{ background: t.card, border: `1px solid ${t.divider}`, minHeight: 194 }}>
-      <div style={{ padding: "13px 13px 11px", borderBottom: `1px solid ${t.divider}` }}>
-        <h3 style={{ fontSize: 13.5, fontWeight: 850, margin: 0 }}>{title}</h3>
-        <div style={{ color: t.dim, fontSize: 10.5, marginTop: 3 }}>{unit}</div>
+    <article className="rounded-2xl overflow-hidden" style={{ background: t.card, border: `1px solid ${t.divider}`, minHeight: 192, paddingBottom: visible.length ? 8 : 0 }}>
+      <div className="flex items-center justify-between" style={{ padding: "16px 18px 12px" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 900, margin: 0 }}>{title}</h3>
+        <span style={{ color: t.faint, fontSize: 23, lineHeight: 1 }}>›</span>
       </div>
       {visible.map((record, index) => (
-        <div key={record.id} className="flex items-center gap-2" style={{ minHeight: 47, padding: "6px 9px", borderTop: index ? `1px solid ${t.divider}` : "none" }}>
-          <span style={{ color: t.dim, width: 12, fontSize: 10.5, fontWeight: 800 }}>{index + 1}</span>
-          {kind === "player" ? <PlayerPhoto player={record} size={28} t={t} /> : <Crest short={record.short} color={record.color} logo={record.logoUrl} size={27} ring={t.divider} />}
+        <div key={record.id} className="flex items-center gap-3" style={{ minHeight: 47, padding: "5px 18px" }}>
+          {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={38} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest short={record.team.short} color={record.team.color} logo={record.team.logoUrl} size={16} ring={t.card} /></span>}</span> : <Crest short={record.short} color={record.color} logo={record.logoUrl} size={38} ring={t.divider} />}
           <span className="min-w-0" style={{ flex: 1 }}>
-            <span className="block truncate" style={{ fontSize: 11.5, fontWeight: 750 }}>{record.name}</span>
-            {kind === "player" && record.team && <span className="block truncate" style={{ color: t.dim, fontSize: 9.5, marginTop: 2 }}>{record.team.name}</span>}
+            <span className="block truncate" style={{ fontSize: 14.5, fontWeight: 750 }}>{record.name}</span>
           </span>
-          <span className="rounded-full" style={{ minWidth: 31, textAlign: "center", background: index === 0 ? t.green : t.chip, color: index === 0 ? "#FFFFFF" : t.text, padding: "5px 6px", fontSize: 10.5, fontWeight: 900 }}>{formatMetric(record[valueKey])}{suffix}</span>
+          <span className={index === 0 ? "rounded-full" : ""} style={{ minWidth: 42, textAlign: "center", background: index === 0 ? accent : "transparent", color: index === 0 ? "#FFFFFF" : t.text, padding: index === 0 ? "6px 9px" : "6px 2px", fontSize: 14, fontWeight: index === 0 ? 900 : 700 }}>{formatMetric(record[valueKey])}{suffix}</span>
         </div>
       ))}
     </article>
@@ -363,11 +364,6 @@ function Seasons({ seasons, competition, t }) {
 function SeasonTeam({ row, label, t, winner = false }) {
   if (!row) return null;
   return <div className="flex items-center gap-3" style={{ padding: "8px 2px" }}><span className="inline-flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: winner ? t.disc : t.chip }}>{winner ? <Trophy size={16} color={t.yellow} /> : <span style={{ color: t.dim, fontSize: 12, fontWeight: 900 }}>2</span>}</span><Crest short={row.short} color={row.color} logo={row.logoUrl} size={34} ring={t.divider} /><span className="min-w-0" style={{ flex: 1 }}><span className="block" style={{ color: t.dim, fontSize: 10.5 }}>{label}</span><span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, marginTop: 2 }}>{row.name}</span></span><span style={{ color: t.dim, fontSize: 11.5, fontWeight: 750 }}>{row.pts} pts</span></div>;
-}
-
-function EditorialEmpty({ t, type, competition }) {
-  const isNews = type === "News";
-  return <div className="mx-2 my-3 rounded-2xl text-center" style={{ padding: "42px 24px", background: t.card, border: `1px solid ${t.divider}` }}>{isNews ? <Newspaper size={36} color={t.dim} style={{ margin: "0 auto 13px" }} /> : <Trophy size={36} color={t.dim} style={{ margin: "0 auto 13px" }} />}<h2 style={{ margin: 0, fontSize: 16, fontWeight: 850 }}>No {type.toLowerCase()} yet</h2><p style={{ color: t.dim, fontSize: 12.5, lineHeight: 1.55, margin: "7px 0 0" }}>{isNews ? `Competition news published for ${competition.name} will appear here.` : `Player transfers registered for ${competition.name} will appear here.`}</p></div>;
 }
 
 function PlayerPhoto({ player, size, t, light = false }) {

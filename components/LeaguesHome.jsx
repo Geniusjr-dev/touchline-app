@@ -53,18 +53,18 @@ export default function LeaguesHome() {
   }, [competitions, query]);
   return (
     <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header style={{ padding: "28px 16px 12px" }}>
-        <h1 style={{ margin: 0, fontSize: 31, lineHeight: 1.1, fontWeight: 900, letterSpacing: -0.7 }}>Leagues</h1>
-        <label className="flex items-center rounded-full" style={{ height: 56, marginTop: 22, padding: "0 17px", background: t.pill, border: `1px solid ${t.pillBorder}` }}>
-          <Search size={23} color={t.dim} />
-          <input aria-label="Find leagues" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find leagues" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: t.text, padding: "0 12px", fontSize: 17, fontWeight: 700 }} />
+      <header style={{ padding: "22px 16px 10px" }}>
+        <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, letterSpacing: -0.4 }}>Leagues</h1>
+        <label className="flex items-center rounded-full" style={{ height: 48, marginTop: 16, padding: "0 15px", background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <Search size={20} color={t.dim} />
+          <input aria-label="Find leagues" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find leagues" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: t.text, padding: "0 10px", fontSize: 14 }} />
         </label>
       </header>
 
-      <main style={{ padding: "18px 12px" }}>
+      <main style={{ padding: "15px 12px" }}>
         <div className="flex items-center justify-between" style={{ margin: "0 4px 15px" }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900 }}>Following</h2>
-          <Link href="/admin/competitions" style={{ color: t.accent, fontSize: 14, fontWeight: 850 }}>Edit</Link>
+          <h2 style={{ margin: 0, fontSize: 17 }}>Following</h2>
+          <Link href="/admin/competitions" style={{ color: t.accent, fontSize: 13 }}>Edit</Link>
         </div>
         {!data && !loadError && <LeagueListShell t={t} />}
         {loadError && (
@@ -86,7 +86,7 @@ export default function LeaguesHome() {
             href={`/league/${competition.id}`}
             key={competition.id}
             className="flex items-center rounded-2xl active:opacity-70"
-            style={{ minHeight: 76, marginBottom: 10, padding: "12px 17px", background: t.card, border: `1px solid ${t.divider}` }}
+            style={{ minHeight: 66, marginBottom: 9, padding: "10px 15px", background: t.card, border: `1px solid ${t.divider}` }}
           >
             <span className="inline-flex items-center justify-center shrink-0 overflow-hidden" style={{ width: 42, height: 42, background: "transparent" }}>
               {competition.logoUrl
@@ -94,7 +94,7 @@ export default function LeaguesHome() {
                 : <Trophy size={28} color={competition.themeColor || t.accent} />}
             </span>
             <span className="min-w-0" style={{ flex: 1, paddingLeft: 15 }}>
-              <span className="block truncate" style={{ color: t.text, fontSize: 16, fontWeight: 800 }}>{competition.name}</span>
+              <span className="block truncate" style={{ color: t.text, fontSize: 14 }}>{competition.name}</span>
             </span>
             {competition.liveCount > 0 && (
               <span className="rounded-full" style={{ color: "#07130B", background: t.accent, padding: "5px 8px", fontSize: 9.5, fontWeight: 900, marginRight: 5 }}>LIVE</span>
@@ -111,7 +111,7 @@ export default function LeaguesHome() {
 function LeagueListShell({ t }) {
   return <div aria-hidden="true">
     {[0, 1, 2].map((item) => (
-      <div key={item} className="flex items-center rounded-2xl" style={{ minHeight: 76, marginBottom: 10, padding: "12px 17px", background: t.card }}>
+      <div key={item} className="flex items-center rounded-2xl" style={{ minHeight: 66, marginBottom: 9, padding: "10px 15px", background: t.card }}>
         <span className="rounded-full" style={{ width: 42, height: 42, background: t.chip }} />
         <span style={{ flex: 1, paddingLeft: 12 }}>
           <span className="block rounded-md" style={{ width: 170, height: 14, background: t.chip }} />

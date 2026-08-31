@@ -247,7 +247,7 @@ export default function MatchesHome() {
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 56 }}>
-        <span style={{ color: t.text, fontSize: 21, fontWeight: 800, letterSpacing: -0.5 }}>
+        <span style={{ color: t.text, fontSize: 19, letterSpacing: -0.35 }}>
           <span style={{ color: t.accent }}>⚡</span>Touchline
         </span>
         <div className="relative flex items-center gap-2">

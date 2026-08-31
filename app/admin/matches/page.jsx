@@ -100,7 +100,7 @@ export default function Matches() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>{role === "admin" ? "Matches" : "Assigned matches"}</h1>
+      <h1 style={{ fontSize: 20, marginBottom: 16 }}>{role === "admin" ? "Matches" : "Assigned matches"}</h1>
 
       {role === "admin" && <div style={{ marginBottom: 20 }}>
         <form onSubmit={make} style={card}>

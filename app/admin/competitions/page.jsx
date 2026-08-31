@@ -71,7 +71,7 @@ export default function CompetitionsPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Competitions</h1>
+      <h1 style={{ fontSize: 20, marginBottom: 6 }}>Competitions</h1>
       <div style={{ color: "#8E939B", fontSize: 13, lineHeight: 1.5 }}>
         Create competitions, then use Edit to update their details and registered teams.
       </div>

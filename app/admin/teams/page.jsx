@@ -71,7 +71,7 @@ export default function Teams() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Teams, squads & trophies</h1>
+      <h1 style={{ fontSize: 20, marginBottom: 6 }}>Teams, squads & trophies</h1>
       <p style={{ color: "#8E939B", fontSize: 13, margin: "0 0 16px" }}>Everything saved here appears on the public team page.</p>
 
       <form onSubmit={submit} style={{ ...card, marginBottom: 20 }}>

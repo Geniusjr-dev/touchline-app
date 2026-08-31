@@ -1287,7 +1287,7 @@ function H2H({ t, h, a, homeId, awayId, meetings }) {
 function H2HCount({ value, label, color, textColor, t }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="inline-flex items-center justify-center rounded-full" style={{ minWidth: 48, height: 34, padding: "0 12px", background: color, color: textColor, fontSize: 17, fontWeight: 850 }}>{value}</span>
+      <span className="inline-flex items-center justify-center rounded-full" style={{ minWidth: 46, height: 32, padding: "0 11px", background: color, color: textColor, fontSize: 15 }}>{value}</span>
       <span style={{ color: t.text, fontSize: 12, fontWeight: 650, marginTop: 7 }}>{label}</span>
     </div>
   );

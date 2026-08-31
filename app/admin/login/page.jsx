@@ -24,7 +24,7 @@ export default function Login() {
   return (
     <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 360 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline</div>
+        <div style={{ fontSize: 20, marginBottom: 4 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline</div>
         <div style={{ color: "#8E939B", fontSize: 14, marginBottom: 24 }}>Admin & scorer sign in</div>
         {!hasSupabase() && (
           <div style={{ background: "#3a1d1d", color: "#f3b0b0", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
@@ -43,7 +43,7 @@ export default function Login() {
           </button>
         </form>
         <div style={{ color: "#5B6069", fontSize: 12, marginTop: 16 }}>
-          Accounts are created by the admin in the Supabase dashboard (Authentication, then Users).
+          Accounts are created by the admin in the Supabase dashboard (Authentication → Users).
         </div>
       </div>
     </div>

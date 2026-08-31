@@ -54,7 +54,7 @@ export function BottomNav({ t, active = "Matches" }) {
           const color = selected ? t.accent : t.navText;
           const contents = <>
             {item.icon(color)}
-            <span style={{ fontSize: 11, fontWeight: selected ? 750 : 600, color }}>{item.label}</span>
+            <span style={{ fontSize: 10.5, color }}>{item.label}</span>
           </>;
           const styles = { background: selected ? t.pill : "transparent" };
           return item.href ? (

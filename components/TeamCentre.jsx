@@ -132,7 +132,7 @@ export default function TeamCentre({ id }) {
         <div className="flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
           <Crest short={team.short} color={team.color} logo={team.logoUrl} size={64} ring={t.divider} />
           <div className="min-w-0">
-            <h1 style={{ fontSize: 24, lineHeight: 1.08, fontWeight: 850, margin: 0 }}>{team.fullName}</h1>
+            <h1 style={{ fontSize: 20, lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
             <div style={{ color: t.dim, fontSize: 14, fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
@@ -327,7 +327,7 @@ function Stats({ state, t }) {
         <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
           {metrics.map(([label, value]) => (
             <div key={label} style={{ padding: "15px 12px", borderBottom: `1px solid ${t.divider}` }}>
-              <div style={{ fontSize: 20, fontWeight: 850 }}>{value}</div>
+              <div style={{ fontSize: 17 }}>{value}</div>
               <div style={{ color: t.dim, fontSize: 12.5, marginTop: 3 }}>{label}</div>
             </div>
           ))}

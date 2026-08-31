@@ -19,7 +19,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

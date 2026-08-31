@@ -30,7 +30,7 @@ export default function AdminLayout({ children }) {
   return (
     <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderBottom: "1px solid #26282B", position: "sticky", top: 0, background: "#0A0A0A", zIndex: 10, flexWrap: "wrap" }}>
-        <Link href="/admin" style={{ fontWeight: 800, fontSize: 18 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline <span style={{ color: "#8E939B", fontWeight: 600, fontSize: 14 }}>admin</span></Link>
+        <Link href="/admin" style={{ fontSize: 17 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline <span style={{ color: "#8E939B", fontSize: 13 }}>admin</span></Link>
         <nav style={{ display: "flex", gap: 14, marginLeft: 8 }}>
           {role === "admin" && <Tab href="/admin/teams" path={path}>Teams</Tab>}
           <Tab href="/admin/matches" path={path}>Matches</Tab>

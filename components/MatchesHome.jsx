@@ -8,6 +8,7 @@ import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav, StatusChip } from "@/components/ui";
 import MatchNotificationButton from "@/components/MatchNotificationButton";
+import MatchDateCalendar from "@/components/MatchDateCalendar";
 
 const warmedMatches = new Set();
 const selectedDateStorageKey = "touchline-selected-match-date";
@@ -136,10 +137,10 @@ export default function MatchesHome() {
   const { t, mode, toggle } = useTheme();
   const [liveOnly, setLiveOnly] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [data, setData] = useState(null);
   const [now, setNow] = useState(0);
   const dateStripRef = useRef(null);
-  const dateInputRef = useRef(null);
   const todayKey = now ? localDateKey(new Date(now)) : "";
   const [selectedDateOverride, setSelectedDateOverride] = useState(null);
   const selectedDate = selectedDateOverride || todayKey;
@@ -221,17 +222,6 @@ export default function MatchesHome() {
     }
   };
 
-  const openDatePicker = (event) => {
-    const input = dateInputRef.current;
-    if (!input || typeof input.showPicker !== "function") return;
-
-    try {
-      input.showPicker();
-    } catch {
-      event.currentTarget.focus({ preventScroll: true });
-    }
-  };
-
   const comps = !data ? [] : data.competitions
     .map((competition) => ({
       ...competition,
@@ -257,21 +247,12 @@ export default function MatchesHome() {
               <span style={{ color: liveOnly ? t.text : t.dim, fontSize: 13, fontWeight: 700 }}>Live</span>
             </button>
             <div style={{ width: 1, height: 20, background: t.pillBorder }} />
-            <label className="relative flex items-center justify-center h-full cursor-pointer" style={{ width: 42, color: t.text }}>
+            <button type="button" onClick={() => setCalendarOpen(true)} aria-label="Open match calendar" className="relative flex items-center justify-center h-full" style={{ width: 42, color: t.text }}>
               <span className="relative inline-flex items-center justify-center rounded" style={{ width: 20, height: 19, border: `2px solid ${t.text}`, fontSize: 10, fontWeight: 800, lineHeight: 1 }}>
                 <span style={{ position: "absolute", left: -2, right: -2, top: 3, height: 2, background: t.text }} />
                 <span style={{ paddingTop: 4 }}>{selectedDate ? Number(selectedDate.slice(8, 10)) : ""}</span>
               </span>
-              <input
-                ref={dateInputRef}
-                type="date"
-                aria-label="Choose match date"
-                value={selectedDate}
-                onClick={openDatePicker}
-                onChange={(event) => event.target.value && selectDate(event.target.value)}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", fontSize: 16 }}
-              />
-            </label>
+            </button>
           </div>
           <button
             type="button"
@@ -339,6 +320,7 @@ export default function MatchesHome() {
       )}
 
       <BottomNav t={t} active="Matches" />
+      <MatchDateCalendar open={calendarOpen} selectedDate={selectedDate} t={t} onSelect={selectDate} onClose={() => setCalendarOpen(false)} />
     </div>
   );
 }

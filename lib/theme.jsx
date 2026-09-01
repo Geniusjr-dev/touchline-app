@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 export const THEMES = {
   dark: {
@@ -23,9 +23,40 @@ export const THEMES = {
 };
 
 const ThemeCtx = createContext({ mode: "dark", t: THEMES.dark, toggle: () => {} });
+const themeStorageKey = "touchline-theme";
+
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState("dark");
-  const value = { mode, t: THEMES[mode], toggle: () => setMode((m) => (m === "dark" ? "light" : "dark")) };
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedMode = window.localStorage.getItem(themeStorageKey);
+      if (savedMode === "light" || savedMode === "dark") setMode(savedMode);
+    } catch {
+      // The app still works when browser storage is unavailable.
+    }
+    setRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      window.localStorage.setItem(themeStorageKey, mode);
+    } catch {
+      // Keep the selected theme in memory when browser storage is unavailable.
+    }
+    document.documentElement.style.background = THEMES[mode].bg;
+    document.body.style.background = THEMES[mode].bg;
+    document.documentElement.style.colorScheme = mode;
+  }, [mode, restored]);
+
+  const value = {
+    mode,
+    t: THEMES[mode],
+    setMode,
+    toggle: () => setMode((current) => (current === "dark" ? "light" : "dark")),
+  };
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 }
 export const useTheme = () => useContext(ThemeCtx);

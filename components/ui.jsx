@@ -45,8 +45,7 @@ export function BottomNav({ t, active = "Matches" }) {
   ];
   return (
     <div
-      className="fixed left-0 right-0 flex items-center gap-2 px-3 z-40 pointer-events-none"
-      style={{ maxWidth: 480, margin: "0 auto", bottom: "max(7px, env(safe-area-inset-bottom))" }}
+      className="touchline-bottom-nav flex items-center gap-2 z-40 pointer-events-none"
     >
       <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 58, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
         {items.map((item) => {

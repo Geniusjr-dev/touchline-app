@@ -763,6 +763,9 @@ create policy "organization admins delete teams" on public.teams for delete
 create policy "public read matches" on public.matches for select using (true);
 create policy "organization admins create matches" on public.matches for insert
   with check (public.is_org_admin(organization_id));
+create policy "organization admins update scheduled matches" on public.matches for update
+  using (public.is_org_admin(organization_id) and status = 'scheduled')
+  with check (public.is_org_admin(organization_id) and status = 'scheduled');
 create policy "organization admins delete matches" on public.matches for delete
   using (public.is_org_admin(organization_id));
 

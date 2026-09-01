@@ -139,6 +139,10 @@ export default function MatchCentre({ id }) {
   const refreshTimerRef = useRef(null);
   const tableRequestRef = useRef("");
   const tableRowsRef = useRef(new Map());
+  const goBack = () => {
+    if (window.history.length > 1) router.back();
+    else router.push("/");
+  };
 
   const load = useCallback(async (force = false) => {
     try {
@@ -216,9 +220,9 @@ export default function MatchCentre({ id }) {
     });
   }, [state?.match]);
 
-  if (!state) return <MatchPageShell t={t} onBack={() => router.push("/")} error={loadError} onRetry={load} />;
+  if (!state) return <MatchPageShell t={t} onBack={goBack} error={loadError} onRetry={load} />;
   const { match: m, teams, detail: d } = state;
-  if (!m) return <MatchPageShell t={t} onBack={() => router.push("/")} error="Match not found." onRetry={load} />;
+  if (!m) return <MatchPageShell t={t} onBack={goBack} error="Match not found." onRetry={load} />;
 
   const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
   const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
@@ -246,7 +250,7 @@ export default function MatchCentre({ id }) {
       {/* header */}
       <div className="sticky top-0 z-30" style={{ background: t.bg }}>
         <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
-          <button onClick={() => router.push("/")} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
+          <button onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
             <ChevronLeft size={22} color={t.text} />
           </button>
           <span />
@@ -1151,7 +1155,7 @@ function TableTab({ t, m, rows }) {
             <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
               <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
                 <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : qualifies ? t.accent : "transparent", marginRight: 6 }} />
-                <span style={{ color: t.dim, fontSize: 13, fontWeight: 750 }}>{index + 1}</span>
+                <span className="league-table-number" style={{ color: t.dim, fontSize: 13 }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
                 <Crest short={tm.short} color={tm.color} logo={tm.logoUrl} size={24} ring={t.divider} />
@@ -1184,7 +1188,7 @@ function TableTab({ t, m, rows }) {
                 <>
                   <TableValue width={28} color={t.text}>{tm.pl}</TableValue>
                   <TableValue width={38} color={t.dim}>{signedNumber(goalDifference)}</TableValue>
-                  <TableValue width={38} color={t.text} strong>{tm.pts}</TableValue>
+                  <TableValue width={38} color={t.text}>{tm.pts}</TableValue>
                 </>
               ) : (
                 <>
@@ -1194,7 +1198,7 @@ function TableTab({ t, m, rows }) {
                   <TableValue width={22} color={t.dim}>{tm.l}</TableValue>
                   <TableValue width={42} color={t.dim}>{tm.gf}-{tm.ga}</TableValue>
                   <TableValue width={34} color={t.dim}>{signedNumber(goalDifference)}</TableValue>
-                  <TableValue width={34} color={t.text} strong>{tm.pts}</TableValue>
+                  <TableValue width={34} color={t.text}>{tm.pts}</TableValue>
                 </>
               )}
             </div>
@@ -1221,8 +1225,8 @@ function TableHeading({ width, children }) {
   return <span style={{ width, textAlign: "center", flex: "0 0 auto" }}>{children}</span>;
 }
 
-function TableValue({ width, color, strong = false, children }) {
-  return <span style={{ width, textAlign: "center", color, fontSize: 12.5, fontWeight: strong ? 850 : 600, flex: "0 0 auto" }}>{children}</span>;
+function TableValue({ width, color, children }) {
+  return <span className="league-table-number" style={{ width, textAlign: "center", color, fontSize: 12.5, flex: "0 0 auto" }}>{children}</span>;
 }
 
 function signedNumber(value) {

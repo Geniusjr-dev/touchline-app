@@ -116,7 +116,7 @@ export default function CompetitionTable({ t, competition, rows }) {
             >
               <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
                 <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : "transparent", marginRight: 6 }} />
-                <span style={{ color: t.dim, fontSize: 12.5 }}>{index + 1}</span>
+                <span className="league-table-number" style={{ color: t.dim, fontSize: 12.5 }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
                 <Crest short={team.short} color={team.color} logo={team.logoUrl} size={24} ring={t.divider} />
@@ -147,7 +147,7 @@ export default function CompetitionTable({ t, competition, rows }) {
                 <>
                   <Value width={28} color={t.text}>{team.pl}</Value>
                   <Value width={38} color={t.dim}>{signedNumber(goalDifference)}</Value>
-                  <Value width={38} color={t.text} strong>{team.pts}</Value>
+                  <Value width={38} color={t.text}>{team.pts}</Value>
                 </>
               ) : (
                 <>
@@ -157,7 +157,7 @@ export default function CompetitionTable({ t, competition, rows }) {
                   <Value width={22} color={t.dim}>{team.l}</Value>
                   <Value width={42} color={t.dim}>{team.gf}-{team.ga}</Value>
                   <Value width={34} color={t.dim}>{signedNumber(goalDifference)}</Value>
-                  <Value width={34} color={t.text} strong>{team.pts}</Value>
+                  <Value width={34} color={t.text}>{team.pts}</Value>
                 </>
               )}
             </Link>
@@ -177,8 +177,8 @@ function Heading({ width, children }) {
   return <span style={{ width, textAlign: "center", flex: "0 0 auto" }}>{children}</span>;
 }
 
-function Value({ width, color, strong = false, children }) {
-  return <span style={{ width, textAlign: "center", color, fontSize: 11.5, fontWeight: strong ? 700 : 600, flex: "0 0 auto" }}>{children}</span>;
+function Value({ width, color, children }) {
+  return <span className="league-table-number" style={{ width, textAlign: "center", color, fontSize: 11.5, flex: "0 0 auto" }}>{children}</span>;
 }
 
 function signedNumber(value) {

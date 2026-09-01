@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { listTeams, listCompetitions, listCompetitionTeams, listMatches, listScorers, listMatchScorers, replaceMatchScorer, createMatch } from "@/lib/db";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { createMatch, deleteScheduledMatch, listCompetitionTeams, listCompetitions, listMatches, listMatchScorers, listScorers, listTeams, replaceMatchScorer } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
 import { cacheAdminMatch } from "@/lib/matchCache";
 
@@ -27,6 +28,7 @@ export default function Matches() {
   const [weather, setWeather] = useState("");
   const [refereeName, setRefereeName] = useState("");
   const [err, setErr] = useState("");
+  const [openCompetition, setOpenCompetition] = useState("");
 
   const load = useCallback(async () => {
     if (!activeOrganizationId) return;
@@ -89,6 +91,15 @@ export default function Matches() {
     if (error) return setErr(error.message);
     setAssignments((current) => ({ ...current, [matchId]: scorerId ? [scorerId] : [] }));
   }
+  async function removeScheduledMatch(match) {
+    const homeName = match.home?.display_name || match.home?.name || teamName(match.home_id);
+    const awayName = match.away?.display_name || match.away?.name || teamName(match.away_id);
+    if (!window.confirm(`Delete the scheduled match between ${homeName} and ${awayName}?`)) return;
+    setErr("");
+    const { error } = await deleteScheduledMatch(match.id);
+    if (error) { setErr(error.message); return; }
+    await load();
+  }
   const teamName = (id) => teams.find((t) => t.id === id)?.name || "Team not found";
   const selectedCompetition = comps.find((competition) => competition.id === comp);
   const registeredTeamIds = new Set(competitionTeams
@@ -97,6 +108,15 @@ export default function Matches() {
   const eligibleTeams = selectedCompetition?.competition_type === "friendly"
     ? teams
     : teams.filter((team) => registeredTeamIds.has(team.id));
+  const competitionGroups = useMemo(() => {
+    const grouped = comps.map((competition) => ({
+      ...competition,
+      matches: matches.filter((match) => match.competition_id === competition.id),
+    })).filter((competition) => competition.matches.length > 0);
+    const unmatched = matches.filter((match) => !comps.some((competition) => competition.id === match.competition_id));
+    if (unmatched.length) grouped.push({ id: "unassigned", name: "Unassigned matches", competition_type: "other", matches: unmatched });
+    return grouped;
+  }, [comps, matches]);
 
   return (
     <div>
@@ -173,22 +193,35 @@ export default function Matches() {
 
       {err && <div style={{ color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{err}</div>}
 
-      <div style={{ ...card, padding: 0 }}>
-        <div style={{ ...h3, padding: "14px 16px 0" }}>All matches</div>
-        {matches.length === 0 && <div style={{ color: "#8E939B", padding: 20, fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
-        {matches.map((m) => (
-          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: "1px solid #26282B", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: statusColor(m.status), width: 64 }}>{m.status}</span>
-            <span style={{ flex: 1, minWidth: 200, fontSize: 14 }}><span style={{ color: "#8E939B", fontSize: 12 }}>{m.match_date}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""} · </span>{m.home?.display_name || m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.display_name || m.away?.name || teamName(m.away_id)}</span>
-            {role === "admin" && (
-              <select value={assignments[m.id]?.[0] || ""} onChange={(e) => assignScorer(m.id, e.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 190, padding: "7px 9px", fontSize: 12 }}>
-                <option value="">No scorer assigned</option>
-                {scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}
-              </select>
-            )}
-            <Link href={`/admin/match/${m.id}`} onPointerDown={() => cacheAdminMatch(m)} onClick={() => cacheAdminMatch(m)} style={{ ...btn, textDecoration: "none", padding: "7px 14px" }}>Score</Link>
-          </div>
-        ))}
+      <div>
+        <div style={{ ...h3, marginBottom: 10 }}>{role === "admin" ? "Matches by competition" : "Assigned matches by competition"}</div>
+        {matches.length === 0 && <div style={{ ...card, color: "#8E939B", fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
+        {competitionGroups.map((competition) => {
+          const open = openCompetition === competition.id;
+          const scheduledCount = competition.matches.filter((match) => match.status === "scheduled").length;
+          return (
+            <section key={competition.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 12 }}>
+              <button type="button" onClick={() => setOpenCompetition(open ? "" : competition.id)} className="w-full flex items-center" style={{ minHeight: 62, gap: 12, padding: "12px 16px", background: "transparent", color: "#FFFFFF", border: 0, textAlign: "left", cursor: "pointer" }}>
+                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "#22252A", color: "#4FC263", fontSize: 16 }}>🏆</span>
+                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 14 }}>{competition.name}</span><span className="block" style={{ color: "#8E939B", fontSize: 11, marginTop: 3 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
+                {open ? <ChevronDown size={19} color="#8E939B" /> : <ChevronRight size={19} color="#8E939B" />}
+              </button>
+              {open && <div style={{ borderTop: "1px solid #26282B" }}>
+                {competition.matches.map((m) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: "1px solid #26282B", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10.5, textTransform: "uppercase", color: statusColor(m.status), width: 58 }}>{m.status}</span>
+                    <span style={{ flex: 1, minWidth: 190, fontSize: 13 }}><span style={{ display: "block", color: "#8E939B", fontSize: 11.5, marginBottom: 3 }}>{m.match_date} · {m.kickoff || "TBD"}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""}</span>{m.home?.display_name || m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.display_name || m.away?.name || teamName(m.away_id)}</span>
+                    {role === "admin" && <select value={assignments[m.id]?.[0] || ""} onChange={(event) => assignScorer(m.id, event.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 178, padding: "7px 9px", fontSize: 12 }}><option value="">No scorer assigned</option>{scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}</select>}
+                    <div className="flex items-center" style={{ gap: 7 }}>
+                      {role === "admin" && m.status === "scheduled" && <><Link href={`/admin/matches/${m.id}`} style={{ ...secondaryBtn, textDecoration: "none" }}>Edit</Link><button type="button" onClick={() => removeScheduledMatch(m)} style={dangerBtn}>Delete</button></>}
+                      <Link href={`/admin/match/${m.id}`} onPointerDown={() => cacheAdminMatch(m)} onClick={() => cacheAdminMatch(m)} style={{ ...btn, textDecoration: "none", padding: "7px 12px" }}>{m.status === "scheduled" ? "Open" : "Score"}</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
@@ -210,3 +243,5 @@ const h3 = { fontSize: 15, fontWeight: 700, marginBottom: 12 };
 const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
 const pickerInput = { ...inp, colorScheme: "dark", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
+const secondaryBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #384049", background: "#22252A", color: "#FFFFFF", cursor: "pointer", fontSize: 12 };
+const dangerBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", cursor: "pointer", fontSize: 12 };

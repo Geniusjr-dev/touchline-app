@@ -295,9 +295,9 @@ function Table({ state, t }) {
           </div>
           {state.table.map((row, index) => (
             <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", borderTop: `1px solid ${t.divider}`, background: row.id === state.team.id ? t.hl : "transparent", fontSize: 12.5 }}>
-              <span style={{ fontWeight: 800 }}>{index + 1}</span>
-              <span className="flex items-center gap-2 min-w-0"><Crest short={row.short} color={row.color} logo={row.logoUrl} size={26} ring={t.divider} /><span style={{ fontWeight: 750 }}>{row.name}</span></span>
-              <span>{row.pl}</span><span>{row.w}</span><span>{row.d}</span><span>{row.l}</span><span>{row.gf - row.ga}</span><span style={{ fontWeight: 850 }}>{row.pts}</span>
+              <span className="league-table-number">{index + 1}</span>
+              <span className="flex items-center gap-2 min-w-0"><Crest short={row.short} color={row.color} logo={row.logoUrl} size={26} ring={t.divider} /><span>{row.name}</span></span>
+              <span className="league-table-number">{row.pl}</span><span className="league-table-number">{row.w}</span><span className="league-table-number">{row.d}</span><span className="league-table-number">{row.l}</span><span className="league-table-number">{row.gf - row.ga}</span><span className="league-table-number">{row.pts}</span>
               <span className="flex gap-1">{row.form.slice(-5).map((result, resultIndex) => <i key={`${result}-${resultIndex}`} className="rounded-full" style={{ width: 9, height: 9, background: result === "W" ? t.green : result === "L" ? t.red : t.drawPill }} />)}</span>
             </Link>
           ))}

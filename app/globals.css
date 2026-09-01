@@ -20,6 +20,7 @@ textarea {
 body * { font-weight: 400 !important; }
 .league-table-number { font-weight: 700 !important; }
 ::placeholder { font-weight: 400; }
+.touchline-admin ::placeholder { color: var(--admin-faint); opacity: 1; }
 * { -webkit-tap-highlight-color: transparent; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

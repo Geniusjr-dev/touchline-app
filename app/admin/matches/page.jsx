@@ -191,26 +191,26 @@ export default function Matches() {
         </form>
       </div>}
 
-      {err && <div style={{ color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{err}</div>}
+      {err && <div style={{ color: "#F04444", background: "var(--admin-soft-danger)", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{err}</div>}
 
       <div>
         <div style={{ ...h3, marginBottom: 10 }}>{role === "admin" ? "Matches by competition" : "Assigned matches by competition"}</div>
-        {matches.length === 0 && <div style={{ ...card, color: "#8E939B", fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
+        {matches.length === 0 && <div style={{ ...card, color: "var(--admin-dim)", fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
         {competitionGroups.map((competition) => {
           const open = openCompetition === competition.id;
           const scheduledCount = competition.matches.filter((match) => match.status === "scheduled").length;
           return (
             <section key={competition.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 12 }}>
-              <button type="button" onClick={() => setOpenCompetition(open ? "" : competition.id)} className="w-full flex items-center" style={{ minHeight: 62, gap: 12, padding: "12px 16px", background: "transparent", color: "#FFFFFF", border: 0, textAlign: "left", cursor: "pointer" }}>
-                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "#22252A", color: "#4FC263", fontSize: 16 }}>🏆</span>
-                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 14 }}>{competition.name}</span><span className="block" style={{ color: "#8E939B", fontSize: 11, marginTop: 3 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
-                {open ? <ChevronDown size={19} color="#8E939B" /> : <ChevronRight size={19} color="#8E939B" />}
+              <button type="button" onClick={() => setOpenCompetition(open ? "" : competition.id)} className="w-full flex items-center" style={{ minHeight: 62, gap: 12, padding: "12px 16px", background: "transparent", color: "var(--admin-text)", border: 0, textAlign: "left", cursor: "pointer" }}>
+                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "var(--admin-elevated)", color: "#4FC263", fontSize: 16 }}>🏆</span>
+                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 14 }}>{competition.name}</span><span className="block" style={{ color: "var(--admin-dim)", fontSize: 11, marginTop: 3 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
+                {open ? <ChevronDown size={19} color="var(--admin-dim)" /> : <ChevronRight size={19} color="var(--admin-dim)" />}
               </button>
-              {open && <div style={{ borderTop: "1px solid #26282B" }}>
+              {open && <div style={{ borderTop: "1px solid var(--admin-divider)" }}>
                 {competition.matches.map((m) => (
-                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: "1px solid #26282B", flexWrap: "wrap" }}>
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: "1px solid var(--admin-divider)", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 10.5, textTransform: "uppercase", color: statusColor(m.status), width: 58 }}>{m.status}</span>
-                    <span style={{ flex: 1, minWidth: 190, fontSize: 13 }}><span style={{ display: "block", color: "#8E939B", fontSize: 11.5, marginBottom: 3 }}>{m.match_date} · {m.kickoff || "TBD"}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""}</span>{m.home?.display_name || m.home?.name || teamName(m.home_id)} <span style={{ color: "#5B6069" }}>vs</span> {m.away?.display_name || m.away?.name || teamName(m.away_id)}</span>
+                    <span style={{ flex: 1, minWidth: 190, fontSize: 13 }}><span style={{ display: "block", color: "var(--admin-dim)", fontSize: 11.5, marginBottom: 3 }}>{m.match_date} · {m.kickoff || "TBD"}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""}</span>{m.home?.display_name || m.home?.name || teamName(m.home_id)} <span style={{ color: "var(--admin-faint)" }}>vs</span> {m.away?.display_name || m.away?.name || teamName(m.away_id)}</span>
                     {role === "admin" && <select value={assignments[m.id]?.[0] || ""} onChange={(event) => assignScorer(m.id, event.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 178, padding: "7px 9px", fontSize: 12 }}><option value="">No scorer assigned</option>{scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}</select>}
                     <div className="flex items-center" style={{ gap: 7 }}>
                       {role === "admin" && m.status === "scheduled" && <><Link href={`/admin/matches/${m.id}`} style={{ ...secondaryBtn, textDecoration: "none" }}>Edit</Link><button type="button" onClick={() => removeScheduledMatch(m)} style={dangerBtn}>Delete</button></>}
@@ -226,7 +226,7 @@ export default function Matches() {
     </div>
   );
 }
-function statusColor(s) { return s === "live" ? "#F04444" : s === "ft" ? "#8E939B" : s === "ht" ? "#F5C518" : "#4FC263"; }
+function statusColor(s) { return s === "live" ? "#F04444" : s === "ft" ? "var(--admin-dim)" : s === "ht" ? "#F5C518" : "#4FC263"; }
 function openNativePicker(event) {
   if (typeof event.currentTarget.showPicker === "function") event.currentTarget.showPicker();
 }
@@ -237,11 +237,11 @@ function preventManualPickerEntry(event) {
     event.currentTarget.showPicker();
   }
 }
-function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 600 }}>{label}</span>{children}</label>; }
-const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
+function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}><span style={{ color: "var(--admin-dim)", fontSize: 12, fontWeight: 600 }}>{label}</span>{children}</label>; }
+const card = { background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 14, padding: 16 };
 const h3 = { fontSize: 15, fontWeight: 700, marginBottom: 12 };
-const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
-const pickerInput = { ...inp, colorScheme: "dark", cursor: "pointer" };
+const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", fontSize: 14, outline: "none" };
+const pickerInput = { ...inp, colorScheme: "inherit", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
-const secondaryBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #384049", background: "#22252A", color: "#FFFFFF", cursor: "pointer", fontSize: 12 };
-const dangerBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", cursor: "pointer", fontSize: 12 };
+const secondaryBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid var(--admin-control-border)", background: "var(--admin-elevated)", color: "var(--admin-text)", cursor: "pointer", fontSize: 12 };
+const dangerBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #5A2929", background: "var(--admin-soft-danger)", color: "var(--admin-danger-text)", cursor: "pointer", fontSize: 12 };

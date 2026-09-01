@@ -72,7 +72,7 @@ export default function CompetitionsPage() {
   return (
     <div>
       <h1 style={{ fontSize: 20, marginBottom: 6 }}>Competitions</h1>
-      <div style={{ color: "#8E939B", fontSize: 13, lineHeight: 1.5 }}>
+      <div style={{ color: "var(--admin-dim)", fontSize: 13, lineHeight: 1.5 }}>
         Create competitions, then use Edit to update their details and registered teams.
       </div>
 
@@ -110,7 +110,7 @@ export default function CompetitionsPage() {
       </form>
 
       {error && <div style={errorBox}>{error}</div>}
-      {competitions.length === 0 && <div style={{ ...card, color: "#8E939B", fontSize: 14 }}>No competitions yet.</div>}
+      {competitions.length === 0 && <div style={{ ...card, color: "var(--admin-dim)", fontSize: 14 }}>No competitions yet.</div>}
       {competitions.map((competition) => (
         <CompetitionEditor key={competition.id} competition={competition} teams={teams} onSaved={load} />
       ))}
@@ -186,12 +186,12 @@ function CompetitionEditor({ competition, teams, onSaved }) {
   const entryByTeam = Object.fromEntries(entries.map((entry) => [entry.team_id, entry]));
   return (
     <div style={{ ...card, padding: 0, marginBottom: 12, overflow: "hidden" }}>
-      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "#fff", cursor: "pointer" }}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "var(--admin-text)", cursor: "pointer" }}>
         <span style={{ fontSize: 15, fontWeight: 750, textAlign: "left", flex: 1 }}>{competition.name}</span>
         <span style={formatPill(competition.competition_type)}>{competition.competition_type || "tournament"}</span>
         <span style={editPill(open)}>{open ? "Close" : "Edit"}</span>
       </button>
-      {open && <div style={{ padding: 16, borderTop: "1px solid #26282B" }}>
+      {open && <div style={{ padding: 16, borderTop: "1px solid var(--admin-divider)" }}>
         <form onSubmit={saveSettings}>
           <div style={grid}>
             <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} style={inp} /></Field>
@@ -210,11 +210,11 @@ function CompetitionEditor({ competition, teams, onSaved }) {
         </form>
 
         <div style={{ fontSize: 14, fontWeight: 750, margin: "18px 0 4px" }}>{format === "tournament" ? "Assign teams to groups" : "Register teams"}</div>
-        <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 8 }}>{format === "friendly" ? "Registration is optional for friendly competitions." : format === "league" ? "All registered teams appear in the overall table, including teams that have not played yet." : "A group cannot exceed the configured teams-per-group limit."}</div>
-        <div style={{ border: "1px solid #26282B", borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ color: "var(--admin-dim)", fontSize: 12, marginBottom: 8 }}>{format === "friendly" ? "Registration is optional for friendly competitions." : format === "league" ? "All registered teams appear in the overall table, including teams that have not played yet." : "A group cannot exceed the configured teams-per-group limit."}</div>
+        <div style={{ border: "1px solid var(--admin-divider)", borderRadius: 10, overflow: "hidden" }}>
           {teams.map((team) => {
             const entry = entryByTeam[team.id];
-            return <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderTop: "1px solid #26282B" }}>
+            return <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", borderTop: "1px solid var(--admin-divider)" }}>
               <span style={{ width: 28, height: 28, borderRadius: "50%", background: team.color, color: readableTextColor(team.color), border: "1px solid rgba(127,127,127,.28)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>{team.short}</span>
               <span style={{ flex: 1, fontSize: 13 }}>{team.display_name || team.name}</span>
               {format === "tournament" ? (
@@ -236,14 +236,14 @@ function CompetitionEditor({ competition, teams, onSaved }) {
 
 function formatPill(format) {
   const colors = { friendly: "#58708A", league: "#2563EB", tournament: "#7C3AED" };
-  return { color: "#fff", background: colors[format] || colors.tournament, borderRadius: 999, padding: "4px 8px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" };
+  return { color: "#FFFFFF", background: colors[format] || colors.tournament, borderRadius: 999, padding: "4px 8px", fontSize: 10, fontWeight: 800, textTransform: "uppercase" };
 }
 function editPill(open) {
   return {
     minWidth: 48,
-    color: open ? "#B7BBC2" : "#4FC263",
-    background: open ? "#24262A" : "#17271C",
-    border: `1px solid ${open ? "#34373C" : "#285B35"}`,
+    color: open ? "var(--admin-dim)" : "#4FC263",
+    background: open ? "var(--admin-elevated)" : "var(--admin-soft-green)",
+    border: `1px solid ${open ? "var(--admin-control-border)" : "#285B35"}`,
     borderRadius: 999,
     padding: "5px 9px",
     fontSize: 11,
@@ -251,12 +251,12 @@ function editPill(open) {
     textAlign: "center",
   };
 }
-function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 650 }}>{label}</span>{children}</label>; }
+function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6 }}><span style={{ color: "var(--admin-dim)", fontSize: 12, fontWeight: 650 }}>{label}</span>{children}</label>; }
 const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12 };
-const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
+const card = { background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 14, padding: 16 };
 const h3 = { fontSize: 15, fontWeight: 750, marginBottom: 12 };
-const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
-const colorInput = { width: 46, height: 42, padding: 3, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", cursor: "pointer" };
+const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", fontSize: 14, outline: "none" };
+const colorInput = { width: 46, height: 42, padding: 3, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
-const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", fontWeight: 800, cursor: "pointer" };
-const errorBox = { color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 };
+const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "var(--admin-soft-danger)", color: "var(--admin-danger-text)", fontWeight: 800, cursor: "pointer" };
+const errorBox = { color: "#F04444", background: "var(--admin-soft-danger)", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 };

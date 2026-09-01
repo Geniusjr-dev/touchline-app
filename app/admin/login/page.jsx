@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Moon, Sun } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { hasSupabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme";
 
 export default function Login() {
   const { signIn } = useAuth();
+  const { mode, toggle } = useTheme();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,10 +25,13 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div style={{ minHeight: "100vh", background: "var(--admin-bg)", color: "var(--admin-text)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, position: "relative" }}>
+      <button type="button" onClick={toggle} aria-label={`Switch to ${mode === "dark" ? "light" : "dark"} mode`} className="inline-flex items-center justify-center" style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: "50%", background: "var(--admin-control)", color: "var(--admin-text)", border: "1px solid var(--admin-control-border)", cursor: "pointer" }}>
+        {mode === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+      </button>
       <div style={{ width: "100%", maxWidth: 360 }}>
         <div style={{ fontSize: 20, marginBottom: 4 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline</div>
-        <div style={{ color: "#8E939B", fontSize: 14, marginBottom: 24 }}>Admin & scorer sign in</div>
+        <div style={{ color: "var(--admin-dim)", fontSize: 14, marginBottom: 24 }}>Admin & scorer sign in</div>
         {!hasSupabase() && (
           <div style={{ background: "#3a1d1d", color: "#f3b0b0", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
             Supabase is not configured yet. Add your keys to <code>.env.local</code> and Vercel, then reload.
@@ -42,11 +48,11 @@ export default function Login() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        <div style={{ color: "#5B6069", fontSize: 12, marginTop: 16 }}>
+        <div style={{ color: "var(--admin-faint)", fontSize: 12, marginTop: 16 }}>
           Accounts are created by the admin in the Supabase dashboard (Authentication → Users).
         </div>
       </div>
     </div>
   );
 }
-const inp = { width: "100%", padding: 12, borderRadius: 10, border: "1px solid #2A2C30", background: "#161719", color: "#fff", fontSize: 15, marginBottom: 12, outline: "none" };
+const inp = { width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--admin-control-border)", background: "var(--admin-card)", color: "var(--admin-text)", fontSize: 15, marginBottom: 12, outline: "none" };

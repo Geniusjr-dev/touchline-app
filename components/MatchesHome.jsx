@@ -266,7 +266,6 @@ export default function MatchesHome() {
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-10 overflow-hidden rounded-xl z-50" style={{ minWidth: 142, background: t.card, border: `1px solid ${t.divider}`, boxShadow: "0 10px 28px rgba(0,0,0,0.34)" }}>
-              <Link href="/admin" className="block px-4 py-3" style={{ color: t.text, fontSize: 13, fontWeight: 700, borderBottom: `1px solid ${t.divider}` }}>Admin</Link>
               <button type="button" onClick={() => { toggle(); setMenuOpen(false); }} className="w-full text-left px-4 py-3" style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>
                 {mode === "dark" ? "Light mode" : "Dark mode"}
               </button>

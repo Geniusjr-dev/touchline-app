@@ -62,9 +62,8 @@ export default function LeaguesHome() {
       </header>
 
       <main style={{ padding: "15px 12px" }}>
-        <div className="flex items-center justify-between" style={{ margin: "0 4px 15px" }}>
+        <div className="flex items-center" style={{ margin: "0 4px 15px" }}>
           <h2 style={{ margin: 0, fontSize: 17 }}>Following</h2>
-          <Link href="/admin/competitions" style={{ color: t.accent, fontSize: 13 }}>Edit</Link>
         </div>
         {!data && !loadError && <LeagueListShell t={t} />}
         {loadError && (
@@ -77,7 +76,7 @@ export default function LeaguesHome() {
           <div className="rounded-2xl text-center" style={{ background: t.card, padding: "36px 24px" }}>
             <Trophy size={34} color={t.dim} style={{ margin: "0 auto 12px" }} />
             <div style={{ fontSize: 15, fontWeight: 800 }}>No leagues available</div>
-            <div style={{ color: t.dim, fontSize: 13, marginTop: 5 }}>Leagues created by an administrator will appear here.</div>
+            <div style={{ color: t.dim, fontSize: 13, marginTop: 5 }}>Competitions will appear here when available.</div>
           </div>
         )}
         {data && competitions.length > 0 && visibleCompetitions.length === 0 && <div style={{ minHeight: 110 }} />}

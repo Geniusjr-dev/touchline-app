@@ -69,7 +69,19 @@ export default function AdminPortalShell({ children }) {
               ))}
             </select>
           )}
-          <Link href="/" style={{ color: "#8E939B", fontSize: 13 }}>Public site</Link>
+          <Link
+            href="/"
+            onClick={() => {
+              try {
+                window.sessionStorage.setItem("touchline-admin-return-path", path);
+              } catch {
+                // The return button will use the admin dashboard when storage is unavailable.
+              }
+            }}
+            style={{ color: "#8E939B", fontSize: 13 }}
+          >
+            Public site
+          </Link>
           <button
             type="button"
             onClick={async () => {

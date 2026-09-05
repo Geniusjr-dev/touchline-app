@@ -118,10 +118,23 @@ function LiveMatchClock({ match, theme, announcedStoppage }) {
   );
 }
 
-function scorerSummary(events, side) {
+function scorerLineupPlayer(event, lineup) {
+  const players = [...(lineup?.starters || []), ...(lineup?.substitutes || [])];
+  if (event.playerId) {
+    const playerById = players.find((player) => player.id === event.playerId);
+    if (playerById) return playerById;
+  }
+  const eventName = String(event.player || "").trim().toLocaleLowerCase();
+  return players.find((player) => [player.name, player.displayName]
+    .filter(Boolean)
+    .some((name) => String(name).trim().toLocaleLowerCase() === eventName)) || null;
+}
+
+function scorerSummary(events, side, lineup) {
   const grouped = new Map();
   (events || []).filter((event) => event.type === "goal" && event.side === side && hasKnownScorer(event.player)).forEach((event) => {
-    const player = event.player.trim();
+    const lineupPlayer = scorerLineupPlayer(event, lineup);
+    const player = lineupPlayer?.displayName || lineupPlayer?.name || event.player.trim();
     const minute = `${fotMobMinuteLabel(event.min || `${event.displayMinute || 1}'`)}${goalTypeSuffix(event.goalType)}`;
     if (!grouped.has(player)) grouped.set(player, []);
     grouped.get(player).push(minute);
@@ -241,54 +254,54 @@ export default function MatchCentre({ id }) {
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
   const announcedStoppage = announcedStoppageMinutes(m);
-  const homeScorers = scorerSummary(d?.events, "home");
-  const awayScorers = scorerSummary(d?.events, "away");
+  const homeScorers = scorerSummary(d?.events, "home", d?.lineups?.[m.home]);
+  const awayScorers = scorerSummary(d?.events, "away", d?.lineups?.[m.away]);
   const hasScorerSummary = homeScorers.length > 0 || awayScorers.length > 0;
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       {/* The complete match identity, score and tabs remain visible while content scrolls. */}
       <div style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 46 }}>
-          <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: t.pill, border: `1px solid ${t.divider}` }}>
-            <ChevronLeft size={21} color={t.text} />
+        <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
+          <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
+            <ChevronLeft size={22} color={t.text} />
           </button>
-          <div className="flex items-center rounded-full" style={{ height: 36, background: t.pill, border: `1px solid ${t.divider}` }}>
-            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 38, height: 34 }}>
-              <Share2 size={16} color={t.text} />
+          <div className="flex items-center rounded-full" style={{ height: 38, background: t.pill, border: `1px solid ${t.divider}` }}>
+            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
+              <Share2 size={18} color={t.text} />
             </button>
-            <span style={{ width: 1, height: 20, background: t.divider }} />
+            <span style={{ width: 1, height: 22, background: t.divider }} />
             <MatchNotificationButton matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
 
-        <div className="grid items-start px-7 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 96px minmax(0, 1fr)", minHeight: 66 }}>
+        <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
           <Link aria-label={h.name} href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
-            <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={40} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 10.5, fontWeight: 650, lineHeight: 1.15, maxWidth: 116 }}>{h.name}</span>
+            <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={44} ring={t.divider} />
+            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
           </Link>
-          <div className="flex flex-col items-center pt-0.5 min-w-0">
+          <div className="flex flex-col items-center pt-1 min-w-0">
             {m.status === "scheduled"
-              ? <span style={{ color: t.text, fontSize: 22, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
-              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 25, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
-            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 10, fontWeight: 650, marginTop: 2 }}>Half time · {breakClock(m)}</span>}
-            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 10, fontWeight: 650, marginTop: 2 }}>ET break · {breakClock(m)}</span>}
+              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
+              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
+            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
+            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
-            {ended && <span style={{ color: t.dim, fontSize: 10, fontWeight: 650, marginTop: 2 }}>Full time</span>}
+            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
-            <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={40} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 10.5, fontWeight: 650, lineHeight: 1.15, maxWidth: 116 }}>{a.name}</span>
+            <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={44} ring={t.divider} />
+            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
           </Link>
         </div>
 
         {hasScorerSummary && (
-          <div className="grid px-7 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
-            <div style={{ color: t.dim, fontSize: 10, lineHeight: 1.3, textAlign: "right", minWidth: 0 }}>
+          <div className="grid px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
+            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "right", minWidth: 0 }}>
               {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
-            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={10} color={t.text} /></span>
-            <div style={{ color: t.dim, fontSize: 10, lineHeight: 1.3, textAlign: "left", minWidth: 0 }}>
+            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={11} color={t.text} /></span>
+            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "left", minWidth: 0 }}>
               {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
           </div>
@@ -421,9 +434,9 @@ function LineupTab({ t, mode, m, h, a, lineups, events, homeColor, awayColor }) 
   return (
     <div style={{ paddingTop: 8 }}>
       {hasStarters ? (
-        <div style={{ overflow: "hidden", background: pitchHeader }}>
+        <div style={{ width: "92.28%", margin: "0 auto", overflow: "hidden", background: pitchHeader, borderRadius: 14 }}>
           <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
-          <div style={{ position: "relative", height: "clamp(600px, 152vw, 720px)", background: pitchBackground, overflow: "hidden" }}>
+          <div style={{ position: "relative", width: "100%", aspectRatio: "873 / 1129", background: pitchBackground, overflow: "hidden" }}>
             <PublicPitchMarkings line={t.pitchLine} />
             {homeLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer
@@ -501,29 +514,49 @@ function PublicPitchMarkings({ line }) {
   );
 }
 
+function lineupHalfPosition(slotY) {
+  const anchors = [
+    { y: 92, position: 12 },
+    { y: 70, position: 22 },
+    { y: 48, position: 32 },
+    { y: 30, position: 38.5 },
+    { y: 10, position: 45 },
+  ];
+  const y = Math.max(10, Math.min(92, Number(slotY)));
+  for (let index = 0; index < anchors.length - 1; index += 1) {
+    const upper = anchors[index];
+    const lower = anchors[index + 1];
+    if (y <= upper.y && y >= lower.y) {
+      const progress = (upper.y - y) / (upper.y - lower.y);
+      return upper.position + progress * (lower.position - upper.position);
+    }
+  }
+  return y >= anchors[0].y ? anchors[0].position : anchors.at(-1).position;
+}
+
 function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode, events }) {
   const slots = getFormationSlots(formation || DEFAULT_FORMATION);
   const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
   const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
   const naturalLeft = Math.max(9, Math.min(91, slot.x));
   const left = side === "away" ? 100 - naturalLeft : naturalLeft;
-  const halfPosition = Math.max(12.5, Math.min(46, 50 - slot.y * 0.4));
+  const halfPosition = lineupHalfPosition(slot.y);
   const top = side === "away" ? 100 - halfPosition : halfPosition;
   return (
-    <div style={{ position: "absolute", left: `${left}%`, top: `${top}%`, width: 68, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
+    <div style={{ position: "absolute", left: `${left}%`, top: `${top}%`, width: 78, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
       <span className="inline-flex relative">
         {player.photoUrl ? (
-          <span className="inline-flex rounded-full overflow-hidden" style={{ width: 42, height: 42, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.48)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
+          <span className="inline-flex rounded-full overflow-hidden" style={{ width: 50, height: 50, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.48)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
             {/* Supabase public media URLs are administrator controlled player assets. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </span>
         ) : (
-          <NeutralPlayerAvatar size={42} />
+          <NeutralPlayerAvatar size={50} />
         )}
         <LineupEventBadges player={player} side={side} events={events} />
       </span>
-      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 3, color: "#FFFFFF", fontSize: 9.5, lineHeight: 1.15, fontWeight: 700, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 11.5, lineHeight: 1.15, fontWeight: 700, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.displayName || player.name}
       </strong>
     </div>

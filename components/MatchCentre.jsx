@@ -247,64 +247,62 @@ export default function MatchCentre({ id }) {
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
-      {/* header */}
-      <div className="sticky top-0 z-30" style={{ background: t.bg }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
-          <button onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
-            <ChevronLeft size={22} color={t.text} />
+      {/* Compact match controls, score and tabs remain visible while content scrolls. */}
+      <div style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
+        <div className="grid items-center" style={{ height: 66, gridTemplateColumns: "38px minmax(0, 1fr) 78px", gap: 6, padding: "0 8px" }}>
+          <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: t.pill, border: `1px solid ${t.divider}` }}>
+            <ChevronLeft size={21} color={t.text} />
           </button>
-          <span />
-          <div className="flex items-center rounded-full" style={{ height: 38, background: t.pill, border: `1px solid ${t.divider}` }}>
-            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
-              <Share2 size={18} color={t.text} />
+
+          <div className="grid items-center" style={{ gridTemplateColumns: "34px minmax(66px, 1fr) 34px", gap: 7 }}>
+            <Link aria-label={h.name} href={`/team/${m.home}`} className="inline-flex items-center justify-center">
+              <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={32} ring={t.divider} />
+            </Link>
+            <div className="flex flex-col items-center min-w-0">
+              {m.status === "scheduled"
+                ? <span style={{ color: t.text, fontSize: 20, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
+                : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 23, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
+              {m.status === "ht" && <span style={{ color: t.dim, fontSize: 10, fontWeight: 700 }}>Half time · {breakClock(m)}</span>}
+              {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 10, fontWeight: 700 }}>ET break · {breakClock(m)}</span>}
+              {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
+              {ended && <span style={{ color: t.dim, fontSize: 10, fontWeight: 700 }}>Full time</span>}
+            </div>
+            <Link aria-label={a.name} href={`/team/${m.away}`} className="inline-flex items-center justify-center">
+              <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={32} ring={t.divider} />
+            </Link>
+          </div>
+
+          <div className="flex items-center rounded-full" style={{ height: 36, background: t.pill, border: `1px solid ${t.divider}` }}>
+            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 38, height: 34 }}>
+              <Share2 size={16} color={t.text} />
             </button>
-            <span style={{ width: 1, height: 22, background: t.divider }} />
+            <span style={{ width: 1, height: 20, background: t.divider }} />
             <MatchNotificationButton matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
-        <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
-          <Link href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
-            <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={44} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
-          </Link>
-          <div className="flex flex-col items-center pt-1">
-            {m.status === "scheduled"
-              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
-              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
-            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
-            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
-            {(m.status === "live" || m.status === "et_live") && (
-              <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />
-            )}
-            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
-          </div>
-          <Link href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
-            <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={44} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
-          </Link>
-        </div>
-        {hasScorerSummary && (
-          <div className="grid px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
-            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "right", minWidth: 0 }}>
-              {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
-            </div>
-            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={11} color={t.text} /></span>
-            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "left", minWidth: 0 }}>
-              {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar" style={{ height: 46, borderBottom: `1px solid ${t.divider}` }}>
+        <div className="flex items-center gap-5 px-4 overflow-x-auto no-scrollbar" style={{ height: 42, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
           {tabs.map((tb) => {
             const on = tb === activeTab;
             return (
-              <button key={tb} onClick={() => setTab(tb)} className="shrink-0 relative h-full" style={{ color: on ? t.text : t.tab, fontSize: 16, fontWeight: on ? 800 : 600 }}>
+              <button key={tb} onClick={() => setTab(tb)} className="shrink-0 relative h-full" style={{ color: on ? t.text : t.tab, fontSize: 13, fontWeight: on ? 750 : 600 }}>
                 {tb}{on && <span className="absolute left-0 right-0" style={{ bottom: 0, height: 3, background: t.text, borderRadius: 3 }} />}
               </button>
             );
           })}
         </div>
       </div>
+
+      {hasScorerSummary && (
+        <div className="grid mx-3 mt-2 rounded-xl" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start", padding: "9px 12px", background: t.card }}>
+          <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "right", minWidth: 0 }}>
+            {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
+          </div>
+          <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={11} color={t.text} /></span>
+          <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "left", minWidth: 0 }}>
+            {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
+          </div>
+        </div>
+      )}
 
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} d={d} started={started} />}
@@ -413,62 +411,69 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
 function LineupTab({ t, mode, m, h, a, lineups, events, homeColor, awayColor }) {
   const homeLineup = lineups[m.home] || { formation: null, starters: [], substitutes: [] };
   const awayLineup = lineups[m.away] || { formation: null, starters: [], substitutes: [] };
+  const initialSide = homeLineup.starters.length || homeLineup.substitutes.length ? "home" : "away";
+  const [selectedSide, setSelectedSide] = useState(initialSide);
   const hasStarters = homeLineup.starters.length || awayLineup.starters.length;
   const hasSubstitutes = homeLineup.substitutes.length || awayLineup.substitutes.length;
-  const pitchHeader = mode === "light" ? "#0B9D62" : "#242424";
-  const pitchBackground = `linear-gradient(180deg, ${t.pitch1} 0%, ${t.pitch2} 50%, ${t.pitch1} 100%)`;
+  const selectedLineup = selectedSide === "home" ? homeLineup : awayLineup;
+  const selectedTeam = selectedSide === "home" ? h : a;
+  const selectedColor = selectedSide === "home" ? homeColor : awayColor;
+  const availableSides = [
+    { side: "home", team: h, lineup: homeLineup, color: homeColor },
+    { side: "away", team: a, lineup: awayLineup, color: awayColor },
+  ].filter((item) => item.lineup.starters.length || item.lineup.substitutes.length);
+  const pitchHeader = "#078F59";
+  const pitchBackground = "linear-gradient(180deg, #0AA466 0%, #07975E 52%, #0AA466 100%)";
   if (!hasStarters && !hasSubstitutes) return null;
   return (
-    <div>
-      {hasStarters ? (
-        <div style={{ overflow: "hidden", marginTop: 8, background: pitchHeader }}>
-          <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
-          <div style={{ position: "relative", height: 1100, background: pitchBackground, overflow: "hidden" }}>
+    <div style={{ paddingTop: 8 }}>
+      {availableSides.length > 1 && (
+        <div className="grid grid-cols-2 mx-3 mb-2 rounded-xl overflow-hidden" style={{ padding: 3, gap: 3, background: t.seg }}>
+          {availableSides.map((item) => {
+            const selected = selectedSide === item.side;
+            return (
+              <button type="button" key={item.side} onClick={() => setSelectedSide(item.side)} className="flex items-center justify-center gap-2 rounded-lg min-w-0" style={{ height: 38, background: selected ? t.segActive : "transparent", color: selected ? t.text : t.dim, fontSize: 12, fontWeight: selected ? 750 : 600 }}>
+                <Crest short={item.team.short} color={item.color} logo={item.team.logoUrl} size={22} ring={t.divider} />
+                <span className="truncate">{item.team.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedLineup.starters.length ? (
+        <div style={{ overflow: "hidden", background: pitchHeader }}>
+          <LineupTeamHeading team={selectedTeam} formation={selectedLineup.formation} color={selectedColor} background={pitchHeader} />
+          <div style={{ position: "relative", height: "clamp(440px, 118vw, 520px)", background: pitchBackground, overflow: "hidden" }}>
             <PublicPitchMarkings line={t.pitchLine} />
-            {homeLineup.starters.map((player, fallbackIndex) => (
+            {selectedLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer
-                key={`home-${player.id}`}
+                key={`${selectedSide}-${player.id}`}
                 player={player}
                 fallbackIndex={fallbackIndex}
-                formation={homeLineup.formation}
-                side="home"
-                mode={mode}
-                events={events}
-              />
-            ))}
-            {awayLineup.starters.map((player, fallbackIndex) => (
-              <TacticalLineupPlayer
-                key={`away-${player.id}`}
-                player={player}
-                fallbackIndex={fallbackIndex}
-                formation={awayLineup.formation}
-                side="away"
+                formation={selectedLineup.formation}
+                side={selectedSide}
                 mode={mode}
                 events={events}
               />
             ))}
           </div>
-          <LineupTeamHeading team={a} formation={awayLineup.formation} color={awayColor} background={pitchHeader} side="away" />
         </div>
       ) : null}
 
-      {hasSubstitutes ? (
+      {selectedLineup.substitutes.length ? (
         <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
           <div className="px-3 py-2.5" style={{ color: t.text, fontSize: 12, fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
-          <div className="grid grid-cols-2">
-            <SubstituteList players={homeLineup.substitutes} side="home" events={events} t={t} />
-            <SubstituteList players={awayLineup.substitutes} side="away" events={events} t={t} />
-          </div>
+          <SubstituteList players={selectedLineup.substitutes} side={selectedSide} events={events} t={t} />
         </Card>
       ) : null}
     </div>
   );
 }
 
-function LineupTeamHeading({ team, formation, color, background, side }) {
-  const away = side === "away";
+function LineupTeamHeading({ team, formation, color, background }) {
   return (
-    <div className={`flex items-center gap-2.5 px-4 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 54, background }}>
+    <div className="flex items-center gap-2.5 px-4" style={{ minHeight: 50, background }}>
       <Crest short={team.short} color={color} logo={team.logoUrl} size={25} ring="rgba(255,255,255,.22)" />
       <strong className="truncate" style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 800 }}>{team.name}</strong>
       <span style={{ color: "rgba(255,255,255,.72)", fontSize: 13.5, fontWeight: 700 }}>{formation || DEFAULT_FORMATION}</span>
@@ -499,24 +504,23 @@ function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode, ev
   const slots = getFormationSlots(formation || DEFAULT_FORMATION);
   const slotIndex = Number.isInteger(player.slotIndex) ? player.slotIndex : fallbackIndex;
   const slot = slots[slotIndex] || slots[fallbackIndex] || slots[0];
-  const top = side === "home"
-    ? 2.5 + (100 - slot.y) * 0.455
-    : 52.5 + slot.y * 0.455;
+  const left = Math.max(11, Math.min(89, slot.x));
+  const top = Math.max(9, Math.min(91, slot.y));
   return (
-    <div style={{ position: "absolute", left: `${slot.x}%`, top: `${top}%`, width: 76, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
+    <div style={{ position: "absolute", left: `${left}%`, top: `${top}%`, width: 72, transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 2 }}>
       <span className="inline-flex relative">
         {player.photoUrl ? (
-          <span className="inline-flex rounded-full overflow-hidden" style={{ width: 50, height: 50, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.38)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
+          <span className="inline-flex rounded-full overflow-hidden" style={{ width: 46, height: 46, background: mode === "light" ? "rgba(255,255,255,.22)" : "#414141", border: "2px solid rgba(255,255,255,.48)", boxShadow: "0 3px 8px rgba(0,0,0,.40)" }}>
             {/* Supabase public media URLs are administrator controlled player assets. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={player.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </span>
         ) : (
-          <NeutralPlayerAvatar size={50} />
+          <NeutralPlayerAvatar size={46} />
         )}
         <LineupEventBadges player={player} side={side} events={events} />
       </span>
-      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 10.5, lineHeight: 1.15, fontWeight: 800, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 10.5, lineHeight: 1.15, fontWeight: 750, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.displayName || player.name}
       </strong>
     </div>
@@ -602,11 +606,10 @@ function LineupEventBadges({ player, side, events, compact = false }) {
 }
 
 function SubstituteList({ players, side, events, t }) {
-  const away = side === "away";
   return (
-    <div style={{ minWidth: 0, borderLeft: away ? `1px solid ${t.divider}` : "none" }}>
+    <div className="grid grid-cols-2" style={{ minWidth: 0 }}>
       {players.map((player, index) => (
-        <div key={player.id} className={`flex items-center gap-2 px-3 py-2.5 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 48, borderBottom: index === players.length - 1 ? "none" : `1px solid ${t.divider}` }}>
+        <div key={player.id} className="flex items-center gap-2 px-3 py-2.5" style={{ minHeight: 48, borderBottom: index >= players.length - 2 ? "none" : `1px solid ${t.divider}`, borderRight: index % 2 === 0 ? `1px solid ${t.divider}` : "none" }}>
           <span className="inline-flex relative" style={{ flex: "0 0 auto" }}>
             {player.photoUrl ? (
               <span className="inline-flex rounded-full overflow-hidden" style={{ width: 30, height: 30, background: t.chip }}>

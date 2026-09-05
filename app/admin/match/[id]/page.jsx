@@ -6,10 +6,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
 import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
-import { groupPlayersByPosition } from "@/lib/playerPositions";
+import { groupPlayersByPosition, playerPositionGroup } from "@/lib/playerPositions";
 import { readableTextColor } from "@/lib/teamColors";
 import {
   announcedStoppageMinutes,
+  attributeMatchGoal,
   deleteMatchEvent,
   EMPTY_MATCH_STATS,
   formatMatchClock,
@@ -115,6 +116,7 @@ export default function Scorer() {
   const [stats, setStats] = useState({ ...EMPTY_MATCH_STATS });
   const [statsMessage, setStatsMessage] = useState("");
   const [lineups, setLineups] = useState({});
+  const [savedLineups, setSavedLineups] = useState({});
   const [lineupBusy, setLineupBusy] = useState(null);
   const [lineupMessages, setLineupMessages] = useState({});
   const [homeKitColor, setHomeKitColor] = useState("");
@@ -143,6 +145,7 @@ export default function Scorer() {
           substitutes: lineup.substitutes.map((player) => player.id),
         };
       });
+      setSavedLineups(editable);
       setLineups(editable);
     } catch (lineupError) {
       setLineupMessages((current) => ({ ...current, general: lineupError.message || "Could not load the match lineups." }));
@@ -249,8 +252,8 @@ export default function Scorer() {
   const away = { ...awayTeam, color: awayKitColor || m.away_kit_color || awayTeam.color };
   const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
   const storedAway = m.away_score ?? events.filter((e) => e.type === "goal" && e.side === "away").length;
-  const displayedHome = storedHome + (pending?.type === "goal" && pending.side === "home" ? 1 : 0);
-  const displayedAway = storedAway + (pending?.type === "goal" && pending.side === "away" ? 1 : 0);
+  const displayedHome = storedHome;
+  const displayedAway = storedAway;
   const sideTeamId = (side) => (side === "home" ? m.home_id : m.away_id);
   const fullTimeLocked = m.status === "ft" && Boolean(m.locked_at);
   const canRecord = ["live", "et_live"].includes(m.status) || (m.status === "ft" && !m.locked_at);
@@ -297,7 +300,7 @@ export default function Scorer() {
   function beginEvent(type, side) {
     if (!canRecord || busy) return;
     setError("");
-    setPending({ type, side, goalType: type === "goal" ? "normal_goal" : null });
+    setPending({ type, side });
   }
 
   async function commitPending(selection) {
@@ -310,9 +313,7 @@ export default function Scorer() {
       player_id: player?.id || null,
       player: player?.name || null,
       assist: assist?.name || null,
-      goal_type: pending.type === "goal"
-        ? (selection?.goalType || pending.goalType || "normal_goal")
-        : null,
+      goal_type: null,
       card_type: selection?.cardType || null,
       card_reason: selection?.cardReason || null,
       recipient_type: selection?.recipientType || null,
@@ -323,8 +324,63 @@ export default function Scorer() {
       createdEvent = response?.data || null;
       return response;
     }, true);
-    if (saved && createdEvent?.id && ["goal", "red"].includes(createdEvent.type)) {
+    if (saved && createdEvent?.id && createdEvent.type === "red") {
       await notifyFollowers({ kind: "event", eventId: createdEvent.id });
+    }
+  }
+
+  async function recordGoal(side) {
+    if (!canRecord || busy) return;
+    setError("");
+    let createdEvent = null;
+    const saved = await run(async () => {
+      const response = await recordMatchEvent(id, {
+        type: "goal",
+        side,
+        player_id: null,
+        player: null,
+        assist: null,
+        goal_type: "normal_goal",
+      });
+      createdEvent = response?.data || null;
+      return response;
+    });
+    if (!saved || !createdEvent?.id) return;
+    setPending({
+      type: "goal_attribution",
+      side,
+      event: createdEvent,
+      recordedAt: createdEvent.created_at || new Date().toISOString(),
+    });
+    void notifyFollowers({ kind: "event", eventId: createdEvent.id });
+  }
+
+  function openGoalAttribution(event) {
+    if (!canCorrect || busy) return;
+    setError("");
+    setPending({
+      type: "goal_attribution",
+      side: event.side,
+      event,
+      recordedAt: event.created_at || new Date().toISOString(),
+    });
+  }
+
+  async function confirmGoalAttribution(selection) {
+    const goalEvent = pending?.event;
+    if (!goalEvent?.id) return;
+    let updatedEvent = null;
+    const saved = await run(async () => {
+      const response = await attributeMatchGoal(goalEvent.id, {
+        player_id: selection?.player?.id || null,
+        assist_id: selection?.assist?.id || null,
+        goal_type: selection?.goalType || "normal_goal",
+      });
+      updatedEvent = response?.data || null;
+      return response;
+    }, true);
+    if (saved && updatedEvent?.id && updatedEvent.player && !goalEvent.player) {
+      void notifyFollowers({ kind: "scorer", eventId: updatedEvent.id });
     }
   }
 
@@ -484,7 +540,38 @@ export default function Scorer() {
     setLineupMessages((current) => ({ ...current, [teamId]: "" }));
   }
 
+  function swapStarterPositions(teamId, firstSlotIndex, secondSlotIndex) {
+    if (firstSlotIndex === secondSlotIndex) return;
+    if (firstSlotIndex === 0 || secondSlotIndex === 0) {
+      setLineupMessages((current) => ({ ...current, [teamId]: "The goalkeeper position cannot be swapped with an outfield position." }));
+      return;
+    }
+    const lineup = currentLineup(teamId);
+    const starters = [...lineup.starters];
+    [starters[firstSlotIndex], starters[secondSlotIndex]] = [starters[secondSlotIndex], starters[firstSlotIndex]];
+    setLineups((current) => ({ ...current, [teamId]: { ...lineup, starters } }));
+    setLineupMessages((current) => ({ ...current, [teamId]: "" }));
+  }
+
+  function resetTeamLineup(teamId) {
+    const saved = savedLineups[teamId] || { formation: DEFAULT_FORMATION, starters: Array(11).fill(null), substitutes: [] };
+    setLineups((current) => ({
+      ...current,
+      [teamId]: {
+        formation: saved.formation || DEFAULT_FORMATION,
+        starters: [...(saved.starters || Array(11).fill(null))],
+        substitutes: [...(saved.substitutes || [])],
+      },
+    }));
+    setLineupMessages((current) => ({ ...current, [teamId]: "Draft reset to the last published lineup." }));
+  }
+
   async function saveTeamLineup(teamId) {
+    const validationError = lineupValidationError(squads[teamId] || [], currentLineup(teamId));
+    if (validationError) {
+      setLineupMessages((current) => ({ ...current, [teamId]: validationError }));
+      return;
+    }
     setLineupBusy(teamId);
     setLineupMessages((current) => ({ ...current, [teamId]: "" }));
     try {
@@ -499,7 +586,7 @@ export default function Scorer() {
     }
   }
 
-  function substitutionPools(side) {
+  function substitutionPools(side, beforeEvent = null) {
     const teamId = sideTeamId(side);
     const squad = squads[teamId] || [];
     const lineup = currentLineup(teamId);
@@ -507,7 +594,11 @@ export default function Scorer() {
     const onFieldIds = new Set((lineup.starters || []).filter(Boolean));
     const availableSubstituteIds = new Set(lineup.substitutes || []);
     const substitutions = events
-      .filter((event) => event.type === "sub" && event.side === side)
+      .filter((event) => (
+        event.type === "sub"
+        && event.side === side
+        && (!beforeEvent || eventOrder(event, beforeEvent) <= 0)
+      ))
       .sort(eventOrder);
 
     substitutions.forEach((event) => {
@@ -534,7 +625,19 @@ export default function Scorer() {
     };
   }
 
+  function goalAttributionPools(goalEvent) {
+    const scoringSide = goalEvent.side;
+    const opponentSide = scoringSide === "home" ? "away" : "home";
+    return {
+      scoring: substitutionPools(scoringSide, goalEvent).onFieldPlayers,
+      opponent: substitutionPools(opponentSide, goalEvent).onFieldPlayers,
+    };
+  }
+
   const actions = statusActions(m.status, fullTimeLocked);
+  const pendingGoalPools = pending?.type === "goal_attribution" && pending.event
+    ? goalAttributionPools(pending.event)
+    : null;
 
   return (
     <div>
@@ -549,7 +652,7 @@ export default function Scorer() {
         <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
           {clockStatus(m, now)}
         </div>
-        {pending?.type === "goal" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Score pending scorer confirmation</div>}
+        {pending?.type === "goal_attribution" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Goal saved. Add the scorer while play continues.</div>}
       </div>
 
       {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
@@ -625,7 +728,9 @@ export default function Scorer() {
             message={lineupMessages[m.home_id]}
             onFormationChange={(formation) => changeFormation(m.home_id, formation)}
             onStarterChange={(slotIndex, playerId) => assignStarter(m.home_id, slotIndex, playerId)}
+            onStarterSwap={(firstSlotIndex, secondSlotIndex) => swapStarterPositions(m.home_id, firstSlotIndex, secondSlotIndex)}
             onSubstituteChange={(playerId) => toggleSubstitute(m.home_id, playerId)}
+            onReset={() => resetTeamLineup(m.home_id)}
             onSave={() => saveTeamLineup(m.home_id)}
           />
           <LineupTeamEditor
@@ -637,7 +742,9 @@ export default function Scorer() {
             message={lineupMessages[m.away_id]}
             onFormationChange={(formation) => changeFormation(m.away_id, formation)}
             onStarterChange={(slotIndex, playerId) => assignStarter(m.away_id, slotIndex, playerId)}
+            onStarterSwap={(firstSlotIndex, secondSlotIndex) => swapStarterPositions(m.away_id, firstSlotIndex, secondSlotIndex)}
             onSubstituteChange={(playerId) => toggleSubstitute(m.away_id, playerId)}
+            onReset={() => resetTeamLineup(m.away_id)}
             onSave={() => saveTeamLineup(m.away_id)}
           />
         </div>
@@ -692,7 +799,7 @@ export default function Scorer() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
             </div>
-            <button disabled={busy || !canRecord} onClick={() => beginEvent("goal", side)}
+            <button disabled={busy || !canRecord} onClick={() => recordGoal(side)}
               style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>
               ⚽ + GOAL
             </button>
@@ -725,11 +832,23 @@ export default function Scorer() {
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
         {[...events].sort(eventOrder).map((event) => (
-          <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} />
+          <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} onAttributeGoal={openGoalAttribution} />
         ))}
       </div>
 
-      {pending && (
+      {pending?.type === "goal_attribution" && pendingGoalPools && (
+        <GoalAttributionModal
+          pending={pending}
+          scoringTeam={pending.side === "home" ? home : away}
+          opponentTeam={pending.side === "home" ? away : home}
+          scoringPlayers={pendingGoalPools.scoring}
+          opponentPlayers={pendingGoalPools.opponent}
+          busy={busy}
+          onCancel={() => !busy && setPending(null)}
+          onSave={confirmGoalAttribution}
+        />
+      )}
+      {pending && pending.type !== "goal_attribution" && (
         <AttributionModal
           pending={pending}
           scoringTeam={pending.side === "home" ? home : away}
@@ -772,7 +891,24 @@ function AdminMatchShell({ error, onRetry }) {
   </div>;
 }
 
-function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onFormationChange, onStarterChange, onSubstituteChange, onSave }) {
+function lineupValidationError(squad, lineup) {
+  const starters = lineup.starters || [];
+  const starterIds = starters.filter(Boolean);
+  if (starterIds.length !== 11) return `Select exactly 11 starters. ${starterIds.length} of 11 are currently selected.`;
+  if (new Set(starterIds).size !== starterIds.length) return "A player cannot occupy more than one position.";
+  const playerById = Object.fromEntries(squad.map((player) => [player.id, player]));
+  const goalkeeper = playerById[starters[0]];
+  if (!goalkeeper || playerPositionGroup(goalkeeper.position) !== "goalkeeper") {
+    return "The goalkeeper position must contain a registered goalkeeper.";
+  }
+  const outfieldGoalkeeper = starters.slice(1).some((playerId) => playerPositionGroup(playerById[playerId]?.position) === "goalkeeper");
+  if (outfieldGoalkeeper) return "Goalkeepers cannot be assigned to outfield positions.";
+  return "";
+}
+
+function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onFormationChange, onStarterChange, onStarterSwap, onSubstituteChange, onReset, onSave }) {
+  const [selectedSwapSlot, setSelectedSwapSlot] = useState(null);
+  const [draggedSlot, setDraggedSlot] = useState(null);
   const starters = lineup.starters || Array(11).fill(null);
   const substitutes = lineup.substitutes || [];
   const formation = lineup.formation || DEFAULT_FORMATION;
@@ -781,7 +917,30 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
   const selectedStarterIds = starters.filter(Boolean);
   const selectedSubstitutes = squad.filter((player) => substitutes.includes(player.id));
   const reserves = squad.filter((player) => !selectedStarterIds.includes(player.id) && !substitutes.includes(player.id));
-  const success = message === "Lineup saved and published.";
+  const validationError = lineupValidationError(squad, lineup);
+  const success = /saved|published|reset/i.test(message || "");
+
+  function selectSwapSlot(slotIndex) {
+    if (disabled || !starters[slotIndex]) return;
+    if (selectedSwapSlot == null) {
+      setSelectedSwapSlot(slotIndex);
+      return;
+    }
+    if (selectedSwapSlot === slotIndex) {
+      setSelectedSwapSlot(null);
+      return;
+    }
+    onStarterSwap(selectedSwapSlot, slotIndex);
+    setSelectedSwapSlot(null);
+  }
+
+  function dropOnSlot(slotIndex) {
+    if (draggedSlot == null || draggedSlot === slotIndex || disabled) return;
+    onStarterSwap(draggedSlot, slotIndex);
+    setDraggedSlot(null);
+    setSelectedSwapSlot(null);
+  }
+
   return (
     <section style={{ background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -798,21 +957,27 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
       </select>
 
       <div style={{ color: "#8E939B", fontSize: 10.5, lineHeight: 1.45, marginBottom: 8 }}>
-        Tap a position on the pitch and select the player who will start there.
+        Select any outfield player in any outfield position. Drag one starter onto another, or tap two starter circles, to swap them.
       </div>
 
-      <div style={{ position: "relative", height: "clamp(470px, 112vw, 540px)", maxHeight: 540, overflow: "hidden", borderRadius: 12, background: "#171A1D", border: "1px solid #34383D" }}>
+      <div style={{ position: "relative", height: "clamp(410px, 98vw, 470px)", maxHeight: 470, overflow: "hidden", borderRadius: 12, background: "#171A1D", border: "1px solid #34383D" }}>
         <PitchMarkings />
         {slots.map((slot) => {
           const playerId = starters[slot.index] || "";
           const player = playerById[playerId];
-          const options = squad.filter((candidate) => (
-            candidate.id === playerId
-            || (!selectedStarterIds.includes(candidate.id) && !substitutes.includes(candidate.id))
-          ));
+          const options = squad.filter((candidate) => {
+            const correctRole = slot.index === 0
+              ? playerPositionGroup(candidate.position) === "goalkeeper"
+              : playerPositionGroup(candidate.position) !== "goalkeeper";
+            const available = candidate.id === playerId
+              || (!selectedStarterIds.includes(candidate.id) && !substitutes.includes(candidate.id));
+            return available && (correctRole || candidate.id === playerId);
+          });
           return (
             <label
               key={`${formation}-${slot.index}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => { event.preventDefault(); dropOnSlot(slot.index); }}
               style={{
                 position: "absolute",
                 left: `${slot.x}%`,
@@ -823,7 +988,22 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
                 zIndex: 2,
               }}
             >
-              <span className="inline-flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: "2px solid rgba(255,255,255,.35)", boxShadow: "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850 }}>
+              <span
+                role={player ? "button" : undefined}
+                tabIndex={player && !disabled ? 0 : undefined}
+                draggable={Boolean(player && !disabled)}
+                onDragStart={() => setDraggedSlot(slot.index)}
+                onDragEnd={() => setDraggedSlot(null)}
+                onClick={() => selectSwapSlot(slot.index)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    selectSwapSlot(slot.index);
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-full"
+                style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: selectedSwapSlot === slot.index ? "3px solid #4FC263" : "2px solid rgba(255,255,255,.35)", boxShadow: selectedSwapSlot === slot.index ? "0 0 0 3px rgba(79,194,99,.22)" : "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850, cursor: player && !disabled ? "grab" : "default" }}
+              >
                 {player?.number ?? slot.label}
               </span>
               <select
@@ -863,7 +1043,11 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
       />
 
       {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
-      <button type="button" disabled={disabled || busy} onClick={onSave} style={{ ...pill, width: "100%", marginTop: 12, background: "#4FC263", color: "#062", opacity: disabled || busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
+      {validationError && <div role="alert" style={{ color: "#F5C518", fontSize: 11, lineHeight: 1.4, marginTop: 10 }}>{validationError}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)", gap: 8, marginTop: 12 }}>
+        <button type="button" disabled={disabled || busy} onClick={onReset} style={{ ...pill, background: "transparent", color: "#C4C8CE", opacity: disabled || busy ? 0.45 : 1 }}>Reset draft</button>
+        <button type="button" disabled={disabled || busy || Boolean(validationError)} onClick={onSave} style={{ ...pill, background: "#4FC263", color: "#062", opacity: disabled || busy || validationError ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
+      </div>
       {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
     </section>
   );
@@ -1031,7 +1215,7 @@ function scorerEventMinute(event, match) {
   return minute > periodEnd ? `${periodEnd}+${minute - periodEnd}′` : `${minute}′`;
 }
 
-function EventRow({ event, match, locked, onRemove }) {
+function EventRow({ event, match, locked, onRemove, onAttributeGoal }) {
   const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
   const isCard = event.type === "yellow" || event.type === "red";
   const eventName = event.player
@@ -1055,7 +1239,94 @@ function EventRow({ event, match, locked, onRemove }) {
         </span>
       )}
       <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
+      {event.type === "goal" && (
+        <button disabled={locked} onClick={() => onAttributeGoal(event)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#4FC263", cursor: locked ? "not-allowed" : "pointer", fontSize: 12, whiteSpace: "nowrap" }}>
+          {event.player ? "Edit goal" : "Add scorer"}
+        </button>
+      )}
       <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+    </div>
+  );
+}
+
+function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlayers, opponentPlayers, busy, onCancel, onSave }) {
+  const event = pending.event || {};
+  const initialGoalType = event.goal_type === "direct_goal" ? "normal_goal" : event.goal_type || "normal_goal";
+  const [goalType, setGoalType] = useState(initialGoalType);
+  const [selectedPlayer, setSelectedPlayer] = useState(() => {
+    const players = initialGoalType === "own_goal" ? opponentPlayers : scoringPlayers;
+    return players.find((player) => player.id === event.player_id) || null;
+  });
+  const [selectedAssist, setSelectedAssist] = useState(() => scoringPlayers.find((player) => player.name === event.assist) || null);
+  const [query, setQuery] = useState("");
+  const [secondsLeft, setSecondsLeft] = useState(() => Math.max(0, 60 - Math.floor((Date.now() - new Date(pending.recordedAt).getTime()) / 1000)));
+  const scorerTeam = goalType === "own_goal" ? opponentTeam : scoringTeam;
+  const eligibleScorers = goalType === "own_goal" ? opponentPlayers : scoringPlayers;
+  const filteredScorers = eligibleScorers.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const assistOptions = scoringPlayers.filter((player) => player.id !== selectedPlayer?.id);
+
+  useEffect(() => {
+    const updateTimer = () => setSecondsLeft(Math.max(0, 60 - Math.floor((Date.now() - new Date(pending.recordedAt).getTime()) / 1000)));
+    const timer = window.setInterval(updateTimer, 1000);
+    updateTimer();
+    return () => window.clearInterval(timer);
+  }, [pending.recordedAt]);
+
+  function changeGoalType(nextGoalType) {
+    setGoalType(nextGoalType);
+    setSelectedPlayer(null);
+    setSelectedAssist(null);
+    setQuery("");
+  }
+
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <div role="dialog" aria-modal="true" aria-label="Add goal details" style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 440, maxHeight: "90vh", overflow: "auto" }} onClick={(modalEvent) => modalEvent.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}><Badge t={scoringTeam} size={30} /><strong>Goal recorded</strong></div>
+          <span style={{ color: secondsLeft > 0 ? "#4FC263" : "#F5C518", fontSize: 12, fontWeight: 750 }}>{secondsLeft > 0 ? `00:${String(secondsLeft).padStart(2, "0")}` : "Still editable"}</span>
+        </div>
+        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 14 }}>
+          The score and first alert are already live. Add the scorer now to send the separate player alert. Only players who were on the field at the time of the goal are shown.
+        </div>
+
+        <div style={{ ...flabel, marginTop: 0 }}>Goal type</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7, marginBottom: 14 }}>
+          {GOAL_TYPES.map((item) => {
+            const selected = goalType === item.value;
+            return <button type="button" key={item.value} disabled={busy} onClick={() => changeGoalType(item.value)} style={{ ...playerButton, justifyContent: "center", background: selected ? "#4FC263" : "#0E0F11", color: selected ? "#062" : "#fff", borderColor: selected ? "#4FC263" : "#2A2C30", fontWeight: 800 }}>{item.label}</button>;
+          })}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Badge t={scorerTeam} size={24} />
+          <span style={{ color: "#FFFFFF", fontSize: 13 }}>{goalType === "own_goal" ? `Own-goal scorer from ${opponentTeam.name}` : `Scorer from ${scoringTeam.name}`}</span>
+        </div>
+        <input autoFocus value={query} onChange={(inputEvent) => setQuery(inputEvent.target.value)} placeholder="Search on-field players" style={{ ...finp, marginBottom: 8 }} />
+        <div style={{ display: "grid", gap: 7 }}>
+          {filteredScorers.map((player) => (
+            <button type="button" key={player.id} disabled={busy} onClick={() => { setSelectedPlayer(player); if (selectedAssist?.id === player.id) setSelectedAssist(null); }} style={{ ...playerButton, borderColor: selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30", background: selectedPlayer?.id === player.id ? "#172C1C" : "#0E0F11" }}>
+              <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
+            </button>
+          ))}
+          {eligibleScorers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, lineHeight: 1.45, padding: "8px 0" }}>No eligible on-field players were found. Publish a complete lineup before kick-off, or leave this goal without a player name.</div>}
+          {eligibleScorers.length > 0 && filteredScorers.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "8px 0" }}>No on-field player matches that search.</div>}
+        </div>
+        <button type="button" disabled={busy} onClick={() => { setSelectedPlayer(null); setSelectedAssist(null); }} style={{ ...playerButton, width: "100%", marginTop: 9, color: "#F5C518", borderColor: !selectedPlayer ? "#F5C518" : "#2A2C30" }}>Leave player name unconfirmed</button>
+
+        {goalType === "normal_goal" && selectedPlayer && (
+          <div style={{ marginTop: 14 }}>
+            <label htmlFor="confirmed-goal-assist" style={flabel}>Assist, optional</label>
+            <select id="confirmed-goal-assist" value={selectedAssist?.id || ""} onChange={(selectEvent) => setSelectedAssist(assistOptions.find((player) => player.id === selectEvent.target.value) || null)} style={finp}>
+              <option value="">No assist</option>
+              {assistOptions.map((player) => <option key={player.id} value={player.id}>{player.number != null ? `${player.number} ` : ""}{player.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        <button type="button" disabled={busy} onClick={() => onSave({ player: selectedPlayer, assist: goalType === "normal_goal" ? selectedAssist : null, goalType })} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.45 : 1 }}>{busy ? "Saving…" : selectedPlayer ? "Confirm scorer" : "Save without player name"}</button>
+        <button type="button" disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Close for now</button>
+      </div>
     </div>
   );
 }
@@ -1292,4 +1563,3 @@ const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #
 const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
 const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };
 const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, textAlign: "center", outline: "none" };
-

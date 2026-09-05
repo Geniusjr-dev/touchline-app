@@ -434,9 +434,9 @@ function LineupTab({ t, mode, m, h, a, lineups, events, homeColor, awayColor }) 
   return (
     <div style={{ paddingTop: 8 }}>
       {hasStarters ? (
-        <div style={{ width: "92.28%", margin: "0 auto", overflow: "hidden", background: pitchHeader, borderRadius: 14 }}>
+        <div style={{ width: "100%", overflow: "hidden", background: pitchHeader }}>
           <LineupTeamHeading team={h} formation={homeLineup.formation} color={homeColor} background={pitchHeader} side="home" />
-          <div style={{ position: "relative", width: "100%", aspectRatio: "873 / 1129", background: pitchBackground, overflow: "hidden" }}>
+          <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 2", background: pitchBackground, overflow: "hidden" }}>
             <PublicPitchMarkings line={t.pitchLine} />
             {homeLineup.starters.map((player, fallbackIndex) => (
               <TacticalLineupPlayer

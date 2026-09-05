@@ -122,6 +122,8 @@ export default function Scorer() {
   const [previewDetails, setPreviewDetails] = useState({ round: "", venueName: "", venueLocation: "", venueCapacity: "", venueSurface: "Grass", weather: "", refereeName: "" });
   const [previewDetailsBusy, setPreviewDetailsBusy] = useState(false);
   const [previewDetailsMessage, setPreviewDetailsMessage] = useState("");
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
   const kitInitializedFor = useRef(null);
   const previewDetailsInitializedFor = useRef(null);
 
@@ -322,7 +324,7 @@ export default function Scorer() {
       return response;
     }, true);
     if (saved && createdEvent?.id && ["goal", "red"].includes(createdEvent.type)) {
-      notifyFollowers({ kind: "event", eventId: createdEvent.id });
+      await notifyFollowers({ kind: "event", eventId: createdEvent.id });
     }
   }
 
@@ -341,18 +343,18 @@ export default function Scorer() {
         return;
       }
       const saved = await run(() => startMatchWithKits(id, homeKitColor, awayKitColor));
-      if (saved) notifyFollowers({ kind: "status", previousStatus });
+      if (saved) await notifyFollowers({ kind: "status", previousStatus });
       return;
     }
     const saved = await run(() => transitionMatchStatus(id, status));
-    if (saved) notifyFollowers({ kind: "status", previousStatus });
+    if (saved) await notifyFollowers({ kind: "status", previousStatus });
   }
 
   async function notifyFollowers(payload) {
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (!token) return;
+      if (!token) throw new Error("The administrator session could not be verified.");
       const response = await fetch("/api/push/notify", {
         method: "POST",
         keepalive: true,
@@ -364,10 +366,28 @@ export default function Scorer() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(`The match update was saved, but notifications were not delivered. ${result.error || "Please try again."}`);
+        throw new Error(result.error || "Please try again.");
       }
+      return result;
     } catch (notificationError) {
       setError(`The match update was saved, but notifications were not delivered. ${notificationError.message || "Please try again."}`);
+      return null;
+    }
+  }
+
+  async function testNotifications() {
+    if (notificationBusy) return;
+    setNotificationBusy(true);
+    setNotificationMessage("");
+    setError("");
+    try {
+      const result = await notifyFollowers({ kind: "test" });
+      if (result) {
+        const deviceLabel = result.sent === 1 ? "device" : "devices";
+        setNotificationMessage(`Test notification sent to ${result.sent} ${deviceLabel}.`);
+      }
+    } finally {
+      setNotificationBusy(false);
     }
   }
 
@@ -518,26 +538,43 @@ export default function Scorer() {
 
   return (
     <div>
-      <Link href="/admin/matches" style={{ color: "var(--admin-dim)", fontSize: 13 }}>← All matches</Link>
+      <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
 
       <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
           <Badge t={home} />
-          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "var(--admin-faint)" }}>-</span> {displayedAway}</div>
+          <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "#5B6069" }}>-</span> {displayedAway}</div>
           <Badge t={away} />
         </div>
-        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "var(--admin-dim)", fontSize: 13, fontWeight: 700 }}>
+        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
           {clockStatus(m, now)}
         </div>
         {pending?.type === "goal" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Score pending scorer confirmation</div>}
       </div>
 
-      {error && <div role="alert" style={{ color: "var(--admin-danger-text)", background: "var(--admin-soft-danger)", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+      {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+      <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div>
+          <div style={{ color: "#FFFFFF", fontSize: 13 }}>Match notifications</div>
+          <div style={{ color: notificationMessage ? "#4FC263" : "#8E939B", fontSize: 11.5, marginTop: 3 }}>
+            {notificationMessage || "Send a test to every phone following this match."}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={testNotifications}
+          disabled={notificationBusy}
+          style={{ ...pill, flexShrink: 0, opacity: notificationBusy ? 0.55 : 1 }}
+        >
+          {notificationBusy ? "Testing..." : "Send test"}
+        </button>
+      </div>
 
       {role === "admin" && (
         <form onSubmit={savePreviewDetails} style={card}>
           <div style={label}>PUBLIC MATCH DETAILS</div>
-          <div style={{ color: "var(--admin-dim)", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
             These details appear in the public Preview tab before and during the match.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
@@ -557,7 +594,7 @@ export default function Scorer() {
       {m.status === "scheduled" && (
         <div style={card}>
           <div style={label}>MATCH KITS</div>
-          <div style={{ color: "var(--admin-dim)", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
             Confirm both match kits before kick-off. If the team colours clash, the away team must change kit.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
@@ -565,7 +602,7 @@ export default function Scorer() {
             <KitPicker label="Away kit" team={awayTeam} color={awayKitColor} onChange={setAwayKitColor} />
           </div>
           {!kitsAreDistinct(homeKitColor, awayKitColor) && (
-            <div role="alert" style={{ color: "var(--admin-danger-text)", background: "var(--admin-soft-danger)", border: "1px solid #5A2428", borderRadius: 9, padding: 10, fontSize: 12, marginTop: 12 }}>
+            <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 9, padding: 10, fontSize: 12, marginTop: 12 }}>
               Kit clash detected. Select a different away kit to enable kick-off.
             </div>
           )}
@@ -574,10 +611,10 @@ export default function Scorer() {
 
       <div style={card}>
         <div style={label}>MATCH LINEUPS</div>
-        <div style={{ color: "var(--admin-dim)", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+        <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
           Select each team’s starters and substitutes. Saving a team lineup publishes it immediately to the public match centre.
         </div>
-        {lineupMessages.general && <div role="alert" style={{ color: "var(--admin-danger-text)", fontSize: 12, marginBottom: 12 }}>{lineupMessages.general}</div>}
+        {lineupMessages.general && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, marginBottom: 12 }}>{lineupMessages.general}</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <LineupTeamEditor
             team={home}
@@ -611,23 +648,23 @@ export default function Scorer() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {actions.map((action) => (
             <button key={action.status} disabled={busy} onClick={() => changeStatus(action.status)}
-              style={{ ...pill, background: action.primary ? "#4FC263" : "var(--admin-input)", color: action.primary ? "#062" : "var(--admin-text)" }}>{action.label}</button>
+              style={{ ...pill, background: action.primary ? "#4FC263" : "#0E0F11", color: action.primary ? "#062" : "#fff" }}>{action.label}</button>
           ))}
           {role === "admin" && fullTimeLocked && (
-            <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "var(--admin-soft-warning)", color: "#F5C518" }}>Reopen for correction</button>
+            <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
           )}
         </div>
-        {fullTimeLocked && <div style={{ color: "var(--admin-dim)", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
+        {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
         {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>
 
       {["live", "et_live"].includes(m.status) && (
         <div style={card}>
           <div style={label}>STOPPAGE TIME</div>
-          <div style={{ color: "var(--admin-text)", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+          <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
             {periodName(m.current_period)} · {announcedStoppageMinutes(m) > 0 ? `+${announcedStoppageMinutes(m)} announced` : "none announced"}
           </div>
-          <div style={{ color: "var(--admin-dim)", fontSize: 12, marginBottom: 12 }}>
+          <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>
             Tap the minimum added time indicated by the referee. The clock will continue until you end the period.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 7 }}>
@@ -638,8 +675,8 @@ export default function Scorer() {
                 onClick={() => setStoppageTime(minutes)}
                 style={{
                   ...stoppageButton,
-                  background: announcedStoppageMinutes(m) === minutes ? "#4FC263" : "var(--admin-input)",
-                  color: announcedStoppageMinutes(m) === minutes ? "#062" : "var(--admin-text)",
+                  background: announcedStoppageMinutes(m) === minutes ? "#4FC263" : "#0E0F11",
+                  color: announcedStoppageMinutes(m) === minutes ? "#062" : "#fff",
                 }}
               >
                 {minutes === 0 ? "None" : `+${minutes}`}
@@ -667,7 +704,7 @@ export default function Scorer() {
               <button disabled={busy || !canRecord} onClick={() => beginEvent("yellow", side)} style={{ ...half, background: "#3a3410", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>+ Yellow</button>
               <button disabled={busy || !canRecord} onClick={() => beginEvent("red", side)} style={{ ...half, background: "#3a1616", color: "#F04444", opacity: canRecord ? 1 : 0.45 }}>+ Red</button>
             </div>
-            <button disabled={busy || !canRecord} onClick={() => setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "var(--admin-input)", color: "var(--admin-text)", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
+            <button disabled={busy || !canRecord} onClick={() => setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
           </div>
         ))}
       </div>
@@ -686,7 +723,7 @@ export default function Scorer() {
 
       <div style={card}>
         <div style={label}>EVENT LOG</div>
-        {events.length === 0 && <div style={{ color: "var(--admin-dim)", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
+        {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
         {[...events].sort(eventOrder).map((event) => (
           <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} />
         ))}
@@ -720,15 +757,15 @@ export default function Scorer() {
 
 function AdminMatchShell({ error, onRetry }) {
   return <div>
-    <Link href="/admin/matches" style={{ color: "var(--admin-dim)", fontSize: 13 }}>← All matches</Link>
+    <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
     <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18 }}>
-        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--admin-elevated)" }} />
-        <div style={{ width: 82, height: 24, borderRadius: 7, background: "var(--admin-elevated)" }} />
-        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--admin-elevated)" }} />
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
+        <div style={{ width: 82, height: 24, borderRadius: 7, background: "#24262A" }} />
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
       </div>
     </div>
-    {error && <div style={{ ...card, color: "var(--admin-danger-text)" }}>
+    {error && <div style={{ ...card, color: "#F7B4B4" }}>
       <div style={{ fontSize: 13, fontWeight: 700 }}>{error}</div>
       <button onClick={onRetry} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062" }}>Try again</button>
     </div>}
@@ -746,21 +783,21 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
   const reserves = squad.filter((player) => !selectedStarterIds.includes(player.id) && !substitutes.includes(player.id));
   const success = message === "Lineup saved and published.";
   return (
-    <section style={{ background: "var(--admin-input)", border: "1px solid var(--admin-control-border)", borderRadius: 12, padding: 12, minWidth: 0 }}>
+    <section style={{ background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Badge t={team} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <strong style={{ display: "block", color: "var(--admin-text)", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "var(--admin-dim)", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {selectedSubstitutes.length} substitutes, {reserves.length} reserves</span>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {selectedSubstitutes.length} substitutes, {reserves.length} reserves</span>
         </div>
       </div>
 
-      <label style={{ display: "block", color: "var(--admin-dim)", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
+      <label style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
       <select disabled={disabled} value={formation} onChange={(event) => onFormationChange(event.target.value)} style={{ ...finp, marginBottom: 12 }}>
         {FORMATION_OPTIONS.map((formationOption) => <option key={formationOption} value={formationOption}>{formationOption}</option>)}
       </select>
 
-      <div style={{ color: "var(--admin-dim)", fontSize: 10.5, lineHeight: 1.45, marginBottom: 8 }}>
+      <div style={{ color: "#8E939B", fontSize: 10.5, lineHeight: 1.45, marginBottom: 8 }}>
         Tap a position on the pitch and select the player who will start there.
       </div>
 
@@ -786,7 +823,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
                 zIndex: 2,
               }}
             >
-              <span className="inline-flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "var(--admin-dim)", border: "2px solid rgba(255,255,255,.35)", boxShadow: "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850 }}>
+              <span className="inline-flex items-center justify-center rounded-full" style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: "2px solid rgba(255,255,255,.35)", boxShadow: "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850 }}>
                 {player?.number ?? slot.label}
               </span>
               <select
@@ -794,7 +831,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
                 aria-label={`${slot.label} player`}
                 value={playerId}
                 onChange={(event) => onStarterChange(slot.index, event.target.value)}
-                style={{ display: "block", width: "100%", height: 27, marginTop: 3, padding: "0 4px", border: "1px solid var(--admin-control-border)", borderRadius: 7, background: "rgba(14,15,17,.94)", color: player ? "#FFFFFF" : "var(--admin-dim)", fontSize: 10, fontWeight: 750, textAlign: "center", outline: "none" }}
+                style={{ display: "block", width: "100%", height: 27, marginTop: 3, padding: "0 4px", border: "1px solid #3A3E44", borderRadius: 7, background: "rgba(14,15,17,.94)", color: player ? "#FFFFFF" : "#9BA1AA", fontSize: 10, fontWeight: 750, textAlign: "center", outline: "none" }}
               >
                 <option value="">{slot.label}</option>
                 {options.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.number != null ? `${candidate.number} ` : ""}{candidate.name}</option>)}
@@ -825,7 +862,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
         onPlayerAction={onSubstituteChange}
       />
 
-      {squad.length === 0 && <div style={{ color: "var(--admin-dim)", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
+      {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
       <button type="button" disabled={disabled || busy} onClick={onSave} style={{ ...pill, width: "100%", marginTop: 12, background: "#4FC263", color: "#062", opacity: disabled || busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
       {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
     </section>
@@ -838,12 +875,12 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
   return (
     <div style={{ marginTop: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
-        <span style={{ color: "var(--admin-dim)", fontSize: 10.5, fontWeight: 800 }}>{title}</span>
-        <span style={{ color: "var(--admin-faint)", fontSize: 10.5, fontWeight: 750 }}>{count}</span>
+        <span style={{ color: "#8E939B", fontSize: 10.5, fontWeight: 800 }}>{title}</span>
+        <span style={{ color: "#6F757E", fontSize: 10.5, fontWeight: 750 }}>{count}</span>
       </div>
       {groupedPlayers.map((group) => (
         <div key={group.key} style={{ marginTop: 9 }}>
-          <div style={{ color: "var(--admin-dim)", fontSize: 9.5, fontWeight: 800, marginBottom: 5 }}>{group.label.toUpperCase()}</div>
+          <div style={{ color: "#737982", fontSize: 9.5, fontWeight: 800, marginBottom: 5 }}>{group.label.toUpperCase()}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
             {group.players.map((player) => (
               <button
@@ -852,7 +889,7 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
                 disabled={disabled}
                 aria-label={`${actionLabel}: ${player.name}`}
                 onClick={() => onPlayerAction(player.id)}
-                style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: isSubstitute ? "1px solid #4FC263" : "1px solid var(--admin-control-border)", background: isSubstitute ? "#14351D" : "var(--admin-input)", color: isSubstitute ? "#70DB82" : "var(--admin-text)", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+                style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: isSubstitute ? "1px solid #4FC263" : "1px solid #2E3136", background: isSubstitute ? "#14351D" : "#17191C", color: isSubstitute ? "#70DB82" : "#C4C8CE", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
               >
                 {player.number != null ? `${player.number} ` : ""}{player.name}
               </button>
@@ -860,7 +897,7 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
           </div>
         </div>
       ))}
-      {players.length === 0 && <div style={{ color: "var(--admin-dim)", fontSize: 10.5, lineHeight: 1.45, padding: "4px 0" }}>{emptyText}</div>}
+      {players.length === 0 && <div style={{ color: "#737982", fontSize: 10.5, lineHeight: 1.45, padding: "4px 0" }}>{emptyText}</div>}
     </div>
   );
 }
@@ -909,12 +946,12 @@ function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave })
         {rows.map(([rowLabel, homeKey, awayKey]) => (
           <div key={rowLabel} style={{ display: "contents" }}>
             <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[homeKey]} onChange={(event) => onChange(homeKey, event.target.value)} style={statInput} />
-            <span style={{ color: "var(--admin-dim)", fontSize: 13, textAlign: "center" }}>{rowLabel}</span>
+            <span style={{ color: "#AAB0BA", fontSize: 13, textAlign: "center" }}>{rowLabel}</span>
             <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[awayKey]} onChange={(event) => onChange(awayKey, event.target.value)} style={statInput} />
           </div>
         ))}
       </div>
-      <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "var(--admin-input)", color: "var(--admin-text)" }}>{busy ? "Saving…" : "Save stats"}</button>
+      <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "#0E0F11", color: "#fff" }}>{busy ? "Saving…" : "Save stats"}</button>
       {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: 12, marginTop: 8 }}>{message}</div>}
     </div>
   );
@@ -923,15 +960,15 @@ function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave })
 function KitPicker({ label: kitLabel, team, color, onChange }) {
   const selectedColor = normalizeKitColor(color, team.color || "#18A558");
   return (
-    <label style={{ display: "block", background: "var(--admin-input)", border: "1px solid var(--admin-control-border)", borderRadius: 12, padding: 12, cursor: "pointer" }}>
-      <span style={{ display: "block", color: "var(--admin-dim)", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
+    <label style={{ display: "block", background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, cursor: "pointer" }}>
+      <span style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <KitShirt color={selectedColor} />
         <span style={{ minWidth: 0, flex: 1 }}>
-          <strong style={{ display: "block", color: "var(--admin-text)", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "var(--admin-dim)", fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
         </span>
-        <input aria-label={`${team.name} ${kitLabel}`} type="color" value={selectedColor} onChange={(event) => onChange(event.target.value.toUpperCase())} style={{ width: 38, height: 38, padding: 2, border: "1px solid var(--admin-control-border)", borderRadius: 9, background: "var(--admin-card)", cursor: "pointer" }} />
+        <input aria-label={`${team.name} ${kitLabel}`} type="color" value={selectedColor} onChange={(event) => onChange(event.target.value.toUpperCase())} style={{ width: 38, height: 38, padding: 2, border: "1px solid #3A3D42", borderRadius: 9, background: "#161719", cursor: "pointer" }} />
       </span>
     </label>
   );
@@ -1005,20 +1042,20 @@ function EventRow({ event, match, locked, onRemove }) {
     : null;
   const reasonLabel = event.card_reason ? CARD_REASON_LABELS[event.card_reason] : null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--admin-divider)" }}>
-      <span style={{ fontFamily: "monospace", color: "var(--admin-dim)", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
+      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
       <span style={{ fontSize: 14 }}>{emoji}</span>
       {event.type === "sub" ? (
-        <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "var(--admin-faint)" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
+        <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
       ) : (
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--admin-text)" }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#fff" }}>
           <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : isCard ? ` · ${cardLabel}` : ""}</span>
-          {event.type === "goal" && event.assist && <span style={{ display: "block", color: "var(--admin-dim)", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
-          {isCard && reasonLabel && <span style={{ display: "block", color: "var(--admin-dim)", fontSize: 12, marginTop: 2 }}>{reasonLabel}</span>}
+          {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
+          {isCard && reasonLabel && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>{reasonLabel}</span>}
         </span>
       )}
-      <span style={{ color: "var(--admin-faint)", fontSize: 12, width: 42 }}>{event.side}</span>
-      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "var(--admin-dim)", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+      <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
+      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
     </div>
   );
 }
@@ -1084,9 +1121,9 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
 
   return (
     <div style={overlay} onClick={onCancel}>
-      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "var(--admin-card)", border: "1px solid var(--admin-control-border)", borderRadius: 16, padding: 18, width: "100%", maxWidth: 420, maxHeight: "88vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 420, maxHeight: "88vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={scorerTeam} size={30} /><strong>{title}</strong></div>
-        <div style={{ color: "var(--admin-dim)", fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
           {isGoal
             ? goalType === "own_goal"
               ? `The goal benefits ${scoringTeam.name}. Select the scorer from ${opponentTeam.name}.`
@@ -1100,7 +1137,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 7, marginBottom: 14 }}>
               {GOAL_TYPES.map((item) => {
                 const selected = goalType === item.value;
-                return <button key={item.value} disabled={busy} onClick={() => chooseGoalType(item.value)} style={{ ...playerButton, justifyContent: "center", background: selected ? "#4FC263" : "var(--admin-input)", color: selected ? "#062" : "var(--admin-text)", borderColor: selected ? "#4FC263" : "var(--admin-control-border)", fontWeight: 800 }}>{item.label}</button>;
+                return <button key={item.value} disabled={busy} onClick={() => chooseGoalType(item.value)} style={{ ...playerButton, justifyContent: "center", background: selected ? "#4FC263" : "#0E0F11", color: selected ? "#062" : "#fff", borderColor: selected ? "#4FC263" : "#2A2C30", fontWeight: 800 }}>{item.label}</button>;
               })}
             </div>
             <div style={flabel}>Scorer</div>
@@ -1116,7 +1153,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
                 { value: "second_yellow", label: "Second yellow" },
               ].map((item) => {
                 const selected = cardType === item.value;
-                return <button key={item.value} disabled={busy} onClick={() => { setCardType(item.value); setCardReason(""); }} style={{ ...playerButton, justifyContent: "center", background: selected ? "#F04444" : "var(--admin-input)", borderColor: selected ? "#F04444" : "var(--admin-control-border)", fontWeight: 800 }}>{item.label}</button>;
+                return <button key={item.value} disabled={busy} onClick={() => { setCardType(item.value); setCardReason(""); }} style={{ ...playerButton, justifyContent: "center", background: selected ? "#F04444" : "#0E0F11", borderColor: selected ? "#F04444" : "#2A2C30", fontWeight: 800 }}>{item.label}</button>;
               })}
             </div>
           </>
@@ -1131,7 +1168,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
                 { value: "team_official", label: "Team official" },
               ].map((item) => {
                 const selected = recipientType === item.value;
-                return <button key={item.value} disabled={busy} onClick={() => chooseRecipientType(item.value)} style={{ ...playerButton, justifyContent: "center", borderColor: selected ? "#4FC263" : "var(--admin-control-border)", background: selected ? "#172C1C" : "var(--admin-input)", fontWeight: 800 }}>{item.label}</button>;
+                return <button key={item.value} disabled={busy} onClick={() => chooseRecipientType(item.value)} style={{ ...playerButton, justifyContent: "center", borderColor: selected ? "#4FC263" : "#2A2C30", background: selected ? "#172C1C" : "#0E0F11", fontWeight: 800 }}>{item.label}</button>;
               })}
             </div>
           </>
@@ -1142,13 +1179,13 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
             <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
             <div style={{ display: "grid", gap: 7 }}>
               {filtered.map((player) => (
-                <button key={player.id} disabled={busy} onClick={() => chooseScorer(player)} style={{ ...playerButton, borderColor: selectedPlayer?.id === player.id ? "#4FC263" : "var(--admin-control-border)" }}>
-                  <span style={{ color: "var(--admin-dim)", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
+                <button key={player.id} disabled={busy} onClick={() => chooseScorer(player)} style={{ ...playerButton, borderColor: selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30" }}>
+                  <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
                 </button>
               ))}
-              {scorerSquad.length === 0 && <div style={{ color: "var(--admin-dim)", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
+              {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
             </div>
-            <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "var(--admin-control-border)" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
+            <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
           </>
         )}
 
@@ -1163,7 +1200,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
         )}
 
         {isCard && cardType === "second_yellow" && (
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: "var(--admin-input)", border: "1px solid var(--admin-control-border)", color: "var(--admin-text)", fontSize: 13 }}>Reason: second booking</div>
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: "#0E0F11", border: "1px solid #2A2C30", color: "#C9CDD3", fontSize: 13 }}>Reason: second booking</div>
         )}
 
         {isGoal && hasChosenRecipient && goalType === "normal_goal" && (
@@ -1187,7 +1224,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
         {isCard && (
           <button disabled={busy || !canSubmitCard} onClick={submitCard} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: pending.type === "yellow" ? "#F5C518" : "#F04444", color: pending.type === "yellow" ? "#241D00" : "#fff", fontWeight: 800, cursor: busy || !canSubmitCard ? "not-allowed" : "pointer", opacity: busy || !canSubmitCard ? 0.45 : 1 }}>Record {pending.type === "yellow" ? "yellow card" : "red card"}</button>
         )}
-        <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "transparent", color: "var(--admin-text)", cursor: "pointer" }}>Cancel and roll back</button>
+        <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
       </div>
     </div>
   );
@@ -1201,9 +1238,9 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
   const canSubmit = Boolean(incomingPlayer && outgoingPlayer);
   return (
     <div style={overlay} onClick={onCancel}>
-      <div role="dialog" aria-modal="true" style={{ background: "var(--admin-card)", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
         <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution · {team.name}</div>
-        <div style={{ color: "var(--admin-dim)", fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
+        <div style={{ color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
           Only current on-field players can leave. Only announced substitutes can enter.
         </div>
         <label style={flabel}>Player going off</label>
@@ -1224,10 +1261,10 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
             </optgroup>
           ))}
         </select>
-        {pools.onFieldPlayers.length === 0 && <div role="alert" style={{ color: "var(--admin-danger-text)", fontSize: 11, marginTop: 8 }}>Save the starting eleven before recording a substitution.</div>}
-        {pools.onFieldPlayers.length > 0 && pools.availableSubstitutes.length === 0 && <div role="alert" style={{ color: "var(--admin-danger-text)", fontSize: 11, marginTop: 8 }}>No announced substitutes are available for this team.</div>}
+        {pools.onFieldPlayers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>Save the starting eleven before recording a substitution.</div>}
+        {pools.onFieldPlayers.length > 0 && pools.availableSubstitutes.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>No announced substitutes are available for this team.</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "transparent", color: "var(--admin-text)", cursor: "pointer" }}>Cancel</button>
+          <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
           <button disabled={busy || !canSubmit} onClick={() => onSave(side, incomingPlayer, outgoingPlayer)} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !canSubmit ? "not-allowed" : "pointer", opacity: busy || !canSubmit ? 0.45 : 1 }}>Add</button>
         </div>
       </div>
@@ -1240,18 +1277,19 @@ function Badge({ t, size = 40 }) {
 }
 
 function PreviewField({ label: fieldLabel, children }) {
-  return <label style={{ display: "flex", flexDirection: "column", gap: 5 }}><span style={{ color: "var(--admin-dim)", fontSize: 11.5, fontWeight: 650 }}>{fieldLabel}</span>{children}</label>;
+  return <label style={{ display: "flex", flexDirection: "column", gap: 5 }}><span style={{ color: "#8E939B", fontSize: 11.5, fontWeight: 650 }}>{fieldLabel}</span>{children}</label>;
 }
 
-const card = { background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 14, padding: 16, marginBottom: 14 };
-const label = { color: "var(--admin-dim)", fontSize: 12, fontWeight: 700, marginBottom: 10 };
-const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid var(--admin-control-border)", fontSize: 13, fontWeight: 700, cursor: "pointer" };
-const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid var(--admin-control-border)", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };
+const label = { color: "#8E939B", fontSize: 12, fontWeight: 700, marginBottom: 10 };
+const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
 const goalButton = { width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: 18, cursor: "pointer", marginBottom: 8 };
-const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--admin-control-border)", background: "transparent", color: "var(--admin-dim)", fontSize: 12, cursor: "pointer", marginBottom: 10 };
+const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid #2A2C30", background: "transparent", color: "#8E939B", fontSize: 12, cursor: "pointer", marginBottom: 10 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 };
-const flabel = { display: "block", color: "var(--admin-dim)", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
-const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", fontSize: 14, outline: "none" };
-const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", cursor: "pointer", fontSize: 14 };
-const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid var(--admin-control-border)", fontSize: 12, fontWeight: 800, cursor: "pointer" };
-const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", fontSize: 14, textAlign: "center", outline: "none" };
+const flabel = { display: "block", color: "#8E939B", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
+const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
+const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
+const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, textAlign: "center", outline: "none" };
+

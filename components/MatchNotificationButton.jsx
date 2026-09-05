@@ -9,6 +9,15 @@ function urlBase64ToUint8Array(value) {
   return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
 }
 
+function applicationServerKey(subscription) {
+  const key = subscription?.options?.applicationServerKey;
+  if (!key) return null;
+  const bytes = new Uint8Array(key);
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 function supported() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
@@ -22,6 +31,7 @@ function iPhoneNeedsInstallation() {
 async function browserSubscription() {
   if (!supported()) return null;
   const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await registration.update().catch(() => {});
   await navigator.serviceWorker.ready;
   return { registration, subscription: await registration.pushManager.getSubscription() };
 }
@@ -69,8 +79,8 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
     }
     setBusy(true);
     try {
-      const current = await browserSubscription();
       if (enabled) {
+        const current = await browserSubscription();
         if (current.subscription) await savePreference(matchId, current.subscription, "unsubscribe", "DELETE");
         setEnabled(false);
         return;
@@ -81,10 +91,17 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
       }
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (permission !== "granted") throw new Error("Notification permission was not granted.");
+      const current = await browserSubscription();
       const configResponse = await fetch("/api/push/config", { cache: "no-store" });
       const config = await configResponse.json();
       if (!config.ready || !config.publicKey) throw new Error("Match notifications are not configured yet.");
-      const subscription = current.subscription || await current.registration.pushManager.subscribe({
+      let subscription = current.subscription;
+      const savedApplicationKey = applicationServerKey(subscription);
+      if (subscription && savedApplicationKey && savedApplicationKey !== config.publicKey) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+      subscription = subscription || await current.registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(config.publicKey),
       });
@@ -113,3 +130,4 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
     </button>
   );
 }
+

@@ -25,6 +25,7 @@ import {
   saveMatchStats,
   saveMatchLineup,
   setMatchStoppageTime,
+  enableRetrospectiveRecording,
   startMatchWithKits,
   startRetrospectiveMatch,
   transitionMatchStatus,
@@ -128,10 +129,8 @@ export default function Scorer() {
   const [previewDetailsMessage, setPreviewDetailsMessage] = useState("");
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
-  const [recordingMode, setRecordingMode] = useState("live");
   const kitInitializedFor = useRef(null);
   const previewDetailsInitializedFor = useRef(null);
-  const recordingModeInitializedFor = useRef(null);
 
   const loadLineups = useCallback(async () => {
     try {
@@ -248,12 +247,6 @@ export default function Scorer() {
     setAwayKitColor(suggestedAwayKit(nextHome, preferredAway));
     kitInitializedFor.current = m.id;
   }, [m, teams]);
-
-  useEffect(() => {
-    if (!m || recordingModeInitializedFor.current === m.id) return;
-    setRecordingMode(m.operation_mode === "retrospective" ? "retrospective" : "live");
-    recordingModeInitializedFor.current = m.id;
-  }, [m]);
 
   if (!m) return <AdminMatchShell error={error} onRetry={load} />;
   const homeTeam = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
@@ -432,21 +425,31 @@ export default function Scorer() {
   async function changeStatus(status) {
     const previousStatus = m.status;
     if (m.status === "scheduled" && status === "live") {
-      if (!kitsAreDistinct(homeKitColor, awayKitColor)) {
-        setError("The home and away kits clash. Choose a clearly different away kit before kick-off.");
-        return;
-      }
-      const retrospective = recordingMode === "retrospective";
-      const saved = await run(() => retrospective
-        ? startRetrospectiveMatch(id, homeKitColor, awayKitColor)
-        : startMatchWithKits(id, homeKitColor, awayKitColor));
-      if (saved && !retrospective) await notifyFollowers({ kind: "status", previousStatus });
+      await startScheduledMatch("live");
       return;
     }
     const saved = await run(() => isRetrospective
       ? transitionRetrospectiveMatch(id, status)
       : transitionMatchStatus(id, status));
     if (saved && !isRetrospective) await notifyFollowers({ kind: "status", previousStatus });
+  }
+
+  async function startScheduledMatch(mode) {
+    if (busy || m.status !== "scheduled") return;
+    if (!kitsAreDistinct(homeKitColor, awayKitColor)) {
+      setError("The home and away kits clash. Choose a clearly different away kit before kick-off.");
+      return;
+    }
+    const retrospective = mode === "retrospective";
+    const saved = await run(() => retrospective
+      ? startRetrospectiveMatch(id, homeKitColor, awayKitColor)
+      : startMatchWithKits(id, homeKitColor, awayKitColor));
+    if (saved && !retrospective) await notifyFollowers({ kind: "status", previousStatus: "scheduled" });
+  }
+
+  async function switchToRetrospective() {
+    if (busy || isRetrospective) return;
+    await run(() => enableRetrospectiveRecording(id));
   }
 
   async function notifyFollowers(payload) {
@@ -741,22 +744,23 @@ export default function Scorer() {
       {m.status === "scheduled" && (
         <>
         <div style={card}>
-          <div style={label}>HOW WILL THIS MATCH BE RECORDED?</div>
+          <div style={label}>START OR RECORD THIS MATCH</div>
           <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
-            Choose live only when you are operating the match as it happens. Use retrospective recording for a match that has already been played.
+            For a completed game, select the second option and enter the known events with their actual minutes. You can finish the entire record immediately.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-            <RecordingModeOption
-              selected={recordingMode === "live"}
-              title="Live match"
+            <RecordingModeAction
+              title="Start live match"
               note="The match clock runs automatically and follower alerts are sent."
-              onClick={() => setRecordingMode("live")}
+              onClick={() => startScheduledMatch("live")}
+              disabled={busy}
             />
-            <RecordingModeOption
-              selected={recordingMode === "retrospective"}
-              title="Already played"
-              note="Enter every event minute manually. No live follower alerts are sent."
-              onClick={() => setRecordingMode("retrospective")}
+            <RecordingModeAction
+              primary
+              title="Record completed match"
+              note="Manual event times. Finish the match in one short session without live alerts."
+              onClick={() => startScheduledMatch("retrospective")}
+              disabled={busy}
             />
           </div>
         </div>
@@ -776,6 +780,66 @@ export default function Scorer() {
           )}
         </div>
         </>
+      )}
+
+      {isRetrospective && (
+        <>
+          <div style={{ ...card, borderColor: "#4FC263" }}>
+            <div style={label}>QUICK COMPLETED-MATCH RECORDING</div>
+            <div style={{ color: "#70DB82", fontSize: 13, marginBottom: 4 }}>{clockStatus(m, now)}</div>
+            <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+              Add only the events you know. Every event will ask for its actual match minute. You can finish immediately without waiting for the clock.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {actions.map((action) => (
+                <button key={action.status} disabled={busy} onClick={() => changeStatus(action.status)}
+                  style={{ ...pill, background: action.primary ? "#4FC263" : "#0E0F11", color: action.primary ? "#062" : "#fff" }}>{action.label}</button>
+              ))}
+              {role === "admin" && fullTimeLocked && (
+                <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
+              )}
+            </div>
+            {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Reopen the result only if a correction is necessary.</div>}
+          </div>
+
+          {!fullTimeLocked && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
+              {[["home", home], ["away", away]].map(([side, team]) => (
+                <div key={side} style={{ ...card, marginBottom: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
+                  </div>
+                  <button disabled={busy || !canRecord} onClick={() => recordGoal(side)} style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>⚽ + GOAL</button>
+                  <button disabled={busy || !canCorrect} onClick={() => undoLast("goal", side)} style={{ ...undoButton, opacity: canCorrect ? 1 : 0.45 }}>Undo last goal</button>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button disabled={busy || !canRecord} onClick={() => beginEvent("yellow", side)} style={{ ...half, background: "#3a3410", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>+ Yellow</button>
+                    <button disabled={busy || !canRecord} onClick={() => beginEvent("red", side)} style={{ ...half, background: "#3a1616", color: "#F04444", opacity: canRecord ? 1 : 0.45 }}>+ Red</button>
+                  </div>
+                  <button disabled={busy || !canRecord} onClick={() => beginEvent("miss", side)} style={{ ...half, width: "100%", marginTop: 8, background: "#2B2110", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>Missed penalty</button>
+                  <button disabled={busy || !canRecord} onClick={() => beginEvent("sub", side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={card}>
+            <div style={label}>RECORDED EVENTS</div>
+            {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "6px 0" }}>No events recorded. You may finish a match with no known events.</div>}
+            {[...events].sort(eventOrder).map((event) => (
+              <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} onAttributeGoal={openGoalAttribution} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {!isRetrospective && ["live", "ht"].includes(m.status) && (
+        <div style={{ ...card, borderColor: "#F5C518" }}>
+          <div style={label}>IS THIS A MATCH THAT HAS ALREADY BEEN PLAYED?</div>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>
+            Stop the automatic clock and open manual event-time controls immediately.
+          </div>
+          <button disabled={busy} onClick={switchToRetrospective} style={{ ...pill, width: "100%", background: "#F5C518", color: "#241D00" }}>Switch to completed-match recording</button>
+        </div>
       )}
 
       <div style={card}>
@@ -816,7 +880,7 @@ export default function Scorer() {
         </div>
       </div>
 
-      <div style={card}>
+      {!isRetrospective && <div style={card}>
         <div style={label}>MATCH STATUS</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {actions.map((action) => (
@@ -829,7 +893,7 @@ export default function Scorer() {
         </div>
         {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
         {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
-      </div>
+      </div>}
 
       {["live", "et_live"].includes(m.status) && !isRetrospective && (
         <div style={card}>
@@ -859,7 +923,7 @@ export default function Scorer() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
+      {!isRetrospective && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
         {[["home", home], ["away", away]].map(([side, team]) => (
           <div key={side} style={{ ...card, marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -881,7 +945,7 @@ export default function Scorer() {
             <button disabled={busy || !canRecord} onClick={() => isRetrospective ? beginEvent("sub", side) : setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div style={card}>
         <MatchStatsBoard
@@ -895,13 +959,13 @@ export default function Scorer() {
         />
       </div>
 
-      <div style={card}>
+      {!isRetrospective && <div style={card}>
         <div style={label}>EVENT LOG</div>
         {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
         {[...events].sort(eventOrder).map((event) => (
           <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} onAttributeGoal={openGoalAttribution} />
         ))}
-      </div>
+      </div>}
 
       {pending?.type === "goal_attribution" && pendingGoalPools && (
         <GoalAttributionModal
@@ -1245,25 +1309,26 @@ function KitShirt({ color }) {
   );
 }
 
-function RecordingModeOption({ selected, title, note, onClick }) {
+function RecordingModeAction({ primary = false, title, note, onClick, disabled }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-pressed={selected}
-      style={{ minHeight: 92, padding: 12, borderRadius: 12, border: `1px solid ${selected ? "#4FC263" : "#2A2C30"}`, background: selected ? "#172C1C" : "#0E0F11", color: "#FFFFFF", textAlign: "left", cursor: "pointer" }}
+      disabled={disabled}
+      style={{ minHeight: 100, padding: 12, borderRadius: 12, border: `1px solid ${primary ? "#4FC263" : "#2A2C30"}`, background: primary ? "#172C1C" : "#0E0F11", color: "#FFFFFF", textAlign: "left", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }}
     >
-      <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: selected ? "#70DB82" : "#FFFFFF" }}>{selected ? "✓ " : ""}{title}</span>
+      <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: primary ? "#70DB82" : "#FFFFFF" }}>{title}</span>
       <span style={{ display: "block", color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginTop: 5 }}>{note}</span>
+      <span style={{ display: "block", color: primary ? "#70DB82" : "#C4C8CE", fontSize: 11, fontWeight: 800, marginTop: 8 }}>Open controls →</span>
     </button>
   );
 }
 
 function statusActions(status, locked, retrospective = false, period = 0) {
   if (status === "scheduled") return [{ status: "live", label: "Kick off", primary: true }];
-  if (retrospective && status === "live" && Number(period) <= 1) return [{ status: "ht", label: "Go to half time", primary: true }];
+  if (retrospective && status === "live" && Number(period) <= 1) return [{ status: "ht", label: "Go to half time" }, { status: "ft", label: "Finish recording now", primary: true }];
   if (retrospective && status === "live") return [{ status: "ft", label: "Finish match", primary: true }];
-  if (retrospective && status === "ht") return [{ status: "live", label: "Start second half", primary: true }];
+  if (retrospective && status === "ht") return [{ status: "live", label: "Start second half" }, { status: "ft", label: "Finish recording now", primary: true }];
   if (retrospective && status === "ft" && !locked) return [{ status: "ft", label: "Lock full time", primary: true }];
   if (retrospective) return [];
   if (status === "live") return [{ status: "ht", label: "Half time" }, { status: "ft", label: "Full time", primary: true }];

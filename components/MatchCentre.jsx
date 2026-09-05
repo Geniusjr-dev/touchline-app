@@ -286,9 +286,7 @@ export default function MatchCentre({ id }) {
               : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
-            {(m.status === "live" || m.status === "et_live") && (m.operationMode === "retrospective"
-              ? <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>{Number(m.current_period || 1) > 1 ? "Recording second half" : "Recording first half"}</span>
-              : <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />)}
+            {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">

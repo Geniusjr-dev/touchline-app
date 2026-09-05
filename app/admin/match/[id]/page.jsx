@@ -26,7 +26,9 @@ import {
   saveMatchLineup,
   setMatchStoppageTime,
   startMatchWithKits,
+  startRetrospectiveMatch,
   transitionMatchStatus,
+  transitionRetrospectiveMatch,
   updateMatchPreviewDetails,
 } from "@/lib/db";
 
@@ -126,8 +128,10 @@ export default function Scorer() {
   const [previewDetailsMessage, setPreviewDetailsMessage] = useState("");
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [recordingMode, setRecordingMode] = useState("live");
   const kitInitializedFor = useRef(null);
   const previewDetailsInitializedFor = useRef(null);
+  const recordingModeInitializedFor = useRef(null);
 
   const loadLineups = useCallback(async () => {
     try {
@@ -245,6 +249,12 @@ export default function Scorer() {
     kitInitializedFor.current = m.id;
   }, [m, teams]);
 
+  useEffect(() => {
+    if (!m || recordingModeInitializedFor.current === m.id) return;
+    setRecordingMode(m.operation_mode === "retrospective" ? "retrospective" : "live");
+    recordingModeInitializedFor.current = m.id;
+  }, [m]);
+
   if (!m) return <AdminMatchShell error={error} onRetry={load} />;
   const homeTeam = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
   const awayTeam = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
@@ -256,6 +266,7 @@ export default function Scorer() {
   const displayedAway = storedAway;
   const sideTeamId = (side) => (side === "home" ? m.home_id : m.away_id);
   const fullTimeLocked = m.status === "ft" && Boolean(m.locked_at);
+  const isRetrospective = m.operation_mode === "retrospective";
   const canRecord = ["live", "et_live"].includes(m.status) || (m.status === "ft" && !m.locked_at);
   const canCorrect = m.status !== "scheduled" && !fullTimeLocked;
 
@@ -300,7 +311,27 @@ export default function Scorer() {
   function beginEvent(type, side) {
     if (!canRecord || busy) return;
     setError("");
+    if (isRetrospective) {
+      setPending({ type: "event_time", eventType: type, side });
+      return;
+    }
     setPending({ type, side });
+  }
+
+  function continueTimedEvent(timing) {
+    if (pending?.type !== "event_time") return;
+    const { eventType, side } = pending;
+    if (eventType === "goal") {
+      setPending(null);
+      void recordGoal(side, timing);
+      return;
+    }
+    if (eventType === "sub") {
+      setPending(null);
+      setSubFor({ side, timing });
+      return;
+    }
+    setPending({ type: eventType, side, timing });
   }
 
   async function commitPending(selection) {
@@ -317,6 +348,7 @@ export default function Scorer() {
       card_type: selection?.cardType || null,
       card_reason: selection?.cardReason || null,
       recipient_type: selection?.recipientType || null,
+      timing: pending.timing || null,
     };
     let createdEvent = null;
     const saved = await run(async () => {
@@ -324,13 +356,18 @@ export default function Scorer() {
       createdEvent = response?.data || null;
       return response;
     }, true);
-    if (saved && createdEvent?.id && createdEvent.type === "red") {
+    if (saved && createdEvent?.id && createdEvent.type === "red" && !isRetrospective) {
       await notifyFollowers({ kind: "event", eventId: createdEvent.id });
     }
   }
 
-  async function recordGoal(side) {
+  async function recordGoal(side, timing = null) {
     if (!canRecord || busy) return;
+    if (isRetrospective && !timing) {
+      setError("");
+      setPending({ type: "event_time", eventType: "goal", side });
+      return;
+    }
     setError("");
     let createdEvent = null;
     const saved = await run(async () => {
@@ -341,6 +378,7 @@ export default function Scorer() {
         player: null,
         assist: null,
         goal_type: "normal_goal",
+        timing,
       });
       createdEvent = response?.data || null;
       return response;
@@ -352,7 +390,7 @@ export default function Scorer() {
       event: createdEvent,
       recordedAt: createdEvent.created_at || new Date().toISOString(),
     });
-    void notifyFollowers({ kind: "event", eventId: createdEvent.id });
+    if (!isRetrospective) void notifyFollowers({ kind: "event", eventId: createdEvent.id });
   }
 
   function openGoalAttribution(event) {
@@ -379,7 +417,7 @@ export default function Scorer() {
       updatedEvent = response?.data || null;
       return response;
     }, true);
-    if (saved && updatedEvent?.id && updatedEvent.player && !goalEvent.player) {
+    if (saved && updatedEvent?.id && updatedEvent.player && !goalEvent.player && !isRetrospective) {
       void notifyFollowers({ kind: "scorer", eventId: updatedEvent.id });
     }
   }
@@ -398,12 +436,17 @@ export default function Scorer() {
         setError("The home and away kits clash. Choose a clearly different away kit before kick-off.");
         return;
       }
-      const saved = await run(() => startMatchWithKits(id, homeKitColor, awayKitColor));
-      if (saved) await notifyFollowers({ kind: "status", previousStatus });
+      const retrospective = recordingMode === "retrospective";
+      const saved = await run(() => retrospective
+        ? startRetrospectiveMatch(id, homeKitColor, awayKitColor)
+        : startMatchWithKits(id, homeKitColor, awayKitColor));
+      if (saved && !retrospective) await notifyFollowers({ kind: "status", previousStatus });
       return;
     }
-    const saved = await run(() => transitionMatchStatus(id, status));
-    if (saved) await notifyFollowers({ kind: "status", previousStatus });
+    const saved = await run(() => isRetrospective
+      ? transitionRetrospectiveMatch(id, status)
+      : transitionMatchStatus(id, status));
+    if (saved && !isRetrospective) await notifyFollowers({ kind: "status", previousStatus });
   }
 
   async function notifyFollowers(payload) {
@@ -468,6 +511,7 @@ export default function Scorer() {
       player_id: incomingPlayer.id,
       player: incomingPlayer.name,
       assist: outgoingPlayer.name,
+      timing: typeof subFor === "object" ? subFor.timing : null,
     }));
     if (saved) setSubFor(null);
   }
@@ -634,7 +678,7 @@ export default function Scorer() {
     };
   }
 
-  const actions = statusActions(m.status, fullTimeLocked);
+  const actions = statusActions(m.status, fullTimeLocked, isRetrospective, m.current_period);
   const pendingGoalPools = pending?.type === "goal_attribution" && pending.event
     ? goalAttributionPools(pending.event)
     : null;
@@ -695,6 +739,27 @@ export default function Scorer() {
       )}
 
       {m.status === "scheduled" && (
+        <>
+        <div style={card}>
+          <div style={label}>HOW WILL THIS MATCH BE RECORDED?</div>
+          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+            Choose live only when you are operating the match as it happens. Use retrospective recording for a match that has already been played.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            <RecordingModeOption
+              selected={recordingMode === "live"}
+              title="Live match"
+              note="The match clock runs automatically and follower alerts are sent."
+              onClick={() => setRecordingMode("live")}
+            />
+            <RecordingModeOption
+              selected={recordingMode === "retrospective"}
+              title="Already played"
+              note="Enter every event minute manually. No live follower alerts are sent."
+              onClick={() => setRecordingMode("retrospective")}
+            />
+          </div>
+        </div>
         <div style={card}>
           <div style={label}>MATCH KITS</div>
           <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
@@ -710,6 +775,7 @@ export default function Scorer() {
             </div>
           )}
         </div>
+        </>
       )}
 
       <div style={card}>
@@ -765,7 +831,7 @@ export default function Scorer() {
         {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>
 
-      {["live", "et_live"].includes(m.status) && (
+      {["live", "et_live"].includes(m.status) && !isRetrospective && (
         <div style={card}>
           <div style={label}>STOPPAGE TIME</div>
           <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
@@ -811,7 +877,8 @@ export default function Scorer() {
               <button disabled={busy || !canRecord} onClick={() => beginEvent("yellow", side)} style={{ ...half, background: "#3a3410", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>+ Yellow</button>
               <button disabled={busy || !canRecord} onClick={() => beginEvent("red", side)} style={{ ...half, background: "#3a1616", color: "#F04444", opacity: canRecord ? 1 : 0.45 }}>+ Red</button>
             </div>
-            <button disabled={busy || !canRecord} onClick={() => setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
+            <button disabled={busy || !canRecord} onClick={() => beginEvent("miss", side)} style={{ ...half, width: "100%", marginTop: 8, background: "#2B2110", color: "#F5C518", opacity: canRecord ? 1 : 0.45 }}>Missed penalty</button>
+            <button disabled={busy || !canRecord} onClick={() => isRetrospective ? beginEvent("sub", side) : setSubFor(side)} style={{ ...half, width: "100%", marginTop: 8, background: "#0E0F11", color: "#fff", opacity: canRecord ? 1 : 0.45 }}>Substitution</button>
           </div>
         ))}
       </div>
@@ -848,11 +915,22 @@ export default function Scorer() {
           onSave={confirmGoalAttribution}
         />
       )}
-      {pending && pending.type !== "goal_attribution" && (
+      {pending?.type === "event_time" && (
+        <EventTimeModal
+          pending={pending}
+          match={m}
+          busy={busy}
+          onCancel={() => !busy && setPending(null)}
+          onContinue={continueTimedEvent}
+        />
+      )}
+      {pending && !["goal_attribution", "event_time"].includes(pending.type) && (
         <AttributionModal
           pending={pending}
           scoringTeam={pending.side === "home" ? home : away}
-          scoringSquad={squads[sideTeamId(pending.side)] || []}
+          scoringSquad={pending.type === "miss"
+            ? substitutionPools(pending.side, pending.timing ? { period: pending.timing.period, elapsed_seconds: pending.timing.elapsedSeconds, created_at: new Date().toISOString() } : null).onFieldPlayers
+            : squads[sideTeamId(pending.side)] || []}
           opponentTeam={pending.side === "home" ? away : home}
           opponentSquad={squads[sideTeamId(pending.side === "home" ? "away" : "home")] || []}
           busy={busy}
@@ -862,9 +940,9 @@ export default function Scorer() {
       )}
       {subFor && (
         <SubForm
-          side={subFor}
-          team={subFor === "home" ? home : away}
-          pools={substitutionPools(subFor)}
+          side={typeof subFor === "string" ? subFor : subFor.side}
+          team={(typeof subFor === "string" ? subFor : subFor.side) === "home" ? home : away}
+          pools={substitutionPools(typeof subFor === "string" ? subFor : subFor.side)}
           busy={busy}
           onCancel={() => !busy && setSubFor(null)}
           onSave={saveSub}
@@ -1167,8 +1245,27 @@ function KitShirt({ color }) {
   );
 }
 
-function statusActions(status, locked) {
+function RecordingModeOption({ selected, title, note, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      style={{ minHeight: 92, padding: 12, borderRadius: 12, border: `1px solid ${selected ? "#4FC263" : "#2A2C30"}`, background: selected ? "#172C1C" : "#0E0F11", color: "#FFFFFF", textAlign: "left", cursor: "pointer" }}
+    >
+      <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: selected ? "#70DB82" : "#FFFFFF" }}>{selected ? "✓ " : ""}{title}</span>
+      <span style={{ display: "block", color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginTop: 5 }}>{note}</span>
+    </button>
+  );
+}
+
+function statusActions(status, locked, retrospective = false, period = 0) {
   if (status === "scheduled") return [{ status: "live", label: "Kick off", primary: true }];
+  if (retrospective && status === "live" && Number(period) <= 1) return [{ status: "ht", label: "Go to half time", primary: true }];
+  if (retrospective && status === "live") return [{ status: "ft", label: "Finish match", primary: true }];
+  if (retrospective && status === "ht") return [{ status: "live", label: "Start second half", primary: true }];
+  if (retrospective && status === "ft" && !locked) return [{ status: "ft", label: "Lock full time", primary: true }];
+  if (retrospective) return [];
   if (status === "live") return [{ status: "ht", label: "Half time" }, { status: "ft", label: "Full time", primary: true }];
   if (status === "ht") return [{ status: "live", label: "Start second half", primary: true }, { status: "ft", label: "End match" }];
   if (status === "et_live") return [{ status: "et_ht", label: "Extra-time break" }, { status: "ft", label: "Full time", primary: true }];
@@ -1178,6 +1275,8 @@ function statusActions(status, locked) {
 }
 
 function clockStatus(match, now) {
+  if (match.operation_mode === "retrospective" && match.status === "live") return Number(match.current_period || 1) > 1 ? "RECORDING SECOND HALF" : "RECORDING FIRST HALF";
+  if (match.operation_mode === "retrospective" && match.status === "ht") return "RECORDING · HALF TIME";
   if (match.status === "live") return `LIVE ${formatMatchClock(match, now)}`;
   if (match.status === "et_live") return `EXTRA TIME ${formatMatchClock(match, now)}`;
   if (match.status === "ht") return `HALF TIME · ${formatMatchClock(match, now)}`;
@@ -1219,7 +1318,7 @@ function EventRow({ event, match, locked, onRemove, onAttributeGoal }) {
   const emoji = event.type === "goal" ? "⚽" : event.type === "yellow" ? "🟨" : event.type === "red" ? "🟥" : event.type === "miss" ? "❌" : "🔁";
   const isCard = event.type === "yellow" || event.type === "red";
   const eventName = event.player
-    || (event.recipient_type === "team_official" ? "Team official" : event.type === "goal" ? "Scorer not recorded" : "Player not recorded");
+    || (event.recipient_type === "team_official" ? "Team official" : event.type === "goal" ? "Scorer not recorded" : event.type === "miss" ? "Penalty taker not recorded" : "Player not recorded");
   const cardLabel = event.card_type === "second_yellow" ? "Second yellow"
     : event.type === "red" ? "Straight red"
     : event.type === "yellow" ? "Yellow card"
@@ -1233,7 +1332,7 @@ function EventRow({ event, match, locked, onRemove, onAttributeGoal }) {
         <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
       ) : (
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#fff" }}>
-          <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : isCard ? ` · ${cardLabel}` : ""}</span>
+          <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : event.type === "miss" ? " · Missed penalty" : isCard ? ` · ${cardLabel}` : ""}</span>
           {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
           {isCard && reasonLabel && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>{reasonLabel}</span>}
         </span>
@@ -1245,6 +1344,80 @@ function EventRow({ event, match, locked, onRemove, onAttributeGoal }) {
         </button>
       )}
       <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+    </div>
+  );
+}
+
+function parseRetrospectiveTime(minuteValue, secondValue, match) {
+  const minuteText = String(minuteValue || "").trim().replace(/['′\s]/g, "");
+  const matchResult = minuteText.match(/^(\d{1,3})(?:\+(\d{1,2}))?$/);
+  if (!matchResult) return { error: "Enter a minute such as 23, 45+2 or 90+4." };
+  const duration = Number(match.competition?.match_duration_minutes || 90);
+  const half = duration / 2;
+  const baseMinute = Number(matchResult[1]);
+  const addedMinute = Number(matchResult[2] || 0);
+  const seconds = Number(secondValue || 0);
+  if (!Number.isInteger(half) || baseMinute < 1 || baseMinute > duration + 45) {
+    return { error: `The minute must be between 1 and ${duration}+45.` };
+  }
+  if (!Number.isInteger(seconds) || seconds < 0 || seconds > 59) {
+    return { error: "Seconds must be between 0 and 59." };
+  }
+  if (addedMinute > 0 && ![half, duration].includes(baseMinute)) {
+    return { error: `Added time must be entered as ${half}+n or ${duration}+n.` };
+  }
+  const displayMinute = baseMinute + addedMinute;
+  const period = addedMinute > 0 ? (baseMinute === half ? 1 : 2) : (baseMinute <= half ? 1 : 2);
+  return {
+    displayMinute,
+    elapsedSeconds: Math.max(0, (displayMinute - 1) * 60 + seconds),
+    period,
+  };
+}
+
+function eventTypeTitle(type) {
+  if (type === "goal") return "goal";
+  if (type === "yellow") return "yellow card";
+  if (type === "red") return "red card";
+  if (type === "miss") return "missed penalty";
+  return "substitution";
+}
+
+function EventTimeModal({ pending, match, busy, onCancel, onContinue }) {
+  const half = Number(match.competition?.match_duration_minutes || 90) / 2;
+  const [minute, setMinute] = useState(Number(match.current_period || 1) > 1 ? String(half + 1) : "1");
+  const [seconds, setSeconds] = useState("0");
+  const [timeError, setTimeError] = useState("");
+
+  function submit(event) {
+    event.preventDefault();
+    const timing = parseRetrospectiveTime(minute, seconds, match);
+    if (timing.error) {
+      setTimeError(timing.error);
+      return;
+    }
+    onContinue(timing);
+  }
+
+  return (
+    <div style={overlay} onClick={onCancel}>
+      <form onSubmit={submit} role="dialog" aria-modal="true" aria-label="Enter event time" style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 390 }} onClick={(event) => event.stopPropagation()}>
+        <strong style={{ display: "block", fontSize: 16 }}>When did the {eventTypeTitle(pending.eventType)} happen?</strong>
+        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginTop: 5, marginBottom: 14 }}>
+          Enter the official match minute. Added time can be written as {half}+2 or {half * 2}+4.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 110px", gap: 10 }}>
+          <label style={flabel}>Minute
+            <input autoFocus value={minute} onChange={(event) => { setMinute(event.target.value); setTimeError(""); }} placeholder={`${half}+2`} style={{ ...finp, display: "block", marginTop: 6 }} />
+          </label>
+          <label style={flabel}>Seconds
+            <input type="number" min="0" max="59" value={seconds} onChange={(event) => { setSeconds(event.target.value); setTimeError(""); }} style={{ ...finp, display: "block", marginTop: 6 }} />
+          </label>
+        </div>
+        {timeError && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, marginTop: 10 }}>{timeError}</div>}
+        <button type="submit" disabled={busy} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, opacity: busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Continue"}</button>
+        <button type="button" disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff" }}>Cancel</button>
+      </form>
     </div>
   );
 }
@@ -1342,11 +1515,12 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
   const [hasChosenRecipient, setHasChosenRecipient] = useState(false);
   const isGoal = pending.type === "goal";
   const isCard = pending.type === "yellow" || pending.type === "red";
+  const isMissedPenalty = pending.type === "miss";
   const scorerTeam = isGoal && goalType === "own_goal" ? opponentTeam : scoringTeam;
   const scorerSquad = isGoal && goalType === "own_goal" ? opponentSquad : scoringSquad;
   const filtered = scorerSquad.filter((player) => player.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 12);
   const assistOptions = scoringSquad.filter((player) => player.id !== selectedPlayer?.id);
-  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Record yellow card" : "Record red card";
+  const title = pending.type === "goal" ? "Who scored?" : pending.type === "yellow" ? "Record yellow card" : pending.type === "red" ? "Record red card" : "Record missed penalty";
   const reasonOptions = pending.type === "yellow" ? YELLOW_CARD_REASONS : RED_CARD_REASONS;
   const canSubmitCard = isCard && hasChosenRecipient && (cardType === "second_yellow" || cardReason !== "");
 
@@ -1390,6 +1564,11 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
     });
   }
 
+  function submitMissedPenalty() {
+    if (!hasChosenRecipient || busy) return;
+    onChoose({ player: selectedPlayer });
+  }
+
   return (
     <div style={overlay} onClick={onCancel}>
       <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 420, maxHeight: "88vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
@@ -1399,7 +1578,9 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
             ? goalType === "own_goal"
               ? `The goal benefits ${scoringTeam.name}. Select the scorer from ${opponentTeam.name}.`
               : "The score is shown immediately and is saved after this confirmation."
-            : "Select the recipient and the official booking reason. Choose no reason recorded only when the reason is unavailable."}
+            : isMissedPenalty
+              ? "Select the penalty taker if the name is known. The score will not change."
+              : "Select the recipient and the official booking reason. Choose no reason recorded only when the reason is unavailable."}
         </div>
 
         {isGoal && (
@@ -1447,7 +1628,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
 
         {(!isCard || recipientType === "player") && (
           <>
-            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search squad" style={{ ...finp, marginBottom: 8 }} />
+            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isMissedPenalty ? "Search penalty taker" : "Search squad"} style={{ ...finp, marginBottom: 8 }} />
             <div style={{ display: "grid", gap: 7 }}>
               {filtered.map((player) => (
                 <button key={player.id} disabled={busy} onClick={() => chooseScorer(player)} style={{ ...playerButton, borderColor: selectedPlayer?.id === player.id ? "#4FC263" : "#2A2C30" }}>
@@ -1456,7 +1637,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
               ))}
               {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
             </div>
-            <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : "Record without player name"}</button>
+            <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : isMissedPenalty ? "Record without penalty taker" : "Record without player name"}</button>
           </>
         )}
 
@@ -1494,6 +1675,9 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
         )}
         {isCard && (
           <button disabled={busy || !canSubmitCard} onClick={submitCard} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: pending.type === "yellow" ? "#F5C518" : "#F04444", color: pending.type === "yellow" ? "#241D00" : "#fff", fontWeight: 800, cursor: busy || !canSubmitCard ? "not-allowed" : "pointer", opacity: busy || !canSubmitCard ? 0.45 : 1 }}>Record {pending.type === "yellow" ? "yellow card" : "red card"}</button>
+        )}
+        {isMissedPenalty && (
+          <button disabled={busy || !hasChosenRecipient} onClick={submitMissedPenalty} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#F5C518", color: "#241D00", fontWeight: 800, cursor: busy || !hasChosenRecipient ? "not-allowed" : "pointer", opacity: busy || !hasChosenRecipient ? 0.45 : 1 }}>Record missed penalty</button>
         )}
         <button disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel and roll back</button>
       </div>

@@ -2,7 +2,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Share2, MapPin, Calendar, Disc3, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, Share2, MapPin, Calendar, Disc3, ArrowUp, ArrowDown, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable } from "@/lib/db";
 import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
@@ -286,7 +286,9 @@ export default function MatchCentre({ id }) {
               : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
-            {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
+            {(m.status === "live" || m.status === "et_live") && (m.operationMode === "retrospective"
+              ? <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>{Number(m.current_period || 1) > 1 ? "Recording second half" : "Recording first half"}</span>
+              : <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />)}
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
@@ -792,6 +794,7 @@ function Ev({ e, t }) {
   if (e.type === "goal") return <GoalEvent e={e} t={t} />;
   const icon = e.type === "yellow" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.yellow, display: "inline-block" }} />
     : e.type === "red" ? <span className="rounded-sm" style={{ width: 11, height: 15, background: t.red, display: "inline-block" }} />
+    : e.type === "miss" ? <span className="inline-flex items-center justify-center" style={{ position: "relative", width: 18, height: 18 }}><MonoFootball size={15} color={t.text} /><span className="inline-flex items-center justify-center rounded-full" style={{ position: "absolute", right: -4, bottom: -3, width: 10, height: 10, background: t.red }}><X size={8} color="#fff" strokeWidth={4} /></span></span>
     : <span className="inline-flex flex-col items-center" style={{ gap: 2 }}>
         <span className="inline-flex items-center justify-center rounded-full" style={{ width: 15, height: 15, background: t.green }}><ArrowUp size={10} color="#fff" strokeWidth={3} /></span>
         <span className="inline-flex items-center justify-center rounded-full" style={{ width: 15, height: 15, background: t.red }}><ArrowDown size={10} color="#fff" strokeWidth={3} /></span>
@@ -803,6 +806,12 @@ function Ev({ e, t }) {
       return <div style={{ textAlign: align }}>
         {playerOn && <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{playerOn}</div>}
         {playerOff && <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{playerOff}</div>}
+      </div>;
+    }
+    if (e.type === "miss") {
+      return <div style={{ textAlign: align }}>
+        <div style={{ color: t.text, fontSize: 14, fontWeight: 600 }}>{hasKnownScorer(e.player) ? e.player : "Missed penalty"}</div>
+        {hasKnownScorer(e.player) && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: 2 }}>Missed penalty</div>}
       </div>;
     }
     const cardRecipient = hasKnownScorer(e.player) ? e.player : e.recipientType === "team_official" ? "Team official" : null;
@@ -1045,6 +1054,13 @@ function Commentary({ t, m, d, h, a }) {
     if (e.type === "yellow" || e.type === "red") {
       const team = e.side === "away" ? a : h;
       return { sort, m: e.min, text: cardCommentary(e, team) };
+    }
+    if (e.type === "miss") {
+      const team = e.side === "away" ? a : h;
+      const text = hasKnownScorer(e.player)
+        ? `MISSED PENALTY! ${e.player} (${team.name}) fails to convert from the spot.`
+        : `MISSED PENALTY! ${team.name} do not convert from the spot.`;
+      return { sort, m: e.min, text };
     }
     if (e.type === "sub") {
       const team = e.side === "away" ? a : h;

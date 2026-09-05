@@ -4,66 +4,36 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getMyAccess } from "@/lib/db";
-import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
 
 const defaultAdminPath = "/admin";
 const returnPathKey = "touchline-admin-return-path";
+const returnVisibleKey = "touchline-admin-return-visible";
 
 export default function AdminReturnButton() {
   const pathname = usePathname();
   const { t } = useTheme();
-  const [userId, setUserId] = useState(null);
-  const [authorized, setAuthorized] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [returnPath, setReturnPath] = useState(defaultAdminPath);
 
   useEffect(() => {
-    if (!supabase) return undefined;
+    if (pathname.startsWith("/admin")) {
+      setVisible(false);
+      return;
+    }
 
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setUserId(data.session?.user?.id || null);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id || null);
-    });
-
-    return () => {
-      mounted = false;
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    setAuthorized(false);
-    if (!userId) return () => { active = false; };
-
-    getMyAccess(userId)
-      .then(({ profile, memberships }) => {
-        if (!active) return;
-        setAuthorized(profile?.status !== "suspended" && memberships.length > 0);
-      })
-      .catch(() => {
-        if (active) setAuthorized(false);
-      });
-
-    return () => { active = false; };
-  }, [userId]);
-
-  useEffect(() => {
-    if (pathname.startsWith("/admin")) return;
     try {
       const savedPath = window.sessionStorage.getItem(returnPathKey);
       const validPath = savedPath?.startsWith("/admin") && savedPath !== "/admin/login";
       setReturnPath(validPath ? savedPath : defaultAdminPath);
+      setVisible(window.sessionStorage.getItem(returnVisibleKey) === "1");
     } catch {
       setReturnPath(defaultAdminPath);
+      setVisible(false);
     }
   }, [pathname]);
 
-  if (!authorized || pathname.startsWith("/admin")) return null;
+  if (!visible || pathname.startsWith("/admin")) return null;
 
   return (
     <Link
@@ -85,7 +55,8 @@ export default function AdminReturnButton() {
       }}
     >
       <ShieldCheck size={15} />
-      Admin portal
+      Back to admin
     </Link>
   );
 }
+

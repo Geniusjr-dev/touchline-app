@@ -5,6 +5,9 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
+const returnPathKey = "touchline-admin-return-path";
+const returnVisibleKey = "touchline-admin-return-visible";
+
 export default function AdminPortalShell({ children }) {
   const {
     user,
@@ -26,6 +29,17 @@ export default function AdminPortalShell({ children }) {
     if (!loading && !user && !isLogin) router.replace("/admin/login");
     if (!loading && user && role === "scorer" && path.startsWith("/admin/teams")) router.replace("/admin/matches");
   }, [loading, user, role, path, isLogin, router]);
+
+  useEffect(() => {
+    if (loading || !user || isLogin || !activeOrganizationId || !role) return;
+
+    try {
+      window.sessionStorage.setItem(returnPathKey, path);
+      window.sessionStorage.setItem(returnVisibleKey, "1");
+    } catch {
+      // Admin access remains protected even when browser storage is unavailable.
+    }
+  }, [loading, user, isLogin, activeOrganizationId, role, path]);
 
   if (isLogin) return children;
   if (loading || !user) return <PortalLoading />;
@@ -73,7 +87,8 @@ export default function AdminPortalShell({ children }) {
             href="/"
             onClick={() => {
               try {
-                window.sessionStorage.setItem("touchline-admin-return-path", path);
+                window.sessionStorage.setItem(returnPathKey, path);
+                window.sessionStorage.setItem(returnVisibleKey, "1");
               } catch {
                 // The return button will use the admin dashboard when storage is unavailable.
               }
@@ -85,6 +100,12 @@ export default function AdminPortalShell({ children }) {
           <button
             type="button"
             onClick={async () => {
+              try {
+                window.sessionStorage.removeItem(returnPathKey);
+                window.sessionStorage.removeItem(returnVisibleKey);
+              } catch {
+                // Signing out still continues when browser storage is unavailable.
+              }
               await signOut();
               router.replace("/admin/login");
             }}
@@ -111,3 +132,4 @@ function AdminTab({ href, path, children }) {
   const active = path === href || path.startsWith(`${href}/`);
   return <Link href={href} aria-current={active ? "page" : undefined} style={{ color: active ? "#4FC263" : "#8E939B", fontWeight: active ? 700 : 500, fontSize: 14 }}>{children}</Link>;
 }
+

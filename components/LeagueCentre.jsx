@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChevronDown, ChevronLeft, LoaderCircle, Trophy } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, Trophy } from "lucide-react";
 import CompetitionTable from "@/components/CompetitionTable";
 import { BottomNav, Crest, StatusChip } from "@/components/ui";
 import { getLeagueCentre } from "@/lib/db";
@@ -199,8 +199,8 @@ function Fixtures({ matches, teams, t, now }) {
 }
 
 function LeagueMatchRow({ match, teams, t, now, first }) {
-  const home = teams[match.home] || { name: "TBD", short: "?", color: "#555" };
-  const away = teams[match.away] || { name: "TBD", short: "?", color: "#555" };
+  const home = teams[match.home] || { name: "TBD", color: "#555" };
+  const away = teams[match.away] || { name: "TBD", color: "#555" };
   const showScore = ["live", "ht", "et_live", "et_ht", "ft"].includes(match.status);
   const rememberMatch = () => cachePublicMatch(match, teams);
   return (
@@ -212,11 +212,11 @@ function LeagueMatchRow({ match, teams, t, now, first }) {
       <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 50px minmax(0, 1fr)", gap: 8 }}>
         <div className="flex items-center justify-end gap-2 min-w-0">
           <span className="truncate" style={{ fontSize: 13, fontWeight: 700 }}>{home.name}</span>
-          <Crest short={home.short} color={home.color} logo={home.logoUrl} size={25} ring={t.divider} />
+          <Crest color={home.color} logo={home.logoUrl} label={home.name} size={25} ring={t.divider} />
         </div>
         <span style={{ textAlign: "center", color: showScore ? t.text : t.dim, fontSize: 14, fontWeight: 850, whiteSpace: "nowrap" }}>{showScore ? `${match.hs} - ${match.as}` : match.time || "TBD"}</span>
         <div className="flex items-center gap-2 min-w-0">
-          <Crest short={away.short} color={away.color} logo={away.logoUrl} size={25} ring={t.divider} />
+          <Crest color={away.color} logo={away.logoUrl} label={away.name} size={25} ring={t.divider} />
           <span className="truncate" style={{ fontSize: 13, fontWeight: 700 }}>{away.name}</span>
         </div>
       </div>
@@ -281,7 +281,7 @@ function RankingCard({ title, records, valueKey, suffix = "", accent, kind, t, o
       </div>
       {visible.map((record, index) => (
         <div key={record.id} className="flex items-center gap-3" style={{ minHeight: 43, padding: "4px 16px" }}>
-          {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={35} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest short={record.team.short} color={record.team.color} logo={record.team.logoUrl} size={15} ring={t.card} /></span>}</span> : <Crest short={record.short} color={record.color} logo={record.logoUrl} size={35} ring={t.divider} />}
+          {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={35} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest color={record.team.color} logo={record.team.logoUrl} label={record.team.name} size={15} ring={t.card} /></span>}</span> : <Crest color={record.color} logo={record.logoUrl} label={record.name} size={35} ring={t.divider} />}
           <span className="min-w-0" style={{ flex: 1 }}>
             <span className="block truncate" style={{ fontSize: 13.5 }}>{record.name}</span>
           </span>
@@ -333,7 +333,7 @@ function StatRankingSheet({ title, records, valueKey, suffix = "", kind, t, comp
         {visibleRecords.map((record, index) => (
           <div key={record.id} className="flex items-center gap-3" style={{ minHeight: 70, padding: "8px 14px", borderTop: index ? `1px solid ${t.divider}` : "none" }}>
             <span className="shrink-0" style={{ width: 22, color: t.text, textAlign: "center", fontSize: 13.5 }}>{index + 1}</span>
-            {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={42} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest short={record.team.short} color={record.team.color} logo={record.team.logoUrl} size={17} ring={t.card} /></span>}</span> : <Crest short={record.short} color={record.color} logo={record.logoUrl} size={42} ring={t.divider} />}
+            {kind === "player" ? <span className="relative shrink-0"><PlayerPhoto player={record} size={42} t={t} />{record.team && <span className="absolute" style={{ right: -5, bottom: -2 }}><Crest color={record.team.color} logo={record.team.logoUrl} label={record.team.name} size={17} ring={t.card} /></span>}</span> : <Crest color={record.color} logo={record.logoUrl} label={record.name} size={42} ring={t.divider} />}
             <span className="min-w-0" style={{ flex: 1 }}>
               <span className="block truncate" style={{ fontSize: 14.5 }}>{record.name}</span>
               <span className="block truncate" style={{ color: t.dim, fontSize: 12, marginTop: 3 }}>{rankingDetail(record, valueKey, kind)}</span>
@@ -400,7 +400,7 @@ function TotwRow({ players, t }) {
         <span className="absolute rounded-full" style={{ right: -9, top: -5, background: player.rating >= 8 ? "#1275DF" : player.rating >= 7 ? "#20A867" : "#E08B21", color: "#FFFFFF", padding: "4px 6px", fontSize: 10, fontWeight: 900, border: "2px solid rgba(255,255,255,0.8)" }}>{player.rating.toFixed(1)}</span>
       </div>
       <div className="flex items-center gap-1 rounded-full" style={{ marginTop: 5, padding: "4px 7px", background: "rgba(0,0,0,0.62)", maxWidth: "100%" }}>
-        {player.team && <Crest short={player.team.short} color={player.team.color} logo={player.team.logoUrl} size={15} ring="rgba(255,255,255,0.3)" />}
+        {player.team && <Crest color={player.team.color} logo={player.team.logoUrl} label={player.team.name} size={15} ring="rgba(255,255,255,0.3)" />}
         <span className="truncate" style={{ color: "#FFFFFF", fontSize: 9.5, fontWeight: 800 }}>{player.name}</span>
       </div>
     </div>
@@ -427,7 +427,7 @@ function Seasons({ seasons, competition, t }) {
 
 function SeasonTeam({ row, label, t, winner = false }) {
   if (!row) return null;
-  return <div className="flex items-center gap-3" style={{ padding: "8px 2px" }}><span className="inline-flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: winner ? t.disc : t.chip }}>{winner ? <Trophy size={16} color={t.yellow} /> : <span style={{ color: t.dim, fontSize: 12, fontWeight: 900 }}>2</span>}</span><Crest short={row.short} color={row.color} logo={row.logoUrl} size={34} ring={t.divider} /><span className="min-w-0" style={{ flex: 1 }}><span className="block" style={{ color: t.dim, fontSize: 10.5 }}>{label}</span><span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, marginTop: 2 }}>{row.name}</span></span><span style={{ color: t.dim, fontSize: 11.5, fontWeight: 750 }}>{row.pts} pts</span></div>;
+  return <div className="flex items-center gap-3" style={{ padding: "8px 2px" }}><span className="inline-flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: winner ? t.disc : t.chip }}>{winner ? <Trophy size={16} color={t.yellow} /> : <span style={{ color: t.dim, fontSize: 12, fontWeight: 900 }}>2</span>}</span><Crest color={row.color} logo={row.logoUrl} label={row.name} size={34} ring={t.divider} /><span className="min-w-0" style={{ flex: 1 }}><span className="block" style={{ color: t.dim, fontSize: 10.5 }}>{label}</span><span className="block truncate" style={{ fontSize: 13.5, fontWeight: 800, marginTop: 2 }}>{row.name}</span></span><span style={{ color: t.dim, fontSize: 11.5, fontWeight: 750 }}>{row.pts} pts</span></div>;
 }
 
 function PlayerPhoto({ player, size, t, light = false }) {
@@ -461,14 +461,46 @@ function EmptyCard({ t, children }) {
 function LeagueShell({ t, error, onRetry }) {
   return (
     <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
+      <header style={{ height: 144, background: "#4B125F" }}>
+        <div className="flex items-center px-3" style={{ height: 48, gap: 8 }}>
+          <span className="touchline-skeleton rounded-full" style={{ width: 34, height: 34, background: "rgba(255,255,255,0.18)" }} />
+          <span className="touchline-skeleton rounded-full" style={{ width: 104, height: 34, marginLeft: "auto", background: "rgba(255,255,255,0.18)" }} />
+          <span className="touchline-skeleton rounded-full" style={{ width: 86, height: 34, background: "rgba(255,255,255,0.18)" }} />
+        </div>
+        <div className="flex items-center px-4" style={{ height: 54, gap: 11 }}>
+          <span className="touchline-skeleton rounded-xl" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.18)" }} />
+          <span style={{ flex: 1 }}>
+            <span className="touchline-skeleton block rounded" style={{ width: "58%", height: 13, background: "rgba(255,255,255,0.2)" }} />
+            <span className="touchline-skeleton block rounded" style={{ width: 62, height: 9, marginTop: 7, background: "rgba(255,255,255,0.14)" }} />
+          </span>
+        </div>
+        <div className="flex items-center" style={{ height: 42, borderTop: "1px solid rgba(255,255,255,0.16)", padding: "0 14px", gap: 26 }}>
+          {[52, 62, 48, 74].map((width, index) => <span key={index} className="touchline-skeleton rounded" style={{ width, height: 10, background: "rgba(255,255,255,0.16)" }} />)}
+        </div>
+      </header>
+
       {error ? (
         <div className="mx-3 mt-4 rounded-2xl text-center" style={{ padding: 22, background: t.card }}>
           <div style={{ fontSize: 14 }}>{error}</div>
           <button type="button" onClick={onRetry} className="rounded-full" style={{ marginTop: 12, padding: "9px 16px", background: t.accent, color: "#07130B", fontSize: 13 }}>Try again</button>
         </div>
       ) : (
-        <div className="flex items-center justify-center" role="status" aria-label="Loading competition" style={{ minHeight: "calc(100vh - 82px)" }}>
-          <LoaderCircle className="animate-spin" size={22} color={t.dim} strokeWidth={1.7} />
+        <div aria-hidden="true">
+          <div className="flex gap-2 px-2 pt-2">
+            <span className="touchline-skeleton rounded-full" style={{ flex: 1, height: 42, background: t.pill }} />
+            <span className="touchline-skeleton rounded-full" style={{ width: 112, height: 42, background: t.pill }} />
+          </div>
+          <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
+            <div style={{ height: 44, borderBottom: `1px solid ${t.divider}` }} />
+            {[0, 1, 2, 3, 4, 5].map((row) => (
+              <div key={row} className="flex items-center px-3" style={{ height: 50, borderTop: row ? `1px solid ${t.divider}` : "none" }}>
+                <span className="touchline-skeleton rounded" style={{ width: 14, height: 11, background: t.chip }} />
+                <span className="touchline-skeleton rounded-full" style={{ width: 24, height: 24, marginLeft: 12, background: t.chip }} />
+                <span className="touchline-skeleton rounded" style={{ width: 112, height: 11, marginLeft: 9, background: t.chip }} />
+                <span className="touchline-skeleton rounded" style={{ width: 96, height: 11, marginLeft: "auto", background: t.chip }} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
       <BottomNav t={t} active="Leagues" />

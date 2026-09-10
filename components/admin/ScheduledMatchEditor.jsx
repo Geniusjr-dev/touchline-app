@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { deleteScheduledMatch, getMatchRaw, listCompetitionTeams, listCompetitions, listTeams, updateScheduledMatch } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
+import { Crest } from "@/components/ui";
 
 function formValues(match) {
   return {
@@ -68,6 +69,8 @@ export default function ScheduledMatchEditor({ id }) {
   }, [values?.competitionId]);
 
   const selectedCompetition = competitions.find((competition) => competition.id === values?.competitionId);
+  const selectedHome = teams.find((team) => team.id === values?.homeId) || null;
+  const selectedAway = teams.find((team) => team.id === values?.awayId) || null;
   const eligibleTeams = useMemo(() => {
     if (!selectedCompetition || selectedCompetition.competition_type === "friendly") return teams;
     const registered = new Set(competitionTeams.filter((entry) => selectedCompetition.competition_type !== "tournament" || Number(entry.group_number) === Number(values?.groupNumber)).map((entry) => entry.team_id));
@@ -103,8 +106,8 @@ export default function ScheduledMatchEditor({ id }) {
   return (
     <div>
       <div className="flex items-center gap-3" style={{ marginBottom: 18 }}>
-        <Link href="/admin/matches" aria-label="Back to matches" className="inline-flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--admin-elevated)", border: "1px solid var(--admin-control-border)" }}><ChevronLeft size={20} /></Link>
-        <span><h1 style={{ fontSize: 20, margin: 0 }}>Edit scheduled match</h1><span className="block" style={{ color: "var(--admin-dim)", fontSize: 12, marginTop: 3 }}>Changes are allowed only before kick-off.</span></span>
+        <Link href="/admin/matches" aria-label="Back to matches" className="inline-flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "50%", background: "#1B1D20", border: "1px solid #2A2C30" }}><ChevronLeft size={20} /></Link>
+        <span><h1 style={{ fontSize: 20, margin: 0 }}>Edit scheduled match</h1><span className="block" style={{ color: "#8E939B", fontSize: 12, marginTop: 3 }}>Changes are allowed only before kick-off.</span></span>
       </div>
 
       {!values && !error && <div className="touchline-skeleton" style={{ ...card, height: 260 }} />}
@@ -112,6 +115,11 @@ export default function ScheduledMatchEditor({ id }) {
       {match && match.status !== "scheduled" && <div style={{ ...card, color: "#F5C518" }}>This match has already started and can no longer be edited or deleted from scheduling.</div>}
       {values && match?.status === "scheduled" && (
         <form onSubmit={save} style={card}>
+          <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 34px minmax(0, 1fr)", gap: 10, padding: "2px 0 18px", marginBottom: 16, borderBottom: "1px solid #26282B" }}>
+            <SelectedTeam team={selectedHome} fallback="Choose home team" />
+            <span style={{ color: "#6F757E", fontSize: 12, textAlign: "center" }}>vs</span>
+            <SelectedTeam team={selectedAway} fallback="Choose away team" away />
+          </div>
           <div style={formGrid}>
             <Field label="Competition"><select value={values.competitionId} onChange={(event) => setValues((current) => ({ ...current, competitionId: event.target.value, groupNumber: "", homeId: "", awayId: "" }))} style={inp}><option value="">Choose competition</option>{competitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.name} · {competition.competition_type}</option>)}</select></Field>
             {selectedCompetition?.competition_type === "tournament" && <Field label="Tournament group"><select value={values.groupNumber} onChange={(event) => setValues((current) => ({ ...current, groupNumber: event.target.value, homeId: "", awayId: "" }))} style={inp}><option value="">Choose group</option>{Array.from({ length: Number(selectedCompetition.group_count) || 0 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Group {String.fromCharCode(64 + number)}</option>)}</select></Field>}
@@ -136,11 +144,19 @@ export default function ScheduledMatchEditor({ id }) {
   );
 }
 
-function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}><span style={{ color: "var(--admin-dim)", fontSize: 12 }}>{label}</span>{children}</label>; }
+function SelectedTeam({ team, fallback, away = false }) {
+  return <span className="flex items-center min-w-0" style={{ gap: 8, justifyContent: away ? "flex-start" : "flex-end" }}>
+    {!away && <span className="truncate" style={{ fontSize: 13, textAlign: "right" }}>{team?.display_name || team?.name || fallback}</span>}
+    <Crest logo={team?.logo_url} color={team?.color} label={team?.display_name || team?.name || "Team"} size={36} ring="#32363C" />
+    {away && <span className="truncate" style={{ fontSize: 13 }}>{team?.display_name || team?.name || fallback}</span>}
+  </span>;
+}
 
-const card = { background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 14, padding: 16 };
+function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}><span style={{ color: "#8E939B", fontSize: 12 }}>{label}</span>{children}</label>; }
+
+const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
 const formGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, alignItems: "end" };
-const inp = { width: "100%", minWidth: 0, boxSizing: "border-box", padding: 10, borderRadius: 9, border: "1px solid var(--admin-control-border)", background: "var(--admin-input)", color: "var(--admin-text)", fontSize: 14, outline: "none" };
-const pickerInput = { ...inp, colorScheme: "inherit", cursor: "pointer" };
+const inp = { width: "100%", minWidth: 0, boxSizing: "border-box", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
+const pickerInput = { ...inp, colorScheme: "dark", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: 0, background: "#4FC263", color: "#07130B", cursor: "pointer" };
-const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "var(--admin-soft-danger)", color: "var(--admin-danger-text)", cursor: "pointer" };
+const dangerBtn = { padding: "10px 16px", borderRadius: 9, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", cursor: "pointer" };

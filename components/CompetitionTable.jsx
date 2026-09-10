@@ -119,7 +119,7 @@ export default function CompetitionTable({ t, competition, rows }) {
                 <span className="league-table-number" style={{ color: t.dim, fontSize: 12.5 }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
-                <Crest short={team.short} color={team.color} logo={team.logoUrl} size={24} ring={t.divider} />
+                <Crest color={team.color} logo={team.logoUrl} label={team.name} size={24} ring={t.divider} />
                 <span className="truncate" style={{ color: t.text, fontSize: 13 }}>{team.name}</span>
               </div>
 

@@ -1,28 +1,28 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
-import { Search, Newspaper, Trophy, Star } from "lucide-react";
+import { Search, Newspaper, Trophy, Star, Shield } from "lucide-react";
 import { liveMinute } from "@/lib/db";
-import { readableTextColor } from "@/lib/teamColors";
 
-export function Crest({ short, color, logo, size = 26, ring }) {
+export function Crest({ logo, size = 26, ring, label = "" }) {
+  const [failedLogo, setFailedLogo] = useState("");
+  const showLogo = Boolean(logo && failedLogo !== logo);
   return (
-    <span className="inline-flex items-center justify-center shrink-0"
+    <span className="inline-flex items-center justify-center shrink-0" aria-label={!showLogo && label ? `${label} logo unavailable` : undefined}
       style={{
         width: size,
         height: size,
-        borderRadius: logo ? 0 : "50%",
-        background: logo ? "transparent" : color,
-        color: readableTextColor(color),
-        fontSize: size * 0.36,
-        fontWeight: 800,
-        boxShadow: !logo ? `${ring ? `0 0 0 1.5px ${ring}, ` : ""}inset 0 0 0 1px rgba(127,127,127,.28)` : "none",
+        borderRadius: showLogo ? 0 : "50%",
+        background: showLogo ? "transparent" : "#E1E3E6",
+        color: "#858B94",
+        boxShadow: !showLogo ? `${ring ? `0 0 0 1.5px ${ring}, ` : ""}inset 0 0 0 1px rgba(127,127,127,.28)` : "none",
         overflow: "hidden",
       }}>
-      {logo ? (
+      {showLogo ? (
         // Supabase public media URLs are administrator-controlled team assets.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", background: "transparent", filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }} />
-      ) : short}
+        <img src={logo} alt={label ? `${label} logo` : ""} onError={() => setFailedLogo(logo)} style={{ width: "100%", height: "100%", objectFit: "contain", background: "transparent", filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }} />
+      ) : <Shield aria-hidden="true" size={size * 0.56} strokeWidth={1.7} />}
     </span>
   );
 }

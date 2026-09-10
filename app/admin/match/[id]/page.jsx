@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
+import { Crest } from "@/components/ui";
 import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
 import { groupPlayersByPosition, playerPositionGroup } from "@/lib/playerPositions";
-import { readableTextColor } from "@/lib/teamColors";
 import {
   announcedStoppageMinutes,
   attributeMatchGoal,
@@ -249,8 +249,8 @@ export default function Scorer() {
   }, [m, teams]);
 
   if (!m) return <AdminMatchShell error={error} onRetry={load} />;
-  const homeTeam = teams[m.home_id] || { name: "Home", short: "H", color: "#18A558" };
-  const awayTeam = teams[m.away_id] || { name: "Away", short: "A", color: "#2563EB" };
+  const homeTeam = teams[m.home_id] || { name: "Home", color: "#18A558" };
+  const awayTeam = teams[m.away_id] || { name: "Away", color: "#2563EB" };
   const home = { ...homeTeam, color: homeKitColor || m.home_kit_color || homeTeam.color };
   const away = { ...awayTeam, color: awayKitColor || m.away_kit_color || awayTeam.color };
   const storedHome = m.home_score ?? events.filter((e) => e.type === "goal" && e.side === "home").length;
@@ -1266,9 +1266,9 @@ function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave })
     <div>
       <div style={label}>MATCH STATISTICS</div>
       <div style={{ display: "grid", gridTemplateColumns: "80px minmax(140px, 1fr) 80px", gap: 12, alignItems: "center" }}>
-        <strong style={{ textAlign: "center", fontSize: 13 }}>{home.short}</strong>
+        <span className="inline-flex justify-center"><Badge t={home} size={32} /></span>
         <span />
-        <strong style={{ textAlign: "center", fontSize: 13 }}>{away.short}</strong>
+        <span className="inline-flex justify-center"><Badge t={away} size={32} /></span>
         {rows.map(([rowLabel, homeKey, awayKey]) => (
           <div key={rowLabel} style={{ display: "contents" }}>
             <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[homeKey]} onChange={(event) => onChange(homeKey, event.target.value)} style={statInput} />
@@ -1290,6 +1290,7 @@ function KitPicker({ label: kitLabel, team, color, onChange }) {
       <span style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <KitShirt color={selectedColor} />
+        <Badge t={team} size={30} />
         <span style={{ minWidth: 0, flex: 1 }}>
           <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
           <span style={{ color: "#8E939B", fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
@@ -1793,7 +1794,7 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
 }
 
 function Badge({ t, size = 40 }) {
-  return <span style={{ width: size, height: size, borderRadius: "50%", background: t.color, color: readableTextColor(t.color), border: "1px solid rgba(127,127,127,.28)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.36 }}>{t.short}</span>;
+  return <Crest logo={t.logo_url || t.logoUrl} color={t.color} label={t.display_name || t.displayName || t.name} size={size} ring="#32363C" />;
 }
 
 function PreviewField({ label: fieldLabel, children }) {

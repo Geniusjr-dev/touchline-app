@@ -237,8 +237,8 @@ export default function MatchCentre({ id }) {
   const { match: m, teams, detail: d } = state;
   if (!m) return <MatchPageShell t={t} onBack={goBack} error="Match not found." onRetry={load} />;
 
-  const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
-  const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
+  const h = teams[m.home] || { name: "TBD", color: "#555" };
+  const a = teams[m.away] || { name: "TBD", color: "#555" };
   const homeKitColor = m.homeKitColor || h.color || "#18A558";
   const awayKitColor = m.awayKitColor || a.color || "#2563EB";
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
@@ -277,7 +277,7 @@ export default function MatchCentre({ id }) {
 
         <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
           <Link aria-label={h.name} href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
-            <Crest short={h.short} color={homeKitColor} logo={h.logoUrl} size={44} ring={t.divider} />
+            <Crest color={homeKitColor} logo={h.logoUrl} label={h.name} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
           </Link>
           <div className="flex flex-col items-center pt-1 min-w-0">
@@ -290,7 +290,7 @@ export default function MatchCentre({ id }) {
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
-            <Crest short={a.short} color={awayKitColor} logo={a.logoUrl} size={44} ring={t.divider} />
+            <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={44} ring={t.divider} />
             <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
           </Link>
         </div>
@@ -488,7 +488,7 @@ function LineupTeamHeading({ team, formation, color, background, side }) {
   const away = side === "away";
   return (
     <div className={`flex items-center gap-2.5 px-4 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 46, background }}>
-      <Crest short={team.short} color={color} logo={team.logoUrl} size={24} ring="rgba(255,255,255,.22)" />
+      <Crest color={color} logo={team.logoUrl} label={team.name} size={24} ring="rgba(255,255,255,.22)" />
       <strong className="truncate" style={{ color: "#FFFFFF", fontSize: 13, fontWeight: 750 }}>{team.name}</strong>
       <span style={{ color: "rgba(255,255,255,.72)", fontSize: 12.5, fontWeight: 650 }}>{formation || DEFAULT_FORMATION}</span>
     </div>
@@ -644,7 +644,7 @@ function LineupEventBadges({ player, side, events, compact = false }) {
 function SubstituteTeamHeading({ team, color, t, away = false }) {
   return (
     <div className={`flex items-center gap-2 px-3 ${away ? "flex-row-reverse text-right" : ""}`} style={{ height: 36, background: t.chip, borderBottom: `1px solid ${t.divider}` }}>
-      <Crest short={team.short} color={color} logo={team.logoUrl} size={20} ring={t.divider} />
+      <Crest color={color} logo={team.logoUrl} label={team.name} size={20} ring={t.divider} />
       <span className="truncate" style={{ color: t.text, fontSize: 10.5, fontWeight: 700 }}>{team.name}</span>
     </div>
   );
@@ -1220,7 +1220,7 @@ function TableTab({ t, m, rows }) {
                 <span className="league-table-number" style={{ color: t.dim, fontSize: 13 }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
-                <Crest short={tm.short} color={tm.color} logo={tm.logoUrl} size={24} ring={t.divider} />
+                <Crest color={tm.color} logo={tm.logoUrl} label={tm.name} size={24} ring={t.divider} />
                 <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 700 }}>{tm.name}</span>
                 {isLive && highlighted && <span className="rounded-full" title="Playing now" style={{ width: 7, height: 7, background: t.accent, flex: "0 0 auto" }} />}
               </div>
@@ -1336,9 +1336,9 @@ function H2H({ t, h, a, homeId, awayId, meetings }) {
                 <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 22, background: t.chip, color: t.dim, fontSize: 10, fontWeight: 800 }}>FT</span>
                 <div className="flex items-center justify-center" style={{ gap: 7, minWidth: 0 }}>
                   <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{historicalHome.name}</span>
-                  <Crest short={historicalHome.short} color={historicalHome.color} logo={historicalHome.logoUrl} size={27} ring={t.divider} />
+                  <Crest color={historicalHome.color} logo={historicalHome.logoUrl} label={historicalHome.name} size={27} ring={t.divider} />
                   <strong style={{ color: t.text, fontSize: 14, minWidth: 39, textAlign: "center", whiteSpace: "nowrap" }}>{meeting.homeScore} - {meeting.awayScore}</strong>
-                  <Crest short={historicalAway.short} color={historicalAway.color} logo={historicalAway.logoUrl} size={27} ring={t.divider} />
+                  <Crest color={historicalAway.color} logo={historicalAway.logoUrl} label={historicalAway.name} size={27} ring={t.divider} />
                   <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "left", fontSize: 12.5, fontWeight: 700 }}>{historicalAway.name}</span>
                 </div>
               </div>

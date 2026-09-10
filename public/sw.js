@@ -7,7 +7,7 @@ self.addEventListener("push", (event) => {
   }
   event.waitUntil(self.registration.showNotification(message.title || "Touchline", {
     body: message.body || "Match update.",
-    icon: "/touchline-icon.svg",
+    icon: message.icon || "/touchline-icon.svg",
     badge: "/touchline-badge.svg",
     tag: message.tag || "touchline-match-update",
     renotify: true,

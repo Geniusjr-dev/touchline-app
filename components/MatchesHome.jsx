@@ -44,8 +44,8 @@ function isValidDateKey(value) {
 }
 
 function MatchRow({ m, teams, t, now }) {
-  const h = teams[m.home] || { name: "TBD", short: "?", color: "#555" };
-  const a = teams[m.away] || { name: "TBD", short: "?", color: "#555" };
+  const h = teams[m.home] || { name: "TBD", color: "#555" };
+  const a = teams[m.away] || { name: "TBD", color: "#555" };
   const homeName = h.displayName || h.name;
   const awayName = a.displayName || a.name;
   const showScore = ["live", "ht", "ft", "et_live", "et_ht"].includes(m.status);
@@ -97,7 +97,7 @@ function MatchRow({ m, teams, t, now }) {
       )}
       <div className="flex items-center justify-end gap-1.5 min-w-0" style={{ paddingLeft: showStatus ? 42 : 0 }}>
         <span className="min-w-0 text-right" style={teamNameStyle}>{homeName}</span>
-        <Crest short={h.short} color={h.color} logo={h.logoUrl} size={24} ring={t.divider} />
+        <Crest color={h.color} logo={h.logoUrl} label={homeName} size={24} ring={t.divider} />
       </div>
       <div className="shrink-0 text-center min-w-0">
         {showScore
@@ -105,7 +105,7 @@ function MatchRow({ m, teams, t, now }) {
           : <span style={{ color: t.dim, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
       </div>
       <div className="flex items-center justify-start gap-1.5 min-w-0" style={{ paddingRight: m.status === "scheduled" ? 14 : 0 }}>
-        <Crest short={a.short} color={a.color} logo={a.logoUrl} size={24} ring={t.divider} />
+        <Crest color={a.color} logo={a.logoUrl} label={awayName} size={24} ring={t.divider} />
         <span className="min-w-0 text-left" style={teamNameStyle}>{awayName}</span>
       </div>
       </Link>

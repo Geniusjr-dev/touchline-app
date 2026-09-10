@@ -130,7 +130,7 @@ export default function TeamCentre({ id }) {
           </div>
         </div>
         <div className="flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
-          <Crest short={team.short} color={team.color} logo={team.logoUrl} size={64} ring={t.divider} />
+          <Crest color={team.color} logo={team.logoUrl} label={team.name} size={64} ring={t.divider} />
           <div className="min-w-0">
             <h1 style={{ fontSize: 20, lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
             <div style={{ color: t.dim, fontSize: 14, fontWeight: 650, marginTop: 6 }}>{team.country}</div>
@@ -223,7 +223,7 @@ function Overview({ state, t, onMatches }) {
               return (
                 <Link href={`/match/${match.id}`} key={match.id} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="flex flex-col items-center shrink-0" style={{ gap: 8, width: 48 }}>
                   <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "4px 7px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
-                  <Crest short={opponent?.short || "?"} color={opponent?.color || "#555"} logo={opponent?.logoUrl} size={30} ring={t.divider} />
+                  <Crest color={opponent?.color || "#555"} logo={opponent?.logoUrl} label={opponent?.name || "Team"} size={30} ring={t.divider} />
                 </Link>
               );
             })}
@@ -266,18 +266,18 @@ function MatchList({ title, matches, teams, t }) {
 }
 
 function TeamMatchLine({ match, teams, t, large = false }) {
-  const home = teams[match.home] || { name: "TBD", short: "?", color: "#555" };
-  const away = teams[match.away] || { name: "TBD", short: "?", color: "#555" };
+  const home = teams[match.home] || { name: "TBD", color: "#555" };
+  const away = teams[match.away] || { name: "TBD", color: "#555" };
   const score = match.status === "scheduled" ? (match.time || "TBD") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
   return (
     <Link href={`/match/${match.id}`} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">
         <span className="text-right" style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
-        <Crest short={home.short} color={home.color} logo={home.logoUrl} size={large ? 34 : 28} ring={t.divider} />
+        <Crest color={home.color} logo={home.logoUrl} label={home.name} size={large ? 34 : 28} ring={t.divider} />
       </div>
       <span style={{ color: match.status === "live" ? t.green : match.status === "scheduled" ? t.dim : t.text, fontSize: large ? 16 : 14, fontWeight: 800, whiteSpace: "nowrap" }}>{score}</span>
       <div className="flex items-center gap-2 min-w-0">
-        <Crest short={away.short} color={away.color} logo={away.logoUrl} size={large ? 34 : 28} ring={t.divider} />
+        <Crest color={away.color} logo={away.logoUrl} label={away.name} size={large ? 34 : 28} ring={t.divider} />
         <span style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{away.name}</span>
       </div>
     </Link>
@@ -296,7 +296,7 @@ function Table({ state, t }) {
           {state.table.map((row, index) => (
             <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", borderTop: `1px solid ${t.divider}`, background: row.id === state.team.id ? t.hl : "transparent", fontSize: 12.5 }}>
               <span className="league-table-number">{index + 1}</span>
-              <span className="flex items-center gap-2 min-w-0"><Crest short={row.short} color={row.color} logo={row.logoUrl} size={26} ring={t.divider} /><span>{row.name}</span></span>
+              <span className="flex items-center gap-2 min-w-0"><Crest color={row.color} logo={row.logoUrl} label={row.name} size={26} ring={t.divider} /><span>{row.name}</span></span>
               <span className="league-table-number">{row.pl}</span><span className="league-table-number">{row.w}</span><span className="league-table-number">{row.d}</span><span className="league-table-number">{row.l}</span><span className="league-table-number">{row.gf - row.ga}</span><span className="league-table-number">{row.pts}</span>
               <span className="flex gap-1">{row.form.slice(-5).map((result, resultIndex) => <i key={`${result}-${resultIndex}`} className="rounded-full" style={{ width: 9, height: 9, background: result === "W" ? t.green : result === "L" ? t.red : t.drawPill }} />)}</span>
             </Link>

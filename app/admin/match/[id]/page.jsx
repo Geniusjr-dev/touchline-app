@@ -675,6 +675,12 @@ export default function Scorer() {
   function goalAttributionPools(goalEvent) {
     const scoringSide = goalEvent.side;
     const opponentSide = scoringSide === "home" ? "away" : "home";
+    if (isRetrospective) {
+      return {
+        scoring: squads[sideTeamId(scoringSide)] || [],
+        opponent: squads[sideTeamId(opponentSide)] || [],
+      };
+    }
     return {
       scoring: substitutionPools(scoringSide, goalEvent).onFieldPlayers,
       opponent: substitutionPools(opponentSide, goalEvent).onFieldPlayers,
@@ -974,6 +980,7 @@ export default function Scorer() {
           opponentTeam={pending.side === "home" ? away : home}
           scoringPlayers={pendingGoalPools.scoring}
           opponentPlayers={pendingGoalPools.opponent}
+          retrospective={isRetrospective}
           busy={busy}
           onCancel={() => !busy && setPending(null)}
           onSave={confirmGoalAttribution}
@@ -1488,7 +1495,7 @@ function EventTimeModal({ pending, match, busy, onCancel, onContinue }) {
   );
 }
 
-function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlayers, opponentPlayers, busy, onCancel, onSave }) {
+function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlayers, opponentPlayers, retrospective, busy, onCancel, onSave }) {
   const event = pending.event || {};
   const initialGoalType = event.goal_type === "direct_goal" ? "normal_goal" : event.goal_type || "normal_goal";
   const [goalType, setGoalType] = useState(initialGoalType);
@@ -1526,7 +1533,9 @@ function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlaye
           <span style={{ color: secondsLeft > 0 ? "#4FC263" : "#F5C518", fontSize: 12, fontWeight: 750 }}>{secondsLeft > 0 ? `00:${String(secondsLeft).padStart(2, "0")}` : "Still editable"}</span>
         </div>
         <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 14 }}>
-          The score and first alert are already live. Add the scorer now to send the separate player alert. Only players who were on the field at the time of the goal are shown.
+          {retrospective
+            ? "Select the scorer from the registered squad. This completed-match recording remains private until you finish it."
+            : "The score and first alert are already live. Add the scorer now to send the separate player alert. Only players who were on the field at the time of the goal are shown."}
         </div>
 
         <div style={{ ...flabel, marginTop: 0 }}>Goal type</div>
@@ -1548,7 +1557,7 @@ function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlaye
               <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
             </button>
           ))}
-          {eligibleScorers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, lineHeight: 1.45, padding: "8px 0" }}>No eligible on-field players were found. Publish a complete lineup before kick-off, or leave this goal without a player name.</div>}
+          {eligibleScorers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, lineHeight: 1.45, padding: "8px 0" }}>{retrospective ? "No players are registered for this squad. Add the player to the team squad, or leave this goal without a player name." : "No eligible on-field players were found. Publish a complete lineup before kick-off, or leave this goal without a player name."}</div>}
           {eligibleScorers.length > 0 && filteredScorers.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "8px 0" }}>No on-field player matches that search.</div>}
         </div>
         <button type="button" disabled={busy} onClick={() => { setSelectedPlayer(null); setSelectedAssist(null); }} style={{ ...playerButton, width: "100%", marginTop: 9, color: "#F5C518", borderColor: !selectedPlayer ? "#F5C518" : "#2A2C30" }}>Leave player name unconfirmed</button>

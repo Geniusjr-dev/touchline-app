@@ -49,6 +49,7 @@ export function ThemeProvider({ children }) {
     document.documentElement.style.background = THEMES[mode].bg;
     document.body.style.background = THEMES[mode].bg;
     document.documentElement.style.colorScheme = mode;
+    document.documentElement.dataset.theme = mode;
   }, [mode, restored]);
 
   const value = {

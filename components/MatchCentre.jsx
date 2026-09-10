@@ -152,6 +152,8 @@ export default function MatchCentre({ id }) {
   const refreshTimerRef = useRef(null);
   const tableRequestRef = useRef("");
   const tableRowsRef = useRef(new Map());
+  const tabStripRef = useRef(null);
+  const tabSwipeRef = useRef(null);
   const goBack = () => {
     if (window.history.length > 1) router.back();
     else router.push("/");
@@ -252,6 +254,31 @@ export default function MatchCentre({ id }) {
   const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
   const defaultTab = started ? "Facts" : "Preview";
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
+  const selectTab = (next) => {
+    setTab(next);
+    window.requestAnimationFrame(() => {
+      tabStripRef.current?.querySelector(`[data-match-tab="${next}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    });
+  };
+  const shiftTab = (amount) => {
+    const index = tabs.indexOf(activeTab);
+    const next = tabs[index + amount];
+    if (next) selectTab(next);
+  };
+  const startTabSwipe = (event) => {
+    const touch = event.touches[0];
+    tabSwipeRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+  const finishTabSwipe = (event) => {
+    const start = tabSwipeRef.current;
+    const touch = event.changedTouches[0];
+    tabSwipeRef.current = null;
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    shiftTab(dx < 0 ? 1 : -1);
+  };
   const hs = m.hs != null ? m.hs : 0, as = m.as != null ? m.as : 0;
   const announcedStoppage = announcedStoppageMinutes(m);
   const homeScorers = scorerSummary(d?.events, "home", d?.lineups?.[m.home]);
@@ -307,11 +334,11 @@ export default function MatchCentre({ id }) {
           </div>
         )}
 
-        <div className="flex items-center gap-5 px-4 overflow-x-auto no-scrollbar" style={{ height: 42, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
+        <div ref={tabStripRef} className="flex items-center gap-5 px-4 overflow-x-auto no-scrollbar" style={{ height: 42, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
           {tabs.map((tb) => {
             const on = tb === activeTab;
             return (
-              <button key={tb} onClick={() => setTab(tb)} className="shrink-0 relative h-full" style={{ color: on ? t.text : t.tab, fontSize: 13, fontWeight: on ? 750 : 600 }}>
+              <button data-match-tab={tb} key={tb} onClick={() => selectTab(tb)} className="shrink-0 relative h-full" style={{ color: on ? t.text : t.tab, fontSize: 13, fontWeight: on ? 750 : 600 }}>
                 {tb}{on && <span className="absolute left-0 right-0" style={{ bottom: 0, height: 3, background: t.text, borderRadius: 3 }} />}
               </button>
             );
@@ -319,6 +346,7 @@ export default function MatchCentre({ id }) {
         </div>
       </div>
 
+      <div onTouchStart={startTabSwipe} onTouchEnd={finishTabSwipe} style={{ minHeight: "calc(100vh - 220px)", touchAction: "pan-y" }}>
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
@@ -326,6 +354,7 @@ export default function MatchCentre({ id }) {
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} homeId={m.home} awayId={m.away} meetings={d?.h2h || []} />}
+      </div>
 
       <BottomNav t={t} active="Matches" />
     </div>

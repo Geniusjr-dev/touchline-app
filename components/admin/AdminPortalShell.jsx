@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
+import { useTheme } from "@/lib/theme";
 
 const returnPathKey = "touchline-admin-return-path";
 const returnVisibleKey = "touchline-admin-return-visible";
 
 export default function AdminPortalShell({ children }) {
+  const { mode, t, toggle } = useTheme();
   const {
     user,
     profile,
@@ -63,7 +65,7 @@ export default function AdminPortalShell({ children }) {
   if (role === "scorer" && path.startsWith("/admin/teams")) return <PortalLoading />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#fff" }}>
+    <div data-admin-theme data-theme={mode} style={{ minHeight: "100vh", background: t.page, color: t.text }}>
       <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderBottom: "1px solid #26282B", position: "sticky", top: 0, background: "#0A0A0A", zIndex: 10, flexWrap: "wrap" }}>
         <Link href="/admin" style={{ fontSize: 17 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline <span style={{ color: "#8E939B", fontSize: 13 }}>admin</span></Link>
         <nav aria-label="Administration" style={{ display: "flex", gap: 14, marginLeft: 8 }}>
@@ -71,6 +73,7 @@ export default function AdminPortalShell({ children }) {
           <AdminTab href="/admin/matches" path={path}>Matches</AdminTab>
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <button type="button" onClick={toggle} aria-label={`Use ${mode === "dark" ? "light" : "dark"} mode`} style={{ background: t.pill, color: t.text, border: `1px solid ${t.pillBorder}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>{mode === "dark" ? "Light" : "Dark"}</button>
           {memberships.length > 1 && (
             <select
               value={activeOrganizationId}
@@ -132,4 +135,3 @@ function AdminTab({ href, path, children }) {
   const active = path === href || path.startsWith(`${href}/`);
   return <Link href={href} aria-current={active ? "page" : undefined} style={{ color: active ? "#4FC263" : "#8E939B", fontWeight: active ? 700 : 500, fontSize: 14 }}>{children}</Link>;
 }
-

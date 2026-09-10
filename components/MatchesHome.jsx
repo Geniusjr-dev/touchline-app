@@ -141,6 +141,7 @@ export default function MatchesHome() {
   const [data, setData] = useState(null);
   const [now, setNow] = useState(0);
   const dateStripRef = useRef(null);
+  const dateSwipeRef = useRef(null);
   const todayKey = now ? localDateKey(new Date(now)) : "";
   const [selectedDateOverride, setSelectedDateOverride] = useState(null);
   const selectedDate = selectedDateOverride || todayKey;
@@ -222,6 +223,27 @@ export default function MatchesHome() {
     }
   };
 
+  const shiftSelectedDate = (amount) => {
+    if (!selectedDate) return;
+    selectDate(localDateKey(addLocalDays(new Date(`${selectedDate}T12:00:00`), amount)));
+  };
+
+  const startDateSwipe = (event) => {
+    const touch = event.touches[0];
+    dateSwipeRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const finishDateSwipe = (event) => {
+    const start = dateSwipeRef.current;
+    const touch = event.changedTouches[0];
+    dateSwipeRef.current = null;
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    shiftSelectedDate(dx < 0 ? 1 : -1);
+  };
+
   const comps = !data ? [] : data.competitions
     .map((competition) => ({
       ...competition,
@@ -299,13 +321,15 @@ export default function MatchesHome() {
         })}
       </div>
 
-      {!data && <HomeContentShell t={t} />}
-      {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
-      {data && comps.length === 0 && (
-        <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
-          {liveOnly ? `No live matches on ${selectedLabel}.` : `No matches scheduled for ${selectedLabel}.`}
-        </div>
-      )}
+      <main onTouchStart={startDateSwipe} onTouchEnd={finishDateSwipe} style={{ minHeight: "calc(100vh - 176px)", touchAction: "pan-y" }}>
+        {!data && <HomeContentShell t={t} />}
+        {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
+        {data && comps.length === 0 && (
+          <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
+            {liveOnly ? `No live matches on ${selectedLabel}.` : `No matches scheduled for ${selectedLabel}.`}
+          </div>
+        )}
+      </main>
 
       {selectedDate && selectedDate !== todayKey && (
         <button

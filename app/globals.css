@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { margin: 0; padding: 0; background: #0A0A0A; overflow-x: hidden; }
+html, body { margin: 0; padding: 0; background: #0A0A0A; overflow-x: hidden; overscroll-behavior-y: contain; }
 html { font-size: 14px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body,
 button,
@@ -20,11 +20,47 @@ textarea {
 body * { font-weight: 400 !important; }
 .league-table-number { font-weight: 700 !important; }
 ::placeholder { font-weight: 400; }
-.touchline-admin ::placeholder { color: var(--admin-faint); opacity: 1; }
 * { -webkit-tap-highlight-color: transparent; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 a { color: inherit; text-decoration: none; }
+
+html[data-theme="light"] body { background: #DFE2E6; }
+
+/* Older admin screens use inline dark palette values. These scoped overrides make
+   the shared theme authoritative without changing status, warning or team colours. */
+[data-admin-theme][data-theme="light"] { background: #DFE2E6 !important; color: #0C0D0F !important; }
+[data-admin-theme][data-theme="light"] [style*="background: rgb(10, 10, 10)"],
+[data-admin-theme][data-theme="light"] [style*="background: rgb(14, 15, 17)"],
+[data-admin-theme][data-theme="light"] [style*="background:#0A0A0A" i],
+[data-admin-theme][data-theme="light"] [style*="background:#0E0F11" i] { background: #F2F3F5 !important; }
+[data-admin-theme][data-theme="light"] [style*="background: rgb(22, 23, 25)"],
+[data-admin-theme][data-theme="light"] [style*="background: rgb(27, 29, 32)"],
+[data-admin-theme][data-theme="light"] [style*="background: rgb(34, 37, 42)"],
+[data-admin-theme][data-theme="light"] [style*="background: rgb(36, 38, 42)"],
+[data-admin-theme][data-theme="light"] [style*="background:#161719" i],
+[data-admin-theme][data-theme="light"] [style*="background:#1B1D20" i],
+[data-admin-theme][data-theme="light"] [style*="background:#22252A" i],
+[data-admin-theme][data-theme="light"] [style*="background:#24262A" i] { background: #FFFFFF !important; }
+[data-admin-theme][data-theme="light"] [style*="color: rgb(255, 255, 255)"],
+[data-admin-theme][data-theme="light"] [style*="color: white"],
+[data-admin-theme][data-theme="light"] [style*="color:#fff" i],
+[data-admin-theme][data-theme="light"] [style*="color:#FFFFFF" i] { color: #0C0D0F !important; }
+[data-admin-theme][data-theme="light"] [style*="color: rgb(142, 147, 155)"],
+[data-admin-theme][data-theme="light"] [style*="color: rgb(170, 176, 186)"],
+[data-admin-theme][data-theme="light"] [style*="color: rgb(196, 200, 206)"],
+[data-admin-theme][data-theme="light"] [style*="color:#8E939B" i],
+[data-admin-theme][data-theme="light"] [style*="color:#AAB0BA" i],
+[data-admin-theme][data-theme="light"] [style*="color:#C4C8CE" i] { color: #666B73 !important; }
+[data-admin-theme][data-theme="light"] [style*="border: 1px solid rgb(38, 40, 43)"],
+[data-admin-theme][data-theme="light"] [style*="border: 1px solid rgb(42, 44, 48)"],
+[data-admin-theme][data-theme="light"] [style*="border-top: 1px solid rgb(38, 40, 43)"],
+[data-admin-theme][data-theme="light"] [style*="border-bottom: 1px solid rgb(38, 40, 43)"],
+[data-admin-theme][data-theme="light"] [style*="#26282B" i],
+[data-admin-theme][data-theme="light"] [style*="#2A2C30" i] { border-color: #E2E4E7 !important; }
+[data-admin-theme][data-theme="light"] input,
+[data-admin-theme][data-theme="light"] select,
+[data-admin-theme][data-theme="light"] textarea { color-scheme: light; }
 
 .touchline-bottom-nav {
   position: fixed;

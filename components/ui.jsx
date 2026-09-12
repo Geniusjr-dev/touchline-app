@@ -39,23 +39,23 @@ export function PitchIcon({ color }) {
 export function BottomNav({ t, active = "Matches" }) {
   const items = [
     { label: "Matches", href: "/", icon: (color) => <PitchIcon color={color} /> },
-    { label: "News", href: null, icon: (color) => <Newspaper size={19} color={color} /> },
-    { label: "Leagues", href: "/leagues", icon: (color) => <Trophy size={19} color={color} /> },
-    { label: "Following", href: null, icon: (color) => <Star size={19} color={color} /> },
+    { label: "News", href: null, icon: (color) => <Newspaper size={22} color={color} strokeWidth={2.1} /> },
+    { label: "Leagues", href: "/leagues", icon: (color) => <Trophy size={22} color={color} strokeWidth={2.1} /> },
+    { label: "Following", href: null, icon: (color) => <Star size={22} color={color} strokeWidth={2.1} /> },
   ];
   return (
     <div
       className="touchline-bottom-nav flex items-center gap-2 z-40 pointer-events-none"
     >
-      <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 58, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
+      <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 62, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 18px rgba(0,0,0,0.24)" }}>
         {items.map((item) => {
           const selected = active === item.label;
           const color = selected ? t.accent : t.navText;
           const contents = <>
             {item.icon(color)}
-            <span style={{ fontSize: 10.5, color }}>{item.label}</span>
+            <span className="public-nav-label" style={{ fontSize: 11.5, color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>
           </>;
-          const styles = { background: selected ? t.pill : "transparent" };
+          const styles = { background: selected ? t.pill : "transparent", boxShadow: selected ? `inset 0 0 0 1px ${t.pillBorder}` : "none" };
           return item.href ? (
             <Link
               key={item.label}
@@ -79,9 +79,9 @@ export function BottomNav({ t, active = "Matches" }) {
           );
         })}
       </div>
-      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 58, height: 58, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 6px 24px rgba(0,0,0,0.36)" }}>
-        <span className="flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: t.pill }}>
-          <Search size={23} color={t.text} />
+      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 62, height: 62, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 18px rgba(0,0,0,0.24)" }}>
+        <span className="flex items-center justify-center rounded-full" style={{ width: 50, height: 50, background: t.pill }}>
+          <Search size={25} color={t.text} strokeWidth={2.2} />
         </span>
       </div>
     </div>

@@ -1,10 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { createMatch, deleteScheduledMatch, listCompetitionTeams, listCompetitions, listMatches, listMatchScorers, listScorers, listTeams, replaceMatchScorer } from "@/lib/db";
+import { ChevronRight } from "lucide-react";
+import { createMatch, listCompetitionTeams, listCompetitions, listMatches, listTeams } from "@/lib/db";
 import { useAuth } from "@/components/AuthProvider";
-import { cacheAdminMatch } from "@/lib/matchCache";
 import { Crest } from "@/components/ui";
 
 export default function Matches() {
@@ -12,8 +11,6 @@ export default function Matches() {
   const [teams, setTeams] = useState([]);
   const [comps, setComps] = useState([]);
   const [matches, setMatches] = useState([]);
-  const [scorers, setScorers] = useState([]);
-  const [assignments, setAssignments] = useState({});
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
   const [comp, setComp] = useState("");
@@ -29,7 +26,6 @@ export default function Matches() {
   const [weather, setWeather] = useState("");
   const [refereeName, setRefereeName] = useState("");
   const [err, setErr] = useState("");
-  const [openCompetition, setOpenCompetition] = useState("");
 
   const load = useCallback(async () => {
     if (!activeOrganizationId) return;
@@ -42,14 +38,6 @@ export default function Matches() {
       setTeams(nextTeams);
       setComps(nextComps);
       setMatches(nextMatches);
-      if (role === "admin") {
-        const [nextScorers, nextAssignments] = await Promise.all([
-          listScorers(activeOrganizationId),
-          listMatchScorers(nextMatches.map((match) => match.id)),
-        ]);
-        setScorers(nextScorers);
-        setAssignments(nextAssignments);
-      }
     } catch (error) {
       setErr(error.message || "Could not load matches.");
     }
@@ -86,22 +74,6 @@ export default function Matches() {
     if (error) return setErr(error.message);
     setHome(""); setAway(""); setKickoff(""); setMatchRound(""); setVenueName(""); setVenueLocation(""); setVenueCapacity(""); setVenueSurface("Grass"); setWeather(""); setRefereeName(""); load();
   }
-  async function assignScorer(matchId, scorerId) {
-    setErr("");
-    const { error } = await replaceMatchScorer(matchId, scorerId || null);
-    if (error) return setErr(error.message);
-    setAssignments((current) => ({ ...current, [matchId]: scorerId ? [scorerId] : [] }));
-  }
-  async function removeScheduledMatch(match) {
-    const homeName = match.home?.display_name || match.home?.name || teamName(match.home_id);
-    const awayName = match.away?.display_name || match.away?.name || teamName(match.away_id);
-    if (!window.confirm(`Delete the scheduled match between ${homeName} and ${awayName}?`)) return;
-    setErr("");
-    const { error } = await deleteScheduledMatch(match.id);
-    if (error) { setErr(error.message); return; }
-    await load();
-  }
-  const teamName = (id) => teams.find((t) => t.id === id)?.name || "Team not found";
   const selectedCompetition = comps.find((competition) => competition.id === comp);
   const selectedHomeTeam = teams.find((team) => team.id === home) || null;
   const selectedAwayTeam = teams.find((team) => team.id === away) || null;
@@ -127,8 +99,9 @@ export default function Matches() {
 
       {role === "admin" && <div style={{ marginBottom: 20 }}>
         <form onSubmit={make} style={card}>
-          <div style={h3}>New match</div>
-          <Field label="Competition">
+          <div className="admin-section-title" style={h3}>Create a new match</div>
+          <div className="admin-match-form-grid">
+          <Field label="Competition" className="admin-field-wide">
             <select value={comp} onChange={(e) => { setComp(e.target.value); setGroupNumber(""); setHome(""); setAway(""); }} style={inp}>
               <option value="">Choose format and competition</option>
               {comps.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.competition_type || "tournament"}{c.sub ? ` · ${c.sub}` : ""}</option>)}
@@ -186,14 +159,19 @@ export default function Matches() {
               style={pickerInput}
             />
           </Field>
-          <div style={{ ...h3, marginTop: 18 }}>Public preview details</div>
-          <Field label="Round or stage (optional)"><input value={matchRound} onChange={(event) => setMatchRound(event.target.value)} placeholder="Round 2" maxLength={80} style={inp} /></Field>
-          <Field label="Venue name (optional)"><input value={venueName} onChange={(event) => setVenueName(event.target.value)} placeholder="Buya Community Park" maxLength={120} style={inp} /></Field>
-          <Field label="Venue location (optional)"><input value={venueLocation} onChange={(event) => setVenueLocation(event.target.value)} placeholder="Buya, Kpandai District" maxLength={160} style={inp} /></Field>
-          <Field label="Venue capacity (optional)"><input type="number" min="0" value={venueCapacity} onChange={(event) => setVenueCapacity(event.target.value)} placeholder="3000" style={inp} /></Field>
-          <Field label="Playing surface (optional)"><input value={venueSurface} onChange={(event) => setVenueSurface(event.target.value)} placeholder="Grass" maxLength={60} style={inp} /></Field>
-          <Field label="Weather (optional)"><input value={weather} onChange={(event) => setWeather(event.target.value)} placeholder="27°C · Clear" maxLength={100} style={inp} /></Field>
-          <Field label="Referee (optional)"><input value={refereeName} onChange={(event) => setRefereeName(event.target.value)} placeholder="Referee's full name" maxLength={120} style={inp} /></Field>
+          </div>
+          <details className="admin-optional-details">
+            <summary>Optional public match details</summary>
+            <div className="admin-optional-grid">
+              <Field label="Round or stage"><input value={matchRound} onChange={(event) => setMatchRound(event.target.value)} placeholder="Round 2" maxLength={80} style={inp} /></Field>
+              <Field label="Venue name"><input value={venueName} onChange={(event) => setVenueName(event.target.value)} placeholder="Buya Community Park" maxLength={120} style={inp} /></Field>
+              <Field label="Venue location"><input value={venueLocation} onChange={(event) => setVenueLocation(event.target.value)} placeholder="Buya, Kpandai District" maxLength={160} style={inp} /></Field>
+              <Field label="Venue capacity"><input type="number" min="0" value={venueCapacity} onChange={(event) => setVenueCapacity(event.target.value)} placeholder="3000" style={inp} /></Field>
+              <Field label="Playing surface"><input value={venueSurface} onChange={(event) => setVenueSurface(event.target.value)} placeholder="Grass" maxLength={60} style={inp} /></Field>
+              <Field label="Weather"><input value={weather} onChange={(event) => setWeather(event.target.value)} placeholder="27°C · Clear" maxLength={100} style={inp} /></Field>
+              <Field label="Referee"><input value={refereeName} onChange={(event) => setRefereeName(event.target.value)} placeholder="Referee's full name" maxLength={120} style={inp} /></Field>
+            </div>
+          </details>
           <button type="submit" style={btn}>Create match</button>
           {selectedCompetition && selectedCompetition.competition_type !== "friendly" && eligibleTeams.length === 0 && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 8 }}>No teams are registered for {selectedCompetition.competition_type === "tournament" ? "this group" : "this league"}. Configure them under Competitions first.</div>}
           <div style={{ marginTop: 10 }}><Link href="/admin/competitions" style={{ color: "#4FC263", fontSize: 12, fontWeight: 700 }}>Manage competition formats and teams →</Link></div>
@@ -204,46 +182,24 @@ export default function Matches() {
       {err && <div style={{ color: "#F04444", background: "#301719", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{err}</div>}
 
       <div>
-        <div style={{ ...h3, marginBottom: 10 }}>{role === "admin" ? "Matches by competition" : "Assigned matches by competition"}</div>
+        <div className="admin-section-title" style={{ ...h3, marginBottom: 10 }}>{role === "admin" ? "Matches by competition" : "Assigned matches by competition"}</div>
         {matches.length === 0 && <div style={{ ...card, color: "#8E939B", fontSize: 14 }}>{role === "admin" ? "No matches yet." : "No matches have been assigned to you."}</div>}
+        <div className="admin-competition-grid">
         {competitionGroups.map((competition) => {
-          const open = openCompetition === competition.id;
           const scheduledCount = competition.matches.filter((match) => match.status === "scheduled").length;
           return (
-            <section key={competition.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 12 }}>
-              <button type="button" onClick={() => setOpenCompetition(open ? "" : competition.id)} className="w-full flex items-center" style={{ minHeight: 62, gap: 12, padding: "12px 16px", background: "transparent", color: "#FFFFFF", border: 0, textAlign: "left", cursor: "pointer" }}>
+            <Link key={competition.id} href={`/admin/matches/competition/${competition.id}`} className="admin-competition-card w-full flex items-center" style={{ ...card, padding: "16px 18px", gap: 14, color: "#FFFFFF", textAlign: "left", textDecoration: "none" }}>
                 <span className="inline-flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "#22252A", color: "#4FC263", fontSize: 16 }}>🏆</span>
-                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 14 }}>{competition.name}</span><span className="block" style={{ color: "#8E939B", fontSize: 11, marginTop: 3 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
-                {open ? <ChevronDown size={19} color="#8E939B" /> : <ChevronRight size={19} color="#8E939B" />}
-              </button>
-              {open && <div style={{ borderTop: "1px solid #26282B" }}>
-                {competition.matches.map((m) => (
-                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: "1px solid #26282B", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10.5, textTransform: "uppercase", color: statusColor(m.status), width: 58 }}>{m.status}</span>
-                    <span style={{ flex: 1, minWidth: 210, fontSize: 13 }}>
-                      <span style={{ display: "block", color: "#8E939B", fontSize: 11.5, marginBottom: 6 }}>{m.match_date} · {m.kickoff || "TBD"}{m.group_number ? ` · Group ${String.fromCharCode(64 + Number(m.group_number))}` : ""}</span>
-                      <span className="flex items-center flex-wrap" style={{ gap: 7 }}>
-                        <span className="inline-flex items-center" style={{ gap: 6 }}><Crest logo={m.home?.logo_url} color={m.home?.color} label={m.home?.display_name || m.home?.name || teamName(m.home_id)} size={24} ring="#32363C" /><span>{m.home?.display_name || m.home?.name || teamName(m.home_id)}</span></span>
-                        <span style={{ color: "#5B6069" }}>vs</span>
-                        <span className="inline-flex items-center" style={{ gap: 6 }}><Crest logo={m.away?.logo_url} color={m.away?.color} label={m.away?.display_name || m.away?.name || teamName(m.away_id)} size={24} ring="#32363C" /><span>{m.away?.display_name || m.away?.name || teamName(m.away_id)}</span></span>
-                      </span>
-                    </span>
-                    {role === "admin" && <select value={assignments[m.id]?.[0] || ""} onChange={(event) => assignScorer(m.id, event.target.value)} aria-label={`Scorer for ${m.home?.name || teamName(m.home_id)} vs ${m.away?.name || teamName(m.away_id)}`} style={{ ...inp, width: 178, padding: "7px 9px", fontSize: 12 }}><option value="">No scorer assigned</option>{scorers.map((scorer) => <option key={scorer.id} value={scorer.id}>{scorer.email}</option>)}</select>}
-                    <div className="flex items-center" style={{ gap: 7 }}>
-                      {role === "admin" && m.status === "scheduled" && <><Link href={`/admin/matches/${m.id}`} style={{ ...secondaryBtn, textDecoration: "none" }}>Edit</Link><button type="button" onClick={() => removeScheduledMatch(m)} style={dangerBtn}>Delete</button></>}
-                      <Link href={`/admin/match/${m.id}`} onPointerDown={() => cacheAdminMatch(m)} onClick={() => cacheAdminMatch(m)} style={{ ...btn, textDecoration: "none", padding: "7px 12px" }}>{m.status === "scheduled" ? "Open" : "Score"}</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>}
-            </section>
+                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 16, fontWeight: 700 }}>{competition.name}</span><span className="block" style={{ color: "#8E939B", fontSize: 13, marginTop: 4 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
+                <ChevronRight size={22} color="#8E939B" />
+            </Link>
           );
         })}
+        </div>
       </div>
     </div>
   );
 }
-function statusColor(s) { return s === "live" ? "#F04444" : s === "ft" ? "#8E939B" : s === "ht" ? "#F5C518" : "#4FC263"; }
 function SelectedMatchTeam({ team, fallback, away = false }) {
   const name = team?.display_name || team?.name || fallback;
   return <span className="flex items-center min-w-0" style={{ gap: 8, justifyContent: away ? "flex-start" : "flex-end" }}>
@@ -262,11 +218,9 @@ function preventManualPickerEntry(event) {
     event.currentTarget.showPicker();
   }
 }
-function Field({ label, children }) { return <label style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}><span style={{ color: "#8E939B", fontSize: 12, fontWeight: 600 }}>{label}</span>{children}</label>; }
+function Field({ label, children, className = "" }) { return <label className={className} style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}><span style={{ color: "#8E939B", fontSize: 13, fontWeight: 650 }}>{label}</span>{children}</label>; }
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };
 const h3 = { fontSize: 15, fontWeight: 700, marginBottom: 12 };
 const inp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
 const pickerInput = { ...inp, colorScheme: "dark", cursor: "pointer" };
 const btn = { padding: "10px 16px", borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: "pointer" };
-const secondaryBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #384049", background: "#22252A", color: "#FFFFFF", cursor: "pointer", fontSize: 12 };
-const dangerBtn = { padding: "7px 11px", borderRadius: 8, border: "1px solid #5A2929", background: "#2A1A1A", color: "#F87070", cursor: "pointer", fontSize: 12 };

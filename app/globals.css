@@ -62,6 +62,89 @@ html[data-theme="light"] body { background: #DFE2E6; }
 [data-admin-theme][data-theme="light"] select,
 [data-admin-theme][data-theme="light"] textarea { color-scheme: light; }
 
+/* Admin workspace: roomy desktop management and touch-first mobile controls. */
+.admin-portal { --admin-control-height: 44px; }
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 64px;
+  padding: 10px clamp(16px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.admin-brand { font-size: 19px; white-space: nowrap; }
+.admin-brand span:last-child { font-size: 14px; }
+.admin-primary-nav { display: flex; align-items: center; gap: 8px; }
+.admin-nav-link {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+}
+.admin-nav-link[aria-current="page"] { background: rgba(79, 194, 99, 0.12); }
+.admin-header-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.admin-main { width: min(100%, 1320px); margin: 0 auto; padding: 28px clamp(18px, 3vw, 40px) 56px; }
+.admin-main h1 { font-size: clamp(25px, 2.4vw, 34px) !important; line-height: 1.15; letter-spacing: -0.025em; }
+.admin-main input,
+.admin-main select,
+.admin-main textarea { min-height: var(--admin-control-height); font-size: 15px !important; }
+.admin-main button,
+.admin-main a { font-size: 14px; }
+.admin-main h1,
+.admin-main h2,
+.admin-main h3,
+.admin-main strong,
+.admin-main button,
+.admin-main summary { font-weight: 700 !important; }
+.admin-main label > span { font-size: 13px !important; font-weight: 600 !important; }
+.admin-section-title { font-size: 17px !important; font-weight: 750 !important; }
+.admin-match-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+.admin-match-form-grid .admin-field-wide { grid-column: 1 / -1; }
+.admin-optional-details { margin-top: 16px; border-top: 1px solid #26282B; padding-top: 14px; }
+.admin-optional-details > summary { cursor: pointer; font-size: 15px; font-weight: 700 !important; padding: 8px 0; }
+.admin-optional-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding-top: 10px; }
+.admin-competition-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.admin-competition-card { min-height: 88px; transition: transform 150ms ease, border-color 150ms ease; }
+.admin-competition-card:hover { transform: translateY(-1px); border-color: #4FC263 !important; }
+.admin-dashboard-grid { max-width: 900px; }
+.admin-dashboard-card { min-height: 132px; transition: transform 150ms ease, border-color 150ms ease; }
+.admin-dashboard-card:hover { transform: translateY(-2px); border-color: #4FC263 !important; }
+.admin-match-list-row { display: grid; grid-template-columns: 86px minmax(280px, 1fr) 210px auto; align-items: center; gap: 14px; }
+.admin-match-workspace { font-size: 15px; }
+.admin-match-workspace > a:first-child { display: inline-flex; min-height: 40px; align-items: center; }
+.admin-match-workspace .admin-scoreboard { position: sticky; top: 76px; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.admin-match-workspace .admin-scoring-grid { gap: 16px !important; }
+.admin-match-workspace .admin-scoring-grid { width: min(100%, 920px); margin-left: auto; margin-right: auto; }
+.admin-match-workspace .admin-scoring-grid button { min-height: 44px; }
+
+@media (max-width: 760px) {
+  .admin-header { min-height: 0; padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .admin-brand { font-size: 17px; }
+  .admin-brand span:last-child { font-size: 12px; }
+  .admin-primary-nav { order: 3; width: 100%; overflow-x: auto; gap: 4px; border-top: 1px solid #26282B; padding-top: 7px; }
+  .admin-nav-link { min-height: 40px; padding: 0 12px; font-size: 14px; }
+  .admin-header-actions { gap: 7px; }
+  .admin-header-actions select { max-width: 124px; }
+  .admin-header-actions a { display: none; }
+  .admin-main { padding: 18px 12px 92px; }
+  .admin-main h1 { font-size: 25px !important; }
+  .admin-main input,
+  .admin-main select,
+  .admin-main textarea { min-height: 48px; font-size: 16px !important; }
+  .admin-main button { min-height: 44px; font-size: 14px !important; }
+  .admin-match-form-grid,
+  .admin-optional-grid,
+  .admin-competition-grid { grid-template-columns: 1fr; }
+  .admin-match-form-grid .admin-field-wide { grid-column: auto; }
+  .admin-match-list-row { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .admin-match-workspace .admin-scoreboard { top: 105px; }
+  .admin-match-workspace .admin-scoring-grid { grid-template-columns: 1fr !important; }
+}
+
 .touchline-bottom-nav {
   position: fixed;
   left: 50%;

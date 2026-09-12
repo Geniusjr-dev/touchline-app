@@ -693,10 +693,10 @@ export default function Scorer() {
     : null;
 
   return (
-    <div>
+    <div className="admin-match-workspace">
       <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
 
-      <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
+      <div className="admin-scoreboard" style={{ ...card, textAlign: "center", margin: "12px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
           <Badge t={home} />
           <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "#5B6069" }}>-</span> {displayedAway}</div>
@@ -809,7 +809,7 @@ export default function Scorer() {
           </div>
 
           {!fullTimeLocked && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
+            <div className="admin-scoring-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
               {[["home", home], ["away", away]].map(([side, team]) => (
                 <div key={side} style={{ ...card, marginBottom: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -929,7 +929,7 @@ export default function Scorer() {
         </div>
       )}
 
-      {!isRetrospective && <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
+      {!isRetrospective && <div className="admin-scoring-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 14 }}>
         {[["home", home], ["away", away]].map(([side, team]) => (
           <div key={side} style={{ ...card, marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>

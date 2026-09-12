@@ -11,14 +11,14 @@ export default function AdminHome() {
       ]
     : [{ href: "/admin/matches", title: "Assigned matches", desc: "Open a match assigned to you and score it live." }];
   return (
-    <div>
+    <div className="admin-dashboard">
       <h1 style={{ fontSize: 20, marginBottom: 6 }}>Dashboard</h1>
       <p style={{ color: "var(--admin-dim)", fontSize: 14, marginBottom: 20 }}>{role === "admin" ? "Manage teams, create matches, and control scorer access." : "Score only the matches assigned to your account."}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
+      <div className="admin-dashboard-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {cards.map((c) => (
-          <Link key={c.href} href={c.href} style={{ background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 14, padding: 18, textDecoration: "none" }}>
-            <div style={{ color: "var(--admin-text)", fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{c.title}</div>
-            <div style={{ color: "var(--admin-dim)", fontSize: 13 }}>{c.desc}</div>
+          <Link className="admin-dashboard-card" key={c.href} href={c.href} style={{ background: "var(--admin-card)", border: "1px solid var(--admin-divider)", borderRadius: 16, padding: 22, textDecoration: "none" }}>
+            <div style={{ color: "var(--admin-text)", fontSize: 19, fontWeight: 700, marginBottom: 8 }}>{c.title}</div>
+            <div style={{ color: "var(--admin-dim)", fontSize: 14, lineHeight: 1.5 }}>{c.desc}</div>
           </Link>
         ))}
       </div>

@@ -65,14 +65,14 @@ export default function AdminPortalShell({ children }) {
   if (role === "scorer" && path.startsWith("/admin/teams")) return <PortalLoading />;
 
   return (
-    <div data-admin-theme data-theme={mode} style={{ minHeight: "100vh", background: t.page, color: t.text }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderBottom: "1px solid #26282B", position: "sticky", top: 0, background: "#0A0A0A", zIndex: 10, flexWrap: "wrap" }}>
-        <Link href="/admin" style={{ fontSize: 17 }}><span style={{ color: "#4FC263" }}>⚡</span>Touchline <span style={{ color: "#8E939B", fontSize: 13 }}>admin</span></Link>
-        <nav aria-label="Administration" style={{ display: "flex", gap: 14, marginLeft: 8 }}>
+    <div data-admin-theme data-theme={mode} className="admin-portal" style={{ minHeight: "100vh", background: t.page, color: t.text }}>
+      <header className="admin-header" style={{ borderBottom: "1px solid #26282B", background: "#0A0A0A" }}>
+        <Link href="/admin" className="admin-brand"><span style={{ color: "#4FC263" }}>⚡</span>Touchline <span style={{ color: "#8E939B" }}>admin</span></Link>
+        <nav aria-label="Administration" className="admin-primary-nav">
           {role === "admin" && <AdminTab href="/admin/teams" path={path}>Teams</AdminTab>}
           <AdminTab href="/admin/matches" path={path}>Matches</AdminTab>
         </nav>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="admin-header-actions">
           <button type="button" onClick={toggle} aria-label={`Use ${mode === "dark" ? "light" : "dark"} mode`} style={{ background: t.pill, color: t.text, border: `1px solid ${t.pillBorder}`, borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>{mode === "dark" ? "Light" : "Dark"}</button>
           {memberships.length > 1 && (
             <select
@@ -118,7 +118,7 @@ export default function AdminPortalShell({ children }) {
           </button>
         </div>
       </header>
-      <main style={{ maxWidth: 820, margin: "0 auto", padding: 18 }}>{children}</main>
+      <main className="admin-main">{children}</main>
     </div>
   );
 }
@@ -133,5 +133,5 @@ function PortalLoading() {
 
 function AdminTab({ href, path, children }) {
   const active = path === href || path.startsWith(`${href}/`);
-  return <Link href={href} aria-current={active ? "page" : undefined} style={{ color: active ? "#4FC263" : "#8E939B", fontWeight: active ? 700 : 500, fontSize: 14 }}>{children}</Link>;
+  return <Link href={href} aria-current={active ? "page" : undefined} className="admin-nav-link" style={{ color: active ? "#4FC263" : "#8E939B", fontWeight: active ? 700 : 500 }}>{children}</Link>;
 }

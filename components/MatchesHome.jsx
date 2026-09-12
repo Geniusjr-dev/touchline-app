@@ -11,8 +11,6 @@ import MatchNotificationButton from "@/components/MatchNotificationButton";
 import MatchDateCalendar from "@/components/MatchDateCalendar";
 
 const warmedMatches = new Set();
-const selectedDateStorageKey = "touchline-selected-match-date";
-
 function localDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -35,12 +33,6 @@ function dateLabel(date, today) {
   const weekday = date.toLocaleDateString(undefined, { weekday: "short" });
   const month = date.toLocaleDateString(undefined, { month: "short" });
   return `${weekday} ${month} ${date.getDate()}`;
-}
-
-function isValidDateKey(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
-  const date = new Date(`${value}T12:00:00`);
-  return !Number.isNaN(date.getTime()) && localDateKey(date) === value;
 }
 
 function MatchRow({ m, teams, t, now }) {
@@ -184,21 +176,6 @@ export default function MatchesHome() {
   }, []);
 
   useEffect(() => {
-    if (!todayKey) return;
-
-    try {
-      const savedDate = window.localStorage.getItem(selectedDateStorageKey);
-      if (isValidDateKey(savedDate)) {
-        setSelectedDateOverride(savedDate);
-      } else if (savedDate) {
-        window.localStorage.removeItem(selectedDateStorageKey);
-      }
-    } catch {
-      // Date selection still works when browser storage is unavailable.
-    }
-  }, [todayKey]);
-
-  useEffect(() => {
     if (!selectedDate) return undefined;
     const centreSelectedDate = window.setTimeout(() => {
       const selectedButton = dateStripRef.current?.querySelector(`[data-date="${selectedDate}"]`);
@@ -211,16 +188,6 @@ export default function MatchesHome() {
     const returningToToday = dateKey === todayKey;
     setSelectedDateOverride(returningToToday ? null : dateKey);
     setLiveOnly(false);
-
-    try {
-      if (returningToToday) {
-        window.localStorage.removeItem(selectedDateStorageKey);
-      } else {
-        window.localStorage.setItem(selectedDateStorageKey, dateKey);
-      }
-    } catch {
-      // Keep the in-memory selection when browser storage is unavailable.
-    }
   };
 
   const shiftSelectedDate = (amount) => {

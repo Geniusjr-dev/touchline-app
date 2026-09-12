@@ -55,8 +55,8 @@ function MatchRow({ m, teams, t, now }) {
   };
   const teamNameStyle = {
     color: t.text,
-    fontSize: "clamp(13.5px, 3.75vw, 15.5px)",
-    fontWeight: 600,
+    fontSize: "clamp(13px, 3.55vw, 14.5px)",
+    fontWeight: 500,
     lineHeight: 1.16,
     display: "-webkit-box",
     WebkitBoxOrient: "vertical",
@@ -67,7 +67,7 @@ function MatchRow({ m, teams, t, now }) {
     hyphens: "none",
   };
   return (
-    <div className="fixture-match-row relative grid items-center" style={{ borderTop: `1px solid ${t.divider}`, gridTemplateColumns: "38px minmax(0, 1fr) 56px minmax(0, 1fr) 38px", minHeight: 76 }}>
+    <div className="fixture-match-row relative grid items-center" style={{ borderTop: `1px solid ${t.divider}`, gridTemplateColumns: "34px minmax(0, 1fr) 54px minmax(0, 1fr) 34px", minHeight: 68 }}>
       <Link
         href={`/match/${m.id}`}
         onPointerEnter={warmMatch}
@@ -89,7 +89,7 @@ function MatchRow({ m, teams, t, now }) {
       {!showStatus && <span />}
       <div className="relative z-10 flex items-center justify-end min-w-0 pointer-events-none" style={{ gap: 8 }}>
         <span className="fixture-team-name min-w-0 text-right" style={teamNameStyle}>{homeName}</span>
-        <Crest color={h.color} logo={h.logoUrl} label={homeName} size={28} ring={t.divider} />
+        <Crest color={h.color} logo={h.logoUrl} label={homeName} size={26} ring={t.divider} />
       </div>
       <div className="relative z-10 shrink-0 text-center min-w-0 pointer-events-none">
         {showScore
@@ -97,7 +97,7 @@ function MatchRow({ m, teams, t, now }) {
           : <span className="fixture-match-time" style={{ color: t.dim, fontSize: 14.5, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
       </div>
       <div className="relative z-10 flex items-center justify-start min-w-0 pointer-events-none" style={{ gap: 8 }}>
-        <Crest color={a.color} logo={a.logoUrl} label={awayName} size={28} ring={t.divider} />
+        <Crest color={a.color} logo={a.logoUrl} label={awayName} size={26} ring={t.divider} />
         <span className="fixture-team-name min-w-0 text-left" style={teamNameStyle}>{awayName}</span>
       </div>
       {m.status === "scheduled" && (
@@ -113,16 +113,29 @@ function MatchRow({ m, teams, t, now }) {
 function Group({ c, teams, t, now }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="fixture-group mx-2 my-3 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-4" style={{ background: t.groupHead, minHeight: 52 }}>
-        <span className="inline-flex items-center justify-center" style={{ width: 22, height: 22 }}><Trophy size={18} color={t.yellow} strokeWidth={2.2} /></span>
-        <span className="fixture-competition-name" style={{ color: t.text, fontSize: 15.5, fontWeight: 700 }}>{c.name}</span>
+    <div className="fixture-group mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3.5" style={{ background: t.groupHead, minHeight: 46 }}>
+        <CompetitionMark competition={c} t={t} />
+        <span className="fixture-competition-name" style={{ color: t.text, fontSize: 14.5, fontWeight: 700 }}>{c.name}</span>
         {c.sub && <span style={{ color: t.dim, fontSize: 13 }}>· {c.sub}</span>}
         <span className="ml-auto">{open ? <ChevronUp size={18} color={t.dim} /> : <ChevronDown size={18} color={t.dim} />}</span>
       </button>
       {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} now={now} />)}
     </div>
   );
+}
+
+function CompetitionMark({ competition, t }) {
+  if (competition.logoUrl) {
+    return (
+      <span className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22 }}>
+        {/* Competition media is uploaded and controlled by administrators. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={competition.logoUrl} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />
+      </span>
+    );
+  }
+  return <span className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22 }}><Trophy size={17} color={t.yellow} strokeWidth={2.1} /></span>;
 }
 
 export default function MatchesHome() {
@@ -225,7 +238,7 @@ export default function MatchesHome() {
 
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
-      <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 64 }}>
+      <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
         <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: 22, fontWeight: 800, letterSpacing: -0.65, gap: 5 }}>
           <Zap size={21} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
         </span>
@@ -266,7 +279,7 @@ export default function MatchesHome() {
       <div
         ref={dateStripRef}
         className="fixture-date-strip flex items-center gap-6 px-4 overflow-x-auto no-scrollbar sticky z-20"
-        style={{ background: t.bg, height: 52, top: 64, scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
+        style={{ background: t.bg, height: 44, top: 52, scrollSnapType: "x proximity", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
         aria-label="Match dates"
       >
         {dateWindow.map((day) => {

@@ -50,7 +50,7 @@ export function BottomNav({ t, active = "Matches" }) {
       <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 62, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 18px rgba(0,0,0,0.24)" }}>
         {items.map((item) => {
           const selected = active === item.label;
-          const color = selected ? t.accent : t.navText;
+          const color = selected ? t.accent : t.text;
           const contents = <>
             {item.icon(color)}
             <span className="public-nav-label" style={{ fontSize: 11.5, color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>

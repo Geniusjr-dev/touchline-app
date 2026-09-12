@@ -148,34 +148,34 @@ html[data-theme="light"] body { background: #DFE2E6; }
 .touchline-bottom-nav {
   position: fixed;
   left: 50%;
-  width: min(464px, calc(100vw - 16px));
+  width: min(450px, calc(100vw - 40px));
   transform: translateX(-50%);
-  bottom: max(7px, env(safe-area-inset-bottom));
+  bottom: max(18px, env(safe-area-inset-bottom));
 }
 
 .fixture-brand,
-.fixture-team-name,
 .fixture-match-time,
 .fixture-competition-name,
 .fixture-date-button.is-active,
 .public-nav-label { font-weight: 700 !important; }
+.fixture-team-name { font-weight: 500 !important; }
 .fixture-date-button { position: relative; min-height: 44px; padding: 0 2px; }
 .fixture-date-button.is-active::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 2px;
-  width: 22px;
-  height: 3px;
+  bottom: 0;
+  width: 30px;
+  height: 8px;
   border-radius: 999px;
-  background: #1F9E4B;
+  background: rgba(31,158,75,.15);
   transform: translateX(-50%);
-  box-shadow: 0 3px 10px rgba(31,158,75,.28);
+  filter: blur(5px);
 }
 .fixture-group { box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 
 @media (min-width: 700px) {
-  .fixture-match-row { min-height: 78px !important; }
+  .fixture-match-row { min-height: 72px !important; }
 }
 
 @keyframes touchline-skeleton-pulse {

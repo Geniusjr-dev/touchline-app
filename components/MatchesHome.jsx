@@ -135,7 +135,15 @@ function CompetitionMark({ competition, t }) {
       </span>
     );
   }
+  const flag = competitionFlag(competition.country);
+  if (flag) return <span aria-hidden="true" className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22, fontSize: 17 }}>{flag}</span>;
   return <span className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22 }}><Trophy size={17} color={t.yellow} strokeWidth={2.1} /></span>;
+}
+
+function competitionFlag(country) {
+  const countryCodes = { ghana: "GH", england: "GB", italy: "IT", spain: "ES", germany: "DE", france: "FR" };
+  const code = countryCodes[String(country || "").trim().toLowerCase()];
+  return code ? [...code].map((letter) => String.fromCodePoint(127397 + letter.charCodeAt(0))).join("") : "";
 }
 
 export default function MatchesHome() {
@@ -239,12 +247,12 @@ export default function MatchesHome() {
   return (
     <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
-        <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: 22, fontWeight: 800, letterSpacing: -0.65, gap: 5 }}>
-          <Zap size={21} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
+        <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: 19.5, fontWeight: 800, letterSpacing: -0.6, gap: 3 }}>
+          <Zap size={18} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
         </span>
         <div className="relative flex items-center gap-2">
-          <div className="flex items-center rounded-full overflow-hidden" style={{ background: t.pill, border: `1px solid ${t.pillBorder}`, height: 44 }}>
-            <button onClick={() => setLiveOnly((v) => !v)} className="flex items-center gap-1.5 px-3 h-full">
+          <div className="flex items-center rounded-full overflow-hidden" style={{ width: 118, background: t.pill, border: `1px solid ${t.pillBorder}`, height: 44 }}>
+            <button onClick={() => setLiveOnly((v) => !v)} className="flex flex-1 items-center justify-center gap-1.5 h-full">
               <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: liveOnly ? t.red : t.dim }} />
               <span style={{ color: liveOnly ? t.text : t.dim, fontSize: 13, fontWeight: 700 }}>Live</span>
             </button>

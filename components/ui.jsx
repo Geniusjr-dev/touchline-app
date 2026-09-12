@@ -29,9 +29,9 @@ export function Crest({ logo, size = 26, ring, label = "" }) {
 
 export function PitchIcon({ color }) {
   return (
-    <span className="inline-flex items-center justify-center rounded" style={{ width: 28, height: 19, border: `2px solid ${color}`, position: "relative" }}>
-      <span style={{ width: 1.5, height: 19, background: color }} />
-      <span style={{ position: "absolute", width: 7, height: 7, borderRadius: "50%", border: `1.5px solid ${color}` }} />
+    <span className="inline-flex items-center justify-center rounded" style={{ width: 32, height: 22, border: `2px solid ${color}`, position: "relative" }}>
+      <span style={{ width: 1.5, height: 22, background: color }} />
+      <span style={{ position: "absolute", width: 8, height: 8, borderRadius: "50%", border: `1.5px solid ${color}` }} />
     </span>
   );
 }
@@ -47,13 +47,13 @@ export function BottomNav({ t, active = "Matches" }) {
     <div
       className="touchline-bottom-nav flex items-center gap-2 z-40 pointer-events-none"
     >
-      <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 62, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 18px rgba(0,0,0,0.24)" }}>
+      <div className="flex flex-1 items-center rounded-full overflow-hidden pointer-events-auto" style={{ height: 62, padding: 4, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
         {items.map((item) => {
           const selected = active === item.label;
           const color = selected ? t.accent : t.text;
           const contents = <>
             {item.icon(color)}
-            <span className="public-nav-label" style={{ fontSize: 11.5, color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>
+            <span className={`public-nav-label${selected ? " is-active" : ""}`} style={{ fontSize: 11.5, color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>
           </>;
           const styles = { background: selected ? t.pill : "transparent", boxShadow: selected ? `inset 0 0 0 1px ${t.pillBorder}` : "none" };
           return item.href ? (
@@ -79,7 +79,7 @@ export function BottomNav({ t, active = "Matches" }) {
           );
         })}
       </div>
-      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 62, height: 62, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 18px rgba(0,0,0,0.24)" }}>
+      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 62, height: 62, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
         <span className="flex items-center justify-center rounded-full" style={{ width: 50, height: 50, background: t.pill }}>
           <Search size={25} color={t.text} strokeWidth={2.2} />
         </span>

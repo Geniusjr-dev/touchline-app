@@ -155,22 +155,23 @@ html[data-theme="light"] body { background: #DFE2E6; }
 
 .fixture-brand,
 .fixture-match-time,
-.fixture-competition-name,
-.fixture-date-button.is-active,
-.public-nav-label { font-weight: 700 !important; }
+.fixture-date-button.is-active { font-weight: 700 !important; }
+.fixture-competition-name { font-weight: 650 !important; }
 .fixture-team-name { font-weight: 500 !important; }
+.public-nav-label { font-weight: 550 !important; }
+.public-nav-label.is-active { font-weight: 700 !important; }
 .fixture-date-button { position: relative; min-height: 44px; padding: 0 2px; }
 .fixture-date-button.is-active::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: 30px;
-  height: 8px;
+  bottom: -1px;
+  width: 34px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(31,158,75,.15);
+  background: rgba(31,158,75,.09);
   transform: translateX(-50%);
-  filter: blur(5px);
+  filter: blur(7px);
 }
 .fixture-group { box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 

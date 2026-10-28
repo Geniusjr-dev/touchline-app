@@ -40,7 +40,7 @@ function MatchRow({ m, teams, t, now }) {
   const a = teams[m.away] || { name: "TBD", color: "#555" };
   const homeName = h.displayName || h.name;
   const awayName = a.displayName || a.name;
-  const showScore = ["live", "ht", "ft", "et_live", "et_ht"].includes(m.status);
+  const showScore = ["live", "ht", "ft", "awarded", "et_live", "et_ht"].includes(m.status);
   const showStatus = showScore || ["postponed", "cancelled"].includes(m.status);
   const rememberMatch = () => cachePublicMatch(m, teams);
   const warmMatch = () => {

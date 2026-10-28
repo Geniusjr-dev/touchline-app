@@ -201,7 +201,7 @@ function Fixtures({ matches, teams, t, now }) {
 function LeagueMatchRow({ match, teams, t, now, first }) {
   const home = teams[match.home] || { name: "TBD", color: "#555" };
   const away = teams[match.away] || { name: "TBD", color: "#555" };
-  const showScore = ["live", "ht", "et_live", "et_ht", "ft"].includes(match.status);
+  const showScore = ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status);
   const rememberMatch = () => cachePublicMatch(match, teams);
   return (
     <Link href={`/match/${match.id}`} onPointerDown={rememberMatch} onClick={rememberMatch} className="block active:opacity-70" style={{ padding: "12px 13px", borderTop: first ? "none" : `1px solid ${t.divider}` }}>

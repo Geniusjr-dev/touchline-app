@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { readAdminMatch } from "@/lib/matchCache";
 import { Crest } from "@/components/ui";
+import MatchDecisionPanel from "@/components/admin/MatchDecisionPanel";
 import { DEFAULT_FORMATION, FORMATION_OPTIONS, getFormationSlots } from "@/lib/formations";
 import { groupPlayersByPosition, playerPositionGroup } from "@/lib/playerPositions";
 import {
@@ -20,6 +21,7 @@ import {
   getMatchStats,
   listPlayers,
   listTeams,
+  manageMatch,
   recordMatchEvent,
   reopenMatch,
   saveMatchStats,
@@ -259,9 +261,10 @@ export default function Scorer() {
   const displayedAway = storedAway;
   const sideTeamId = (side) => (side === "home" ? m.home_id : m.away_id);
   const fullTimeLocked = m.status === "ft" && Boolean(m.locked_at);
+  const managementLocked = fullTimeLocked || ["awarded", "cancelled", "postponed"].includes(m.status);
   const isRetrospective = m.operation_mode === "retrospective";
   const canRecord = ["live", "et_live"].includes(m.status) || (m.status === "ft" && !m.locked_at);
-  const canCorrect = m.status !== "scheduled" && !fullTimeLocked;
+  const canCorrect = ["live", "ht", "et_live", "et_ht"].includes(m.status) || (m.status === "ft" && !m.locked_at);
 
   async function run(operation, closePending = false) {
     setBusy(true);
@@ -278,6 +281,10 @@ export default function Scorer() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitMatchDecision(action, details) {
+    return run(() => manageMatch(id, action, details));
   }
 
   function changePreviewDetail(key, value) {
@@ -710,6 +717,10 @@ export default function Scorer() {
 
       {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
+      {role === "admin" && (
+        <MatchDecisionPanel match={m} home={homeTeam} away={awayTeam} busy={busy} onSubmit={submitMatchDecision} />
+      )}
+
       <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div>
           <div style={{ color: "#FFFFFF", fontSize: 13 }}>Match notifications</div>
@@ -860,7 +871,7 @@ export default function Scorer() {
             squad={squads[m.home_id] || []}
             lineup={currentLineup(m.home_id)}
             busy={lineupBusy === m.home_id}
-            disabled={Boolean(lineupBusy) || fullTimeLocked}
+            disabled={Boolean(lineupBusy) || managementLocked}
             message={lineupMessages[m.home_id]}
             onFormationChange={(formation) => changeFormation(m.home_id, formation)}
             onStarterChange={(slotIndex, playerId) => assignStarter(m.home_id, slotIndex, playerId)}
@@ -874,7 +885,7 @@ export default function Scorer() {
             squad={squads[m.away_id] || []}
             lineup={currentLineup(m.away_id)}
             busy={lineupBusy === m.away_id}
-            disabled={Boolean(lineupBusy) || fullTimeLocked}
+            disabled={Boolean(lineupBusy) || managementLocked}
             message={lineupMessages[m.away_id]}
             onFormationChange={(formation) => changeFormation(m.away_id, formation)}
             onStarterChange={(slotIndex, playerId) => assignStarter(m.away_id, slotIndex, playerId)}
@@ -1333,6 +1344,7 @@ function RecordingModeAction({ primary = false, title, note, onClick, disabled }
 }
 
 function statusActions(status, locked, retrospective = false, period = 0) {
+  if (["awarded", "cancelled", "postponed"].includes(status)) return [];
   if (status === "scheduled") return [{ status: "live", label: "Kick off", primary: true }];
   if (retrospective && status === "live" && Number(period) <= 1) return [{ status: "ht", label: "Go to half time" }, { status: "ft", label: "Finish recording now", primary: true }];
   if (retrospective && status === "live") return [{ status: "ft", label: "Finish match", primary: true }];
@@ -1348,6 +1360,9 @@ function statusActions(status, locked, retrospective = false, period = 0) {
 }
 
 function clockStatus(match, now) {
+  if (match.status === "awarded") return "RESULT AWARDED";
+  if (match.status === "cancelled") return "MATCH CANCELLED";
+  if (match.status === "postponed") return "MATCH POSTPONED";
   if (match.operation_mode === "retrospective" && match.status === "live") return Number(match.current_period || 1) > 1 ? "RECORDING SECOND HALF" : "RECORDING FIRST HALF";
   if (match.operation_mode === "retrospective" && match.status === "ht") return "RECORDING · HALF TIME";
   if (match.status === "live") return `LIVE ${formatMatchClock(match, now)}`;

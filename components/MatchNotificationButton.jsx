@@ -50,7 +50,7 @@ async function savePreference(matchId, subscription, action, method = "POST") {
 export default function MatchNotificationButton({ matchId, status, color = "#FFFFFF", size = 19, compact = false }) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
-  const acceptsAlerts = !["ft", "cancelled"].includes(status);
+  const acceptsAlerts = !["ft", "awarded", "cancelled"].includes(status);
 
   useEffect(() => {
     let alive = true;

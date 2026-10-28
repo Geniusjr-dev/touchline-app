@@ -244,7 +244,8 @@ export default function MatchCentre({ id }) {
   const homeKitColor = m.homeKitColor || h.color || "#18A558";
   const awayKitColor = m.awayKitColor || a.color || "#2563EB";
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
-  const ended = m.status === "ft";
+  const ended = ["ft", "awarded"].includes(m.status);
+  const unavailable = ["cancelled", "postponed"].includes(m.status);
   const started = live || ended;
   const statsAvailable = statsAvailableForMatch(m, availabilityNow);
   const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
@@ -310,11 +311,16 @@ export default function MatchCentre({ id }) {
           <div className="flex flex-col items-center pt-1 min-w-0">
             {m.status === "scheduled"
               ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
+              : unavailable
+                ? <span style={{ color: t.text, fontSize: 14, fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.status}</span>
               : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
-            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Full time</span>}
+            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
+            {m.decisionReason && ["awarded", "cancelled", "postponed"].includes(m.status) && (
+              <span style={{ color: t.dim, fontSize: 10, lineHeight: 1.2, marginTop: 3, textAlign: "center", maxWidth: 140 }}>{m.decisionReason}</span>
+            )}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
             <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={44} ring={t.divider} />

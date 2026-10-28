@@ -198,7 +198,7 @@ function Overview({ state, t, onMatches }) {
   const { team, matches, teams } = state;
   const ordered = useMemo(() => [...matches].sort((a, b) => matchSortValue(a).localeCompare(matchSortValue(b))), [matches]);
   const nextMatch = ordered.find((match) => match.status === "scheduled");
-  const form = [...ordered].filter((match) => match.status === "ft").slice(-5);
+  const form = [...ordered].filter((match) => ["ft", "awarded"].includes(match.status)).slice(-5);
   return (
     <>
       {nextMatch && (
@@ -237,8 +237,8 @@ function Overview({ state, t, onMatches }) {
 
 function Matches({ state, t }) {
   const ordered = [...state.matches].sort((a, b) => matchSortValue(a).localeCompare(matchSortValue(b)));
-  const previous = ordered.filter((match) => match.status === "ft").reverse();
-  const upcoming = ordered.filter((match) => match.status !== "ft");
+  const previous = ordered.filter((match) => ["ft", "awarded"].includes(match.status)).reverse();
+  const upcoming = ordered.filter((match) => !["ft", "awarded"].includes(match.status));
   return (
     <>
       {previous.length > 0 && <MatchList title="Previous matches" matches={previous} teams={state.teams} t={t} />}
@@ -268,7 +268,15 @@ function MatchList({ title, matches, teams, t }) {
 function TeamMatchLine({ match, teams, t, large = false }) {
   const home = teams[match.home] || { name: "TBD", color: "#555" };
   const away = teams[match.away] || { name: "TBD", color: "#555" };
-  const score = match.status === "scheduled" ? (match.time || "TBD") : match.status === "ft" ? `${match.hs} - ${match.as}` : liveMinute(match);
+  const score = match.status === "scheduled"
+    ? (match.time || "TBD")
+    : match.status === "postponed"
+      ? "Postponed"
+      : match.status === "cancelled"
+        ? "Cancelled"
+        : ["ft", "awarded"].includes(match.status)
+          ? `${match.hs} - ${match.as}`
+          : liveMinute(match);
   return (
     <Link href={`/match/${match.id}`} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">

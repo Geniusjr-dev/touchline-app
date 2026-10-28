@@ -132,7 +132,7 @@ export default function CompetitionMatchesPage() {
                     </>
                   )}
                   <Link href={`/admin/match/${match.id}`} onPointerDown={() => cacheAdminMatch(match)} onClick={() => cacheAdminMatch(match)} style={primaryButton}>
-                    {match.status === "scheduled" ? "Open match" : "Score match"}
+                    {["live", "ht", "et_live", "et_ht"].includes(match.status) ? "Score match" : "Open match"}
                   </Link>
                 </div>
               </article>
@@ -149,7 +149,10 @@ function teamName(team, fallback) {
 }
 
 function statusColor(status) {
-  return status === "live" ? "#F04444" : status === "ft" ? "#8E939B" : status === "ht" ? "#F5C518" : "#4FC263";
+  if (["live", "et_live"].includes(status)) return "#F04444";
+  if (["ft", "awarded", "cancelled"].includes(status)) return "#8E939B";
+  if (["ht", "et_ht", "postponed"].includes(status)) return "#F5C518";
+  return "#4FC263";
 }
 
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16 };

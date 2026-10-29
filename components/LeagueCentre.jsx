@@ -187,9 +187,8 @@ function Fixtures({ matches, teams, t, now }) {
       {!groups.length && <EmptyCard t={t}>No fixtures match this filter.</EmptyCard>}
       {groups.map(([key, group]) => (
         <section key={key} className="mx-2 my-3 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${t.divider}` }}>
+          <div className="flex items-center px-4 py-3" style={{ borderBottom: `1px solid ${t.divider}` }}>
             <span style={{ color: t.text, fontSize: 13.5, fontWeight: 850 }}>{grouping === "date" && key !== "Date to be confirmed" ? dateLabel(key) : key}</span>
-            <span style={{ color: t.dim, fontSize: 11.5 }}>{group.length} {group.length === 1 ? "match" : "matches"}</span>
           </div>
           {group.map((match, index) => <LeagueMatchRow key={match.id} match={match} teams={teams} t={t} now={now} first={index === 0} />)}
         </section>
@@ -208,7 +207,7 @@ function LeagueMatchRow({ match, teams, t, now, first }) {
     <Link href={`/match/${match.id}`} onPointerDown={rememberMatch} onClick={rememberMatch} className="block active:opacity-70" style={{ padding: "12px 13px", borderTop: first ? "none" : `1px solid ${t.divider}` }}>
       <div className="flex items-center justify-between" style={{ color: t.dim, fontSize: 10.5, fontWeight: 700, marginBottom: 10 }}>
         <span>{match.round || dateLabel(match.date, false)}</span>
-        <StatusChip m={match} t={t} now={now} />
+        {match.status !== "ft" && <StatusChip m={match} t={t} now={now} />}
       </div>
       <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 50px minmax(0, 1fr)", gap: 8 }}>
         <div className="flex items-center justify-end gap-2 min-w-0">

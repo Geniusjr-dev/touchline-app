@@ -87,6 +87,19 @@ function matchDateLabel(dateKey, kickoff) {
   return [day, kickoff].filter(Boolean).join(" · ");
 }
 
+function matchCountdownLabel(dateKey) {
+  if (!dateKey) return "";
+  const matchDate = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(matchDate.getTime())) return "";
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const days = Math.round((matchDate.getTime() - today.getTime()) / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  if (days > 1) return `${days} days`;
+  return "";
+}
+
 function matchStageLabel(match) {
   if (match.round) return match.round;
   if (match.competitionType === "tournament" && match.groupNumber) {
@@ -285,64 +298,66 @@ export default function MatchCentre({ id }) {
   const homeScorers = scorerSummary(d?.events, "home", d?.lineups?.[m.home]);
   const awayScorers = scorerSummary(d?.events, "away", d?.lineups?.[m.away]);
   const hasScorerSummary = homeScorers.length > 0 || awayScorers.length > 0;
+  const countdownLabel = m.status === "scheduled" ? matchCountdownLabel(m.date) : "";
 
   return (
     <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       {/* The complete match identity, score and tabs remain visible while content scrolls. */}
-      <div style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
-          <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
-            <ChevronLeft size={22} color={t.text} />
+      <div className="match-centre-header" style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
+        <div className="match-centre-toolbar flex items-center justify-between px-4" style={{ height: 64 }}>
+          <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: t.pill, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 16px rgba(0,0,0,0.08)" }}>
+            <ChevronLeft size={27} color={t.text} />
           </button>
-          <div className="flex items-center rounded-full" style={{ height: 38, background: t.pill, border: `1px solid ${t.divider}` }}>
-            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 40, height: 38 }}>
-              <Share2 size={18} color={t.text} />
+          <div className="flex items-center rounded-full" style={{ height: 48, background: t.pill, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 16px rgba(0,0,0,0.08)" }}>
+            <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 48, height: 48 }}>
+              <Share2 size={21} color={t.text} />
             </button>
-            <span style={{ width: 1, height: 22, background: t.divider }} />
+            <span style={{ width: 1, height: 26, background: t.divider }} />
             <MatchNotificationButton matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
 
-        <div className="grid items-start px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 104px minmax(0, 1fr)" }}>
+        <div className="match-centre-identity grid items-start px-7 pb-4" style={{ gridTemplateColumns: "minmax(0, 1fr) 124px minmax(0, 1fr)", minHeight: 124, alignItems: "center" }}>
           <Link aria-label={h.name} href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
-            <Crest color={homeKitColor} logo={h.logoUrl} label={h.name} size={44} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{h.name}</span>
+            <Crest color={homeKitColor} logo={h.logoUrl} label={h.name} size={56} ring={t.divider} />
+            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: 14, fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{h.name}</span>
           </Link>
-          <div className="flex flex-col items-center pt-1 min-w-0">
+          <div className="flex flex-col items-center min-w-0">
             {m.status === "scheduled"
-              ? <span style={{ color: t.text, fontSize: 24, fontWeight: 750, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
+              ? <span className="match-centre-score" style={{ color: t.text, fontSize: 38, fontWeight: 700, letterSpacing: -1.2, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
               : unavailable
-                ? <span style={{ color: t.text, fontSize: 14, fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.status}</span>
-              : <span className="flex items-center gap-2" style={{ color: t.text, fontSize: 26, fontWeight: 750, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
-            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Half time · {breakClock(m)}</span>}
-            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
+                ? <span className="match-centre-score" style={{ color: t.text, fontSize: 18, fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.status}</span>
+              : <span className="match-centre-score flex items-center gap-3" style={{ color: t.text, fontSize: 42, fontWeight: 700, letterSpacing: -1.2, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
+            {countdownLabel && <span style={{ color: t.dim, fontSize: 13.5, fontWeight: 650, marginTop: 4 }}>{countdownLabel}</span>}
+            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>Half time · {breakClock(m)}</span>}
+            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
-            {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
+            {ended && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
-            <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={44} ring={t.divider} />
-            <span className="text-center mt-1" style={{ color: t.text, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, maxWidth: 120 }}>{a.name}</span>
+            <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={56} ring={t.divider} />
+            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: 14, fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{a.name}</span>
           </Link>
         </div>
 
         {hasScorerSummary && (
-          <div className="grid px-8 pb-2" style={{ gridTemplateColumns: "minmax(0, 1fr) 16px minmax(0, 1fr)", columnGap: 6, alignItems: "start" }}>
-            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "right", minWidth: 0 }}>
+          <div className="match-centre-identity grid px-8 pb-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 18px minmax(0, 1fr)", columnGap: 7, alignItems: "start" }}>
+            <div style={{ color: t.dim, fontSize: 12, lineHeight: 1.4, textAlign: "right", minWidth: 0 }}>
               {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
-            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={11} color={t.text} /></span>
-            <div style={{ color: t.dim, fontSize: 10.5, lineHeight: 1.35, textAlign: "left", minWidth: 0 }}>
+            <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={13} color={t.text} /></span>
+            <div style={{ color: t.dim, fontSize: 12, lineHeight: 1.4, textAlign: "left", minWidth: 0 }}>
               {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
           </div>
         )}
 
-        <div ref={tabStripRef} className="flex items-center gap-5 px-4 overflow-x-auto no-scrollbar" style={{ height: 42, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
+        <div ref={tabStripRef} className="match-centre-tabs flex items-center gap-7 px-5 overflow-x-auto no-scrollbar" style={{ height: 54, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
           {tabs.map((tb) => {
             const on = tb === activeTab;
             return (
-              <button data-match-tab={tb} key={tb} onClick={() => selectTab(tb)} className="shrink-0 relative h-full" style={{ color: on ? t.text : t.tab, fontSize: 13, fontWeight: on ? 750 : 600 }}>
-                {tb}{on && <span className="absolute left-0 right-0" style={{ bottom: 0, height: 3, background: t.text, borderRadius: 3 }} />}
+              <button data-match-tab={tb} key={tb} onClick={() => selectTab(tb)} className={`match-centre-tab shrink-0 relative h-full${on ? " is-active" : ""}`} style={{ color: on ? t.text : t.tab, fontSize: 16, fontWeight: on ? 800 : 650 }}>
+                {tb}{on && <span className="absolute left-0 right-0" style={{ bottom: 0, height: 4, background: t.text, borderRadius: 4 }} />}
               </button>
             );
           })}
@@ -390,7 +405,7 @@ function MatchPageShell({ t, onBack, error, onRetry }) {
   );
 }
 
-function Card({ t, children, style }) { return <div className="mx-3 my-2 rounded-2xl" style={{ background: t.card, ...style }}>{children}</div>; }
+function Card({ t, children, style }) { return <div className="mx-3 my-3 overflow-hidden" style={{ background: t.card, borderRadius: 19, ...style }}>{children}</div>; }
 function Empty({ t, title, note }) {
   return <Card t={t} style={{ padding: "40px 16px" }}>
     <div className="text-center">
@@ -715,7 +730,7 @@ function FactsPreview({ t, m, d, started }) {
   const competition = [m.compName || "Match", stage].filter(Boolean).join(" · ");
   const capacity = Number(m.venueCapacity);
   return (
-    <div>
+    <div style={{ paddingTop: 1 }}>
       {hasVenue && (
         <Card t={t}>
           <div className="flex items-center justify-between px-4 pt-4 pb-3">

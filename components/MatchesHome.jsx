@@ -40,6 +40,7 @@ function MatchRow({ m, teams, t, now }) {
   const a = teams[m.away] || { name: "TBD", color: "#555" };
   const homeName = h.displayName || h.name;
   const awayName = a.displayName || a.name;
+  const cancelled = m.status === "cancelled";
   const showScore = ["live", "ht", "ft", "awarded", "et_live", "et_ht"].includes(m.status);
   const showStatus = showScore || ["postponed", "cancelled"].includes(m.status);
   const rememberMatch = () => cachePublicMatch(m, teams);
@@ -65,6 +66,8 @@ function MatchRow({ m, teams, t, now }) {
     overflowWrap: "break-word",
     wordBreak: "normal",
     hyphens: "none",
+    textDecoration: cancelled ? "line-through" : "none",
+    textDecorationThickness: cancelled ? "1px" : undefined,
   };
   return (
     <div className="fixture-match-row relative grid items-center" style={{ borderTop: `1px solid ${t.divider}`, gridTemplateColumns: "34px minmax(0, 1fr) 54px minmax(0, 1fr) 34px", minHeight: 68 }}>

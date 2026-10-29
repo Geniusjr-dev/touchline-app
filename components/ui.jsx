@@ -110,6 +110,6 @@ export function StatusChip({ m, t, now }) {
   if (m.status === "ft") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>FT</span>;
   if (m.status === "awarded") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.text, background: t.chip }}>AWD</span>;
   if (m.status === "postponed") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>PP</span>;
-  if (m.status === "cancelled") return <span className="inline-flex items-center justify-center" style={{ ...base, color: t.dim, background: t.chip }}>CANC</span>;
+  if (m.status === "cancelled") return null;
   return null;
 }

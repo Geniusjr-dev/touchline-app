@@ -318,9 +318,6 @@ export default function MatchCentre({ id }) {
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
             {ended && <span style={{ color: t.dim, fontSize: 11, fontWeight: 700, marginTop: 3 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
-            {m.decisionReason && ["awarded", "cancelled", "postponed"].includes(m.status) && (
-              <span style={{ color: t.dim, fontSize: 10, lineHeight: 1.2, marginTop: 3, textAlign: "center", maxWidth: 140 }}>{m.decisionReason}</span>
-            )}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
             <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={44} ring={t.divider} />

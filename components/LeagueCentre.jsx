@@ -201,6 +201,7 @@ function Fixtures({ matches, teams, t, now }) {
 function LeagueMatchRow({ match, teams, t, now, first }) {
   const home = teams[match.home] || { name: "TBD", color: "#555" };
   const away = teams[match.away] || { name: "TBD", color: "#555" };
+  const cancelled = match.status === "cancelled";
   const showScore = ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status);
   const rememberMatch = () => cachePublicMatch(match, teams);
   return (
@@ -211,13 +212,13 @@ function LeagueMatchRow({ match, teams, t, now, first }) {
       </div>
       <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) 50px minmax(0, 1fr)", gap: 8 }}>
         <div className="flex items-center justify-end gap-2 min-w-0">
-          <span className="truncate" style={{ fontSize: 13, fontWeight: 700 }}>{home.name}</span>
+          <span className="truncate" style={{ fontSize: 13, fontWeight: 700, textDecoration: cancelled ? "line-through" : "none" }}>{home.name}</span>
           <Crest color={home.color} logo={home.logoUrl} label={home.name} size={25} ring={t.divider} />
         </div>
-        <span style={{ textAlign: "center", color: showScore ? t.text : t.dim, fontSize: 14, fontWeight: 850, whiteSpace: "nowrap" }}>{showScore ? `${match.hs} - ${match.as}` : match.time || "TBD"}</span>
+        <span style={{ textAlign: "center", color: showScore ? t.text : t.dim, fontSize: 14, fontWeight: 850, whiteSpace: "nowrap", textDecoration: cancelled ? "line-through" : "none" }}>{showScore ? `${match.hs} - ${match.as}` : match.time || "TBD"}</span>
         <div className="flex items-center gap-2 min-w-0">
           <Crest color={away.color} logo={away.logoUrl} label={away.name} size={25} ring={t.divider} />
-          <span className="truncate" style={{ fontSize: 13, fontWeight: 700 }}>{away.name}</span>
+          <span className="truncate" style={{ fontSize: 13, fontWeight: 700, textDecoration: cancelled ? "line-through" : "none" }}>{away.name}</span>
         </div>
       </div>
     </Link>

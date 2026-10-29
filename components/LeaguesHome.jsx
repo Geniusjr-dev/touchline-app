@@ -52,7 +52,7 @@ export default function LeaguesHome() {
     return competitions.filter((competition) => `${competition.name} ${competition.country || ""}`.toLocaleLowerCase().includes(search));
   }, [competitions, query]);
   return (
-    <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
       <header style={{ padding: "22px 16px 10px" }}>
         <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, letterSpacing: -0.4 }}>Leagues</h1>
         <label className="flex items-center rounded-full" style={{ height: 48, marginTop: 16, padding: "0 15px", background: t.pill, border: `1px solid ${t.pillBorder}` }}>
@@ -61,7 +61,7 @@ export default function LeaguesHome() {
         </label>
       </header>
 
-      <main style={{ padding: "15px 12px" }}>
+      <main className="touchline-public-content" style={{ paddingTop: 15, paddingBottom: 15 }}>
         <div className="flex items-center" style={{ margin: "0 4px 15px" }}>
           <h2 style={{ margin: 0, fontSize: 17 }}>Following</h2>
         </div>

@@ -248,7 +248,7 @@ export default function MatchesHome() {
   const selectedLabel = dateWindow.find((day) => day.key === selectedDate)?.label || selectedDate;
 
   return (
-    <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
         <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: 19.5, fontWeight: 800, letterSpacing: -0.6, gap: 3 }}>
           <Zap size={18} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
@@ -312,7 +312,7 @@ export default function MatchesHome() {
         })}
       </div>
 
-      <main onTouchStart={startDateSwipe} onTouchEnd={finishDateSwipe} style={{ minHeight: "calc(100vh - 176px)", touchAction: "pan-y" }}>
+      <main className="touchline-public-content" onTouchStart={startDateSwipe} onTouchEnd={finishDateSwipe} style={{ minHeight: "calc(100vh - 176px)", touchAction: "pan-y" }}>
         {!data && <HomeContentShell t={t} />}
         {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
         {data && comps.length === 0 && (

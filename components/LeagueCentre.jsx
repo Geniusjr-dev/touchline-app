@@ -88,8 +88,8 @@ export default function LeagueCentre({ id }) {
   const themeColor = state.competition.themeColor || "#4B125F";
 
   return (
-    <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header className="sticky top-0 z-30" style={{ background: themeColor, color: "#FFFFFF", boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
+      <header className="touchline-public-header sticky top-0 z-30" style={{ background: themeColor, color: "#FFFFFF", boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}>
         <div className="flex items-center px-3" style={{ height: 48, gap: 8 }}>
           <Link href="/leagues" aria-label="Back to leagues" className="flex items-center justify-center rounded-full" style={heroButton}>
             <ChevronLeft size={21} color="#FFFFFF" />
@@ -128,7 +128,7 @@ export default function LeagueCentre({ id }) {
         </nav>
       </header>
 
-      <main style={{ paddingTop: 6 }}>
+      <main className="touchline-public-content" style={{ paddingTop: 6 }}>
         {tab === "Table" && <CompetitionTable t={t} competition={state.competition} rows={state.table} />}
         {tab === "Fixtures" && <Fixtures matches={state.matches} teams={state.teams} t={t} now={now} />}
         {tab === "News" && <div style={{ minHeight: "64vh" }} />}
@@ -299,7 +299,7 @@ function StatRankingSheet({ title, records, valueKey, suffix = "", kind, t, comp
     ? records.filter((record) => record.positionGroup === positionFilter)
     : records;
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 overflow-y-auto" style={{ zIndex: 70, maxWidth: 480, margin: "0 auto", paddingBottom: 82, background: t.bg, color: t.text }}>
+    <div role="dialog" aria-modal="true" aria-label={title} className="touchline-public-shell fixed inset-0 overflow-y-auto" style={{ zIndex: 70, maxWidth: 480, margin: "0 auto", paddingBottom: 82, background: t.bg, color: t.text }}>
       <header style={{ minHeight: 132, background: themeColor, color: "#FFFFFF" }}>
         <div className="relative flex items-center justify-center px-14" style={{ height: 68 }}>
           <button type="button" onClick={onClose} aria-label="Back to statistics" className="absolute left-3 flex items-center justify-center rounded-full" style={heroButton}>
@@ -460,7 +460,7 @@ function EmptyCard({ t, children }) {
 
 function LeagueShell({ t, error, onRetry }) {
   return (
-    <div style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
       <header style={{ height: 144, background: "#4B125F" }}>
         <div className="flex items-center px-3" style={{ height: 48, gap: 8 }}>
           <span className="touchline-skeleton rounded-full" style={{ width: 34, height: 34, background: "rgba(255,255,255,0.18)" }} />

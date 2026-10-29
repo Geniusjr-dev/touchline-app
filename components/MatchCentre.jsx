@@ -287,7 +287,7 @@ export default function MatchCentre({ id }) {
   const hasScorerSummary = homeScorers.length > 0 || awayScorers.length > 0;
 
   return (
-    <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       {/* The complete match identity, score and tabs remain visible while content scrolls. */}
       <div style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
         <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
@@ -349,7 +349,7 @@ export default function MatchCentre({ id }) {
         </div>
       </div>
 
-      <div onTouchStart={startTabSwipe} onTouchEnd={finishTabSwipe} style={{ minHeight: "calc(100vh - 220px)", touchAction: "pan-y" }}>
+      <div className="touchline-public-content" onTouchStart={startTabSwipe} onTouchEnd={finishTabSwipe} style={{ minHeight: "calc(100vh - 220px)", touchAction: "pan-y" }}>
       {/* content */}
       {(activeTab === "Preview" || activeTab === "Facts") && <FactsPreview t={t} m={m} d={d} started={started} />}
       {activeTab === "Commentary" && <Commentary t={t} m={m} d={d} h={h} a={a} />}
@@ -366,7 +366,7 @@ export default function MatchCentre({ id }) {
 
 function MatchPageShell({ t, onBack, error, onRetry }) {
   return (
-    <div style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
+    <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-3" style={{ height: 48 }}>
         <button onClick={onBack} aria-label="Return to matches" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}>
           <ChevronLeft size={22} color={t.text} />

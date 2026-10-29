@@ -153,6 +153,34 @@ html[data-theme="light"] body { background: #DFE2E6; }
   bottom: max(18px, env(safe-area-inset-bottom));
 }
 
+/* Public app: preserve the compact native-phone experience on small screens,
+   then use a genuinely wide workspace on laptops and desktop monitors. */
+.touchline-public-shell { width: 100%; }
+
+@media (min-width: 900px) {
+  .touchline-public-shell {
+    max-width: none !important;
+    width: 100%;
+  }
+  .touchline-public-content {
+    width: min(100%, 1280px);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(16px, 2.5vw, 36px);
+    padding-right: clamp(16px, 2.5vw, 36px);
+  }
+  .touchline-public-header > nav {
+    justify-content: center;
+  }
+  .touchline-public-header > nav > button {
+    flex: 1 1 0;
+    max-width: 180px;
+  }
+  .touchline-bottom-nav {
+    width: min(720px, calc(100vw - 64px));
+  }
+}
+
 .fixture-brand,
 .fixture-match-time,
 .fixture-date-button.is-active { font-weight: 700 !important; }

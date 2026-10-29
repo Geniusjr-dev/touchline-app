@@ -115,7 +115,7 @@ export default function TeamCentre({ id }) {
   const tabs = state.tableCompetition ? TABS : TABS.filter((item) => item !== "Table");
   const activeTab = tabs.includes(tab) ? tab : "Overview";
   return (
-    <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
+    <div className="touchline-public-shell" style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
       <header style={{ background: t.card }}>
         <div className="flex items-center justify-between px-3" style={{ height: 56 }}>
           <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
@@ -146,7 +146,7 @@ export default function TeamCentre({ id }) {
         </nav>
       </header>
 
-      <main style={{ paddingTop: 10 }}>
+      <main className="touchline-public-content" style={{ paddingTop: 10 }}>
         {activeTab === "Overview" && <Overview state={state} t={t} onMatches={() => setTab("Matches")} />}
         {activeTab === "Matches" && <Matches state={state} t={t} />}
         {activeTab === "Table" && <Table state={state} t={t} />}
@@ -161,7 +161,7 @@ export default function TeamCentre({ id }) {
 }
 
 function TeamPageShell({ t, onBack, error, onRetry }) {
-  return <div style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text }}>
+  return <div className="touchline-public-shell" style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text }}>
     <div className="flex items-center px-3" style={{ height: 56, background: t.card }}>
       <button onClick={onBack} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill }}><ChevronLeft size={22} /></button>
     </div>

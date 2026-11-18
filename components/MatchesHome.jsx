@@ -96,8 +96,8 @@ function MatchRow({ m, teams, t, now }) {
       </div>
       <div className="relative z-10 shrink-0 text-center min-w-0 pointer-events-none">
         {showScore
-          ? <span className="fixture-match-time" style={{ color: t.text, fontSize: 15.5, fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
-          : <span className="fixture-match-time" style={{ color: t.dim, fontSize: 14.5, fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
+          ? <span className="fixture-match-time" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
+          : <span className="fixture-match-time" style={{ color: t.dim, fontSize: "var(--type-emphasis)", fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
       </div>
       <div className="relative z-10 flex items-center justify-start min-w-0 pointer-events-none" style={{ gap: 8 }}>
         <Crest color={a.color} logo={a.logoUrl} label={awayName} size={26} ring={t.divider} />
@@ -119,8 +119,8 @@ function Group({ c, teams, t, now }) {
     <div className="fixture-group mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3.5" style={{ background: t.groupHead, minHeight: 46 }}>
         <CompetitionMark competition={c} t={t} />
-        <span className="fixture-competition-name" style={{ color: t.text, fontSize: 14.5, fontWeight: 700 }}>{c.name}</span>
-        {c.sub && <span style={{ color: t.dim, fontSize: 13 }}>· {c.sub}</span>}
+        <span className="fixture-competition-name" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{c.name}</span>
+        {c.sub && <span style={{ color: t.dim, fontSize: "var(--type-body)" }}>· {c.sub}</span>}
         <span className="ml-auto">{open ? <ChevronUp size={18} color={t.dim} /> : <ChevronDown size={18} color={t.dim} />}</span>
       </button>
       {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} now={now} />)}
@@ -139,7 +139,7 @@ function CompetitionMark({ competition, t }) {
     );
   }
   const flag = competitionFlag(competition.country);
-  if (flag) return <span aria-hidden="true" className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22, fontSize: 17 }}>{flag}</span>;
+  if (flag) return <span aria-hidden="true" className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22, fontSize: "var(--type-subheading)" }}>{flag}</span>;
   return <span className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22 }}><Trophy size={17} color={t.yellow} strokeWidth={2.1} /></span>;
 }
 
@@ -208,6 +208,16 @@ export default function MatchesHome() {
     return () => window.clearTimeout(centreSelectedDate);
   }, [selectedDate]);
 
+  const oldestMatchDate = useMemo(() => {
+    let oldest = null;
+    for (const competition of data?.competitions || []) {
+      for (const match of competition.matches || []) {
+        if (match.date && (!oldest || match.date < oldest)) oldest = match.date;
+      }
+    }
+    return oldest;
+  }, [data]);
+
   const selectDate = (dateKey) => {
     const returningToToday = dateKey === todayKey;
     setSelectedDateOverride(returningToToday ? null : dateKey);
@@ -250,18 +260,18 @@ export default function MatchesHome() {
   return (
     <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
       <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
-        <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: 19.5, fontWeight: 800, letterSpacing: -0.6, gap: 3 }}>
+        <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: "var(--type-heading)", fontWeight: 800, letterSpacing: -0.6, gap: 3 }}>
           <Zap size={18} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
         </span>
         <div className="relative flex items-center gap-2">
           <div className="flex items-center rounded-full overflow-hidden" style={{ width: 118, background: t.pill, border: `1px solid ${t.pillBorder}`, height: 44 }}>
             <button onClick={() => setLiveOnly((v) => !v)} className="flex flex-1 items-center justify-center gap-1.5 h-full">
               <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: liveOnly ? t.red : t.dim }} />
-              <span style={{ color: liveOnly ? t.text : t.dim, fontSize: 13, fontWeight: 700 }}>Live</span>
+              <span style={{ color: liveOnly ? t.text : t.dim, fontSize: "var(--type-body)", fontWeight: 700 }}>Live</span>
             </button>
             <div style={{ width: 1, height: 20, background: t.pillBorder }} />
             <button type="button" onClick={() => setCalendarOpen(true)} aria-label="Open match calendar" className="relative flex items-center justify-center h-full" style={{ width: 42, color: t.text }}>
-              <span className="relative inline-flex items-center justify-center rounded" style={{ width: 20, height: 19, border: `2px solid ${t.text}`, fontSize: 10, fontWeight: 800, lineHeight: 1 }}>
+              <span className="relative inline-flex items-center justify-center rounded" style={{ width: 20, height: 19, border: `2px solid ${t.text}`, fontSize: "var(--type-badge)", fontWeight: 800, lineHeight: 1 }}>
                 <span style={{ position: "absolute", left: -2, right: -2, top: 3, height: 2, background: t.text }} />
                 <span style={{ paddingTop: 4 }}>{selectedDate ? Number(selectedDate.slice(8, 10)) : ""}</span>
               </span>
@@ -279,7 +289,7 @@ export default function MatchesHome() {
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-10 overflow-hidden rounded-xl z-50" style={{ minWidth: 142, background: t.card, border: `1px solid ${t.divider}`, boxShadow: "0 10px 28px rgba(0,0,0,0.34)" }}>
-              <button type="button" onClick={() => { toggle(); setMenuOpen(false); }} className="w-full text-left px-4 py-3" style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>
+              <button type="button" onClick={() => { toggle(); setMenuOpen(false); }} className="w-full text-left px-4 py-3" style={{ color: t.text, fontSize: "var(--type-body)", fontWeight: 700 }}>
                 {mode === "dark" ? "Light mode" : "Dark mode"}
               </button>
             </div>
@@ -316,7 +326,7 @@ export default function MatchesHome() {
         {!data && <HomeContentShell t={t} />}
         {data && comps.map((c) => <Group key={c.id} c={c} teams={data.teams} t={t} now={now} />)}
         {data && comps.length === 0 && (
-          <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: 14 }}>
+          <div className="text-center py-16 px-6" style={{ color: t.dim, fontSize: "var(--type-emphasis)" }}>
             {liveOnly ? `No live matches on ${selectedLabel}.` : `No matches scheduled for ${selectedLabel}.`}
           </div>
         )}
@@ -327,14 +337,14 @@ export default function MatchesHome() {
           type="button"
           onClick={() => selectDate(todayKey)}
           className="fixed left-1/2 -translate-x-1/2 rounded-full"
-          style={{ bottom: "max(78px, calc(env(safe-area-inset-bottom) + 72px))", zIndex: 45, minWidth: 92, height: 38, padding: "0 18px", background: t.accent, color: "#07130B", boxShadow: "0 5px 16px rgba(0,0,0,0.24)", fontSize: 14, fontWeight: 800 }}
+          style={{ bottom: "max(78px, calc(env(safe-area-inset-bottom) + 72px))", zIndex: 45, minWidth: 92, height: 38, padding: "0 18px", background: t.accent, color: "#07130B", boxShadow: "0 5px 16px rgba(0,0,0,0.24)", fontSize: "var(--type-emphasis)", fontWeight: 800 }}
         >
           Today
         </button>
       )}
 
       <BottomNav t={t} active="Matches" />
-      <MatchDateCalendar open={calendarOpen} selectedDate={selectedDate} t={t} onSelect={selectDate} onClose={() => setCalendarOpen(false)} />
+      <MatchDateCalendar open={calendarOpen} selectedDate={selectedDate} oldestMatchDate={oldestMatchDate} t={t} onSelect={selectDate} onClose={() => setCalendarOpen(false)} />
     </div>
   );
 }

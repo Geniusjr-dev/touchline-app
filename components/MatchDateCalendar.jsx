@@ -34,7 +34,7 @@ function buildMonth(date) {
   };
 }
 
-export default function MatchDateCalendar({ open, selectedDate, t, onSelect, onClose }) {
+export default function MatchDateCalendar({ open, selectedDate, oldestMatchDate, t, onSelect, onClose }) {
   const scrollRef = useRef(null);
   const today = useMemo(() => new Date(), []);
   const selected = useMemo(() => selectedDate ? new Date(`${selectedDate}T12:00:00`) : today, [selectedDate, today]);
@@ -42,11 +42,14 @@ export default function MatchDateCalendar({ open, selectedDate, t, onSelect, onC
   const months = useMemo(() => {
     const todayMonth = monthStart(today);
     const selectedMonth = monthStart(selected);
-    const earliest = selectedMonth < addMonths(todayMonth, -12) ? selectedMonth : addMonths(todayMonth, -12);
+    const defaultEarliest = addMonths(todayMonth, -12);
+    const oldest = oldestMatchDate ? new Date(oldestMatchDate + "T12:00:00") : null;
+    const oldestMonth = oldest && Number.isFinite(oldest.getTime()) ? monthStart(oldest) : defaultEarliest;
+    const earliest = new Date(Math.min(+selectedMonth, +defaultEarliest, +oldestMonth));
     const latest = selectedMonth > addMonths(todayMonth, 18) ? selectedMonth : addMonths(todayMonth, 18);
     const count = (latest.getFullYear() - earliest.getFullYear()) * 12 + latest.getMonth() - earliest.getMonth() + 1;
     return Array.from({ length: count }, (_, index) => buildMonth(addMonths(earliest, index)));
-  }, [selected, today]);
+  }, [selected, today, oldestMatchDate]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -71,13 +74,13 @@ export default function MatchDateCalendar({ open, selectedDate, t, onSelect, onC
           <button type="button" onClick={onClose} aria-label="Close calendar" className="flex items-center justify-center rounded-full" style={{ width: 46, height: 46, background: t.pill, color: t.text }}>
             <X size={25} />
           </button>
-          <button type="button" onClick={() => { onSelect(todayKey); onClose(); }} className="rounded-full" style={{ height: 46, minWidth: 104, padding: "0 24px", background: t.accent, color: "#07130B", fontSize: 14 }}>
+          <button type="button" onClick={() => { onSelect(todayKey); onClose(); }} className="rounded-full" style={{ height: 46, minWidth: 104, padding: "0 24px", background: t.accent, color: "#07130B", fontSize: "var(--type-emphasis)" }}>
             Today
           </button>
         </div>
 
         <div className="grid grid-cols-7" style={{ height: 48, padding: "0 22px", alignItems: "center", background: t.pill, borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }}>
-          {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} style={{ textAlign: "center", color: t.dim, fontSize: 12 }}>{weekday}</span>)}
+          {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} style={{ textAlign: "center", color: t.dim, fontSize: "var(--type-label)" }}>{weekday}</span>)}
         </div>
 
         <div ref={scrollRef} className="overflow-y-auto no-scrollbar" style={{ height: "calc(100% - 134px)", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
@@ -85,7 +88,7 @@ export default function MatchDateCalendar({ open, selectedDate, t, onSelect, onC
             const key = `${month.date.getFullYear()}-${month.date.getMonth()}`;
             return (
               <div key={key} data-month={key} style={{ padding: "24px 22px 14px", scrollMarginTop: 4 }}>
-                <h2 style={{ margin: "0 0 14px", color: t.text, fontSize: 19 }}>{month.label}</h2>
+                <h2 style={{ margin: "0 0 14px", color: t.text, fontSize: "var(--type-heading)" }}>{month.label}</h2>
                 <div className="grid grid-cols-7" style={{ rowGap: 9 }}>
                   {month.cells.map((day, index) => {
                     if (!day) return <span key={`blank-${index}`} style={{ height: 42 }} />;
@@ -100,7 +103,7 @@ export default function MatchDateCalendar({ open, selectedDate, t, onSelect, onC
                         aria-pressed={selectedDay}
                         onClick={() => { onSelect(dayKey); onClose(); }}
                         className="justify-self-center rounded-full"
-                        style={{ width: 42, height: 42, color: selectedDay ? "#07130B" : t.text, background: selectedDay ? t.accent : "transparent", border: currentDay && !selectedDay ? `1px solid ${t.accent}` : "1px solid transparent", fontSize: 14 }}
+                        style={{ width: 42, height: 42, color: selectedDay ? "#07130B" : t.text, background: selectedDay ? t.accent : "transparent", border: currentDay && !selectedDay ? `1px solid ${t.accent}` : "1px solid transparent", fontSize: "var(--type-emphasis)" }}
                       >
                         {day.getDate()}
                       </button>

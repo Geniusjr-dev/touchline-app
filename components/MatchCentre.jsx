@@ -124,7 +124,7 @@ function LiveMatchClock({ match, theme, announcedStoppage }) {
     return () => window.clearInterval(ticker);
   }, []);
   return (
-    <span className="inline-flex items-center gap-1.5" style={{ color: theme.red, fontSize: 11, fontWeight: 700, marginTop: 3 }}>
+    <span className="inline-flex items-center gap-1.5" style={{ color: theme.red, fontSize: "var(--type-caption)", fontWeight: 700, marginTop: 3 }}>
       <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: theme.red }} />
       {match.status === "et_live" ? "ET " : ""}{formatMatchClock(match, clockNow)}{announcedStoppage ? ` · +${announcedStoppage} added` : ""}
     </span>
@@ -320,33 +320,33 @@ export default function MatchCentre({ id }) {
         <div className="match-centre-identity grid items-start px-7 pb-4" style={{ gridTemplateColumns: "minmax(0, 1fr) 124px minmax(0, 1fr)", minHeight: 124, alignItems: "center" }}>
           <Link aria-label={h.name} href={`/team/${m.home}`} className="flex flex-col items-center min-w-0">
             <Crest color={homeKitColor} logo={h.logoUrl} label={h.name} size={56} ring={t.divider} />
-            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: 14, fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{h.name}</span>
+            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{h.name}</span>
           </Link>
           <div className="flex flex-col items-center min-w-0">
             {m.status === "scheduled"
               ? <span className="match-centre-score" style={{ color: t.text, fontSize: 38, fontWeight: 700, letterSpacing: -1.2, whiteSpace: "nowrap" }}>{m.time || "TBD"}</span>
               : unavailable
-                ? <span className="match-centre-score" style={{ color: t.text, fontSize: 18, fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.status}</span>
+                ? <span className="match-centre-score" style={{ color: t.text, fontSize: "var(--type-heading)", fontWeight: 800, textTransform: "uppercase", whiteSpace: "nowrap" }}>{m.status}</span>
               : <span className="match-centre-score flex items-center gap-3" style={{ color: t.text, fontSize: 42, fontWeight: 700, letterSpacing: -1.2, whiteSpace: "nowrap" }}>{hs} <span style={{ color: t.dim }}>-</span> {as}</span>}
-            {countdownLabel && <span style={{ color: t.dim, fontSize: 13.5, fontWeight: 650, marginTop: 4 }}>{countdownLabel}</span>}
-            {m.status === "ht" && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>Half time · {breakClock(m)}</span>}
-            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>Extra-time break · {breakClock(m)}</span>}
+            {countdownLabel && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 650, marginTop: 4 }}>{countdownLabel}</span>}
+            {m.status === "ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Half time · {breakClock(m)}</span>}
+            {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
-            {ended && <span style={{ color: t.dim, fontSize: 13, fontWeight: 700, marginTop: 4 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
+            {ended && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
             <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={56} ring={t.divider} />
-            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: 14, fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{a.name}</span>
+            <span className="match-centre-team-name text-center mt-2" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 750, lineHeight: 1.2, maxWidth: 140 }}>{a.name}</span>
           </Link>
         </div>
 
         {hasScorerSummary && (
           <div className="match-centre-identity grid px-8 pb-3" style={{ gridTemplateColumns: "minmax(0, 1fr) 18px minmax(0, 1fr)", columnGap: 7, alignItems: "start" }}>
-            <div style={{ color: t.dim, fontSize: 12, lineHeight: 1.4, textAlign: "right", minWidth: 0 }}>
+            <div style={{ color: t.dim, fontSize: "var(--type-label)", lineHeight: 1.4, textAlign: "right", minWidth: 0 }}>
               {homeScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
             <span className="inline-flex justify-center" style={{ paddingTop: 1 }}><MonoFootball size={13} color={t.text} /></span>
-            <div style={{ color: t.dim, fontSize: 12, lineHeight: 1.4, textAlign: "left", minWidth: 0 }}>
+            <div style={{ color: t.dim, fontSize: "var(--type-label)", lineHeight: 1.4, textAlign: "left", minWidth: 0 }}>
               {awayScorers.map((scorer) => <div key={scorer}>{scorer}</div>)}
             </div>
           </div>
@@ -356,7 +356,7 @@ export default function MatchCentre({ id }) {
           {tabs.map((tb) => {
             const on = tb === activeTab;
             return (
-              <button data-match-tab={tb} key={tb} onClick={() => selectTab(tb)} className={`match-centre-tab shrink-0 relative h-full${on ? " is-active" : ""}`} style={{ color: on ? t.text : t.tab, fontSize: 16, fontWeight: on ? 800 : 650 }}>
+              <button data-match-tab={tb} key={tb} onClick={() => selectTab(tb)} className={`match-centre-tab shrink-0 relative h-full${on ? " is-active" : ""}`} style={{ color: on ? t.text : t.tab, fontSize: "var(--type-subheading)", fontWeight: on ? 800 : 650 }}>
                 {tb}{on && <span className="absolute left-0 right-0" style={{ bottom: 0, height: 4, background: t.text, borderRadius: 4 }} />}
               </button>
             );
@@ -396,8 +396,8 @@ function MatchPageShell({ t, onBack, error, onRetry }) {
       <div style={{ height: 46, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }} />
       {error && (
         <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card, color: t.text }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{error}</div>
-          <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button>
+          <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{error}</div>
+          <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: "var(--type-body)", fontWeight: 800 }}>Try again</button>
         </div>
       )}
       <BottomNav t={t} active="Matches" />
@@ -409,8 +409,8 @@ function Card({ t, children, style }) { return <div className="mx-3 my-3 overflo
 function Empty({ t, title, note }) {
   return <Card t={t} style={{ padding: "40px 16px" }}>
     <div className="text-center">
-      <div style={{ color: t.text, fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{title}</div>
-      <div style={{ color: t.dim, fontSize: 13 }}>{note}</div>
+      <div style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 700, marginBottom: 4 }}>{title}</div>
+      <div style={{ color: t.dim, fontSize: "var(--type-body)" }}>{note}</div>
     </div>
   </Card>;
 }
@@ -430,10 +430,10 @@ function StatsTab({ t, stats, homeColor, awayColor }) {
   ];
   return (
     <Card t={t} style={{ padding: "18px 16px 16px" }}>
-      <div className="text-center" style={{ color: t.text, fontSize: 13, marginBottom: 8 }}>Ball possession</div>
+      <div className="text-center" style={{ color: t.text, fontSize: "var(--type-body)", marginBottom: 8 }}>Ball possession</div>
       <div className="flex overflow-hidden" style={{ height: 34, borderRadius: 18, marginBottom: 14 }}>
-        <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: homeColor, color: homeTextColor, fontSize: 15, fontWeight: 850 }}>{s.home_possession}%</div>
-        <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: awayColor, color: awayTextColor, fontSize: 15, fontWeight: 850 }}>{s.away_possession}%</div>
+        <div className="flex items-center px-3" style={{ width: `${s.home_possession}%`, background: homeColor, color: homeTextColor, fontSize: "var(--type-emphasis)", fontWeight: 850 }}>{s.home_possession}%</div>
+        <div className="flex items-center justify-end px-3" style={{ width: `${s.away_possession}%`, background: awayColor, color: awayTextColor, fontSize: "var(--type-emphasis)", fontWeight: 850 }}>{s.away_possession}%</div>
       </div>
       {rows.map(([label, home, away]) => {
         const homeLeads = Number(home) > Number(away);
@@ -441,7 +441,7 @@ function StatsTab({ t, stats, homeColor, awayColor }) {
         return (
           <div key={label} className="grid items-center py-2" style={{ gridTemplateColumns: "44px 1fr 44px" }}>
             <StatValue value={home} leading={homeLeads} color={homeColor} textColor={homeTextColor} side="home" theme={t} />
-            <span className="text-center" style={{ color: t.text, fontSize: 13 }}>{label}</span>
+            <span className="text-center" style={{ color: t.text, fontSize: "var(--type-body)" }}>{label}</span>
             <StatValue value={away} leading={awayLeads} color={awayColor} textColor={awayTextColor} side="away" theme={t} />
           </div>
         );
@@ -461,7 +461,7 @@ function StatValue({ value, leading, color, textColor, side, theme }) {
         padding: "0 7px",
         background: leading ? color : "transparent",
         color: leading ? textColor : theme.text,
-        fontSize: 13,
+        fontSize: "var(--type-body)",
         fontWeight: leading ? 800 : 700,
       }}
     >
@@ -514,7 +514,7 @@ function LineupTab({ t, mode, m, h, a, lineups, events, homeColor, awayColor }) 
 
       {hasSubstitutes ? (
         <Card t={t} style={{ overflow: "hidden", borderRadius: 13 }}>
-          <div className="px-3 py-2.5" style={{ color: t.text, fontSize: 12, fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
+          <div className="px-3 py-2.5" style={{ color: t.text, fontSize: "var(--type-label)", fontWeight: 800, background: t.groupHead, borderBottom: `1px solid ${t.divider}` }}>Substitutes</div>
           <div className="grid grid-cols-2" style={{ minWidth: 0 }}>
             <div style={{ minWidth: 0 }}>
               <SubstituteTeamHeading team={h} color={homeColor} t={t} />
@@ -536,8 +536,8 @@ function LineupTeamHeading({ team, formation, color, background, side }) {
   return (
     <div className={`flex items-center gap-2.5 px-4 ${away ? "flex-row-reverse text-right" : ""}`} style={{ minHeight: 46, background }}>
       <Crest color={color} logo={team.logoUrl} label={team.name} size={24} ring="rgba(255,255,255,.22)" />
-      <strong className="truncate" style={{ color: "#FFFFFF", fontSize: 13, fontWeight: 750 }}>{team.name}</strong>
-      <span style={{ color: "rgba(255,255,255,.72)", fontSize: 12.5, fontWeight: 650 }}>{formation || DEFAULT_FORMATION}</span>
+      <strong className="truncate" style={{ color: "#FFFFFF", fontSize: "var(--type-body)", fontWeight: 750 }}>{team.name}</strong>
+      <span style={{ color: "rgba(255,255,255,.72)", fontSize: "var(--type-label)", fontWeight: 650 }}>{formation || DEFAULT_FORMATION}</span>
     </div>
   );
 }
@@ -603,7 +603,7 @@ function TacticalLineupPlayer({ player, fallbackIndex, formation, side, mode, ev
         )}
         <LineupEventBadges player={player} side={side} events={events} />
       </span>
-      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: 11.5, lineHeight: 1.15, fontWeight: 700, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
+      <strong style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden", marginTop: 4, color: "#FFFFFF", fontSize: "var(--type-caption)", lineHeight: 1.15, fontWeight: 700, textShadow: "0 1px 4px rgba(0,0,0,.95)" }}>
         {player.number != null ? `${player.number} ` : ""}{player.displayName || player.name}
       </strong>
     </div>
@@ -692,7 +692,7 @@ function SubstituteTeamHeading({ team, color, t, away = false }) {
   return (
     <div className={`flex items-center gap-2 px-3 ${away ? "flex-row-reverse text-right" : ""}`} style={{ height: 36, background: t.chip, borderBottom: `1px solid ${t.divider}` }}>
       <Crest color={color} logo={team.logoUrl} label={team.name} size={20} ring={t.divider} />
-      <span className="truncate" style={{ color: t.text, fontSize: 10.5, fontWeight: 700 }}>{team.name}</span>
+      <span className="truncate" style={{ color: t.text, fontSize: "var(--type-badge)", fontWeight: 700 }}>{team.name}</span>
     </div>
   );
 }
@@ -714,8 +714,8 @@ function SubstituteList({ players, side, events, t, away = false }) {
             <LineupEventBadges player={player} side={side} events={events} compact />
           </span>
           <span style={{ minWidth: 0 }}>
-            <strong className="block truncate" style={{ color: t.text, fontSize: 11 }}>{player.displayName || player.name}</strong>
-            <span className="block truncate" style={{ color: t.dim, fontSize: 9.5 }}>{player.position || "Substitute"}</span>
+            <strong className="block truncate" style={{ color: t.text, fontSize: "var(--type-caption)" }}>{player.displayName || player.name}</strong>
+            <span className="block truncate" style={{ color: t.dim, fontSize: "var(--type-badge)" }}>{player.position || "Substitute"}</span>
           </span>
         </div>
       ))}
@@ -737,8 +737,8 @@ function FactsPreview({ t, m, d, started }) {
             <div className="flex items-center gap-3 min-w-0">
               <Disc3 size={20} color={t.dim} />
               <div className="min-w-0">
-                <div className="truncate" style={{ color: t.text, fontSize: 16, fontWeight: 750 }}>{m.venueName || "Match venue"}</div>
-                {m.venueLocation && <div className="truncate" style={{ color: t.dim, fontSize: 13 }}>{m.venueLocation}</div>}
+                <div className="truncate" style={{ color: t.text, fontSize: "var(--type-subheading)", fontWeight: 750 }}>{m.venueName || "Match venue"}</div>
+                {m.venueLocation && <div className="truncate" style={{ color: t.dim, fontSize: "var(--type-body)" }}>{m.venueLocation}</div>}
               </div>
             </div>
             <span className="inline-flex items-center justify-center rounded-full shrink-0" style={{ width: 34, height: 34, background: t.chip }}><MapPin size={16} color={t.accent} /></span>
@@ -746,21 +746,21 @@ function FactsPreview({ t, m, d, started }) {
           {(m.venueCapacity || m.venueSurface) && <div style={{ height: 1, background: t.divider }} />}
           {(m.venueCapacity || m.venueSurface) && (
             <div className="flex items-center gap-8 px-4 py-3">
-              {m.venueCapacity && <span style={{ color: t.text, fontSize: 14 }}><b>Capacity</b> <span style={{ color: t.dim }}>{Number.isFinite(capacity) ? capacity.toLocaleString() : m.venueCapacity}</span></span>}
-              {m.venueSurface && <span style={{ color: t.text, fontSize: 14 }}><b>Surface</b> <span style={{ color: t.dim }}>{m.venueSurface}</span></span>}
+              {m.venueCapacity && <span style={{ color: t.text, fontSize: "var(--type-emphasis)" }}><b>Capacity</b> <span style={{ color: t.dim }}>{Number.isFinite(capacity) ? capacity.toLocaleString() : m.venueCapacity}</span></span>}
+              {m.venueSurface && <span style={{ color: t.text, fontSize: "var(--type-emphasis)" }}><b>Surface</b> <span style={{ color: t.dim }}>{m.venueSurface}</span></span>}
             </div>
           )}
           {m.weather && <div style={{ height: 1, background: t.divider }} />}
-          {m.weather && <div className="px-4 py-3" style={{ color: t.text, fontSize: 14 }}><b>Weather</b> <span style={{ color: t.dim }}>{m.weather}</span></div>}
+          {m.weather && <div className="px-4 py-3" style={{ color: t.text, fontSize: "var(--type-emphasis)" }}><b>Weather</b> <span style={{ color: t.dim }}>{m.weather}</span></div>}
         </Card>
       )}
 
       <Card t={t}>
-        <div className="px-4 py-3 flex items-center gap-3"><Calendar size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14, fontWeight: 650 }}>{matchDateLabel(m.date, m.time)}</span></div>
+        <div className="px-4 py-3 flex items-center gap-3"><Calendar size={17} color={t.dim} /><span style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 650 }}>{matchDateLabel(m.date, m.time)}</span></div>
         <div style={{ height: 1, background: t.divider }} />
-        <div className="px-4 py-3 flex items-center gap-3"><span className="rounded-full px-3 py-1" style={{ background: t.chip, color: t.text, fontSize: 13, fontWeight: 650 }}>{competition}</span></div>
+        <div className="px-4 py-3 flex items-center gap-3"><span className="rounded-full px-3 py-1" style={{ background: t.chip, color: t.text, fontSize: "var(--type-body)", fontWeight: 650 }}>{competition}</span></div>
         {m.refereeName && <div style={{ height: 1, background: t.divider }} />}
-        {m.refereeName && <div className="px-4 py-3 flex items-center gap-3"><Disc3 size={17} color={t.dim} /><span style={{ color: t.text, fontSize: 14 }}>Referee <b>{m.refereeName}</b></span></div>}
+        {m.refereeName && <div className="px-4 py-3 flex items-center gap-3"><Disc3 size={17} color={t.dim} /><span style={{ color: t.text, fontSize: "var(--type-emphasis)" }}>Referee <b>{m.refereeName}</b></span></div>}
       </Card>
 
       {started && d ? <Timeline t={t} events={d.events} match={m} /> : null}
@@ -797,7 +797,7 @@ function Timeline({ t, events = [], match }) {
 }
 function RunScore({ score, scored, t }) {
   const [x, y] = String(score || "0 - 0").split(" - ");
-  return <span style={{ color: t.dim, fontSize: 13 }}>(<span style={{ color: scored === "home" ? t.green : t.dim, fontWeight: 700 }}>{x}</span> - <span style={{ color: scored === "away" ? t.green : t.dim, fontWeight: 700 }}>{y}</span>)</span>;
+  return <span style={{ color: t.dim, fontSize: "var(--type-body)" }}>(<span style={{ color: scored === "home" ? t.green : t.dim, fontWeight: 700 }}>{x}</span> - <span style={{ color: scored === "away" ? t.green : t.dim, fontWeight: 700 }}>{y}</span>)</span>;
 }
 
 function GoalEvent({ e, t }) {
@@ -810,13 +810,13 @@ function GoalEvent({ e, t }) {
   const content = (
     <div style={{ minWidth: 0, textAlign: align }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: justify, gap: 5, minHeight: 16, lineHeight: "16px" }}>
-        {primaryText && <span style={{ color: t.text, fontSize: 13.5, fontWeight: 700 }}>{primaryText}</span>}
+        {primaryText && <span style={{ color: t.text, fontSize: "var(--type-body)", fontWeight: 700 }}>{primaryText}</span>}
         <RunScore score={e.score} scored={e.scored} t={t} />
       </div>
-      {knownAssist && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: 3 }}>Assist by {e.assist}</div>}
+      {knownAssist && <div style={{ color: t.dim, fontSize: "var(--type-caption)", lineHeight: 1.25, marginTop: 3 }}>Assist by {e.assist}</div>}
     </div>
   );
-  const minute = <span style={{ color: t.text, fontSize: 13, fontWeight: 700, lineHeight: "16px", whiteSpace: "nowrap" }}>{fotMobMinuteLabel(e.min)}</span>;
+  const minute = <span style={{ color: t.text, fontSize: "var(--type-body)", fontWeight: 700, lineHeight: "16px", whiteSpace: "nowrap" }}>{fotMobMinuteLabel(e.min)}</span>;
   const ball = <span className="inline-flex items-center justify-center" style={{ width: 16, height: 16 }}><MonoFootball size={15} color={t.text} /></span>;
 
   if (e.side === "home") {
@@ -830,8 +830,8 @@ function Ev({ e, t }) {
     return <div className="flex items-center gap-3 py-3">
       <div className="flex-1" style={{ height: 1, background: t.divider }} />
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 26, height: 26, border: `1.5px solid ${t.faint}`, color: t.dim, fontSize: 10, fontWeight: 800 }}>{e.label}</span>
-        <span style={{ color: t.dim, fontSize: 13, fontWeight: 700 }}>{e.score}</span>
+        <span className="inline-flex items-center justify-center rounded-full" style={{ width: 26, height: 26, border: `1.5px solid ${t.faint}`, color: t.dim, fontSize: "var(--type-badge)", fontWeight: 800 }}>{e.label}</span>
+        <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700 }}>{e.score}</span>
       </div>
       <div className="flex-1" style={{ height: 1, background: t.divider }} />
     </div>;
@@ -849,24 +849,24 @@ function Ev({ e, t }) {
       const playerOn = hasKnownScorer(e.player) ? e.player : null;
       const playerOff = hasKnownScorer(e.assist) ? e.assist : null;
       return <div style={{ textAlign: align }}>
-        {playerOn && <div style={{ color: t.green, fontSize: 14, fontWeight: 600 }}>{playerOn}</div>}
-        {playerOff && <div style={{ color: t.red, fontSize: 14, fontWeight: 600 }}>{playerOff}</div>}
+        {playerOn && <div style={{ color: t.green, fontSize: "var(--type-emphasis)", fontWeight: 600 }}>{playerOn}</div>}
+        {playerOff && <div style={{ color: t.red, fontSize: "var(--type-emphasis)", fontWeight: 600 }}>{playerOff}</div>}
       </div>;
     }
     if (e.type === "miss") {
       return <div style={{ textAlign: align }}>
-        <div style={{ color: t.text, fontSize: 14, fontWeight: 600 }}>{hasKnownScorer(e.player) ? e.player : "Missed penalty"}</div>
-        {hasKnownScorer(e.player) && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: 2 }}>Missed penalty</div>}
+        <div style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 600 }}>{hasKnownScorer(e.player) ? e.player : "Missed penalty"}</div>
+        {hasKnownScorer(e.player) && <div style={{ color: t.dim, fontSize: "var(--type-caption)", lineHeight: 1.25, marginTop: 2 }}>Missed penalty</div>}
       </div>;
     }
     const cardRecipient = hasKnownScorer(e.player) ? e.player : e.recipientType === "team_official" ? "Team official" : null;
     const cardReason = e.cardType === "second_yellow" ? "Second booking" : CARD_REASON_PHRASES[e.cardReason];
     return cardRecipient || cardReason ? <div style={{ textAlign: align }}>
-      {cardRecipient && <div style={{ color: t.text, fontSize: 14, fontWeight: 600 }}>{cardRecipient}</div>}
-      {cardReason && <div style={{ color: t.dim, fontSize: 11.5, lineHeight: 1.25, marginTop: cardRecipient ? 2 : 0 }}>{cardReason}</div>}
+      {cardRecipient && <div style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 600 }}>{cardRecipient}</div>}
+      {cardReason && <div style={{ color: t.dim, fontSize: "var(--type-caption)", lineHeight: 1.25, marginTop: cardRecipient ? 2 : 0 }}>{cardReason}</div>}
     </div> : null;
   };
-  const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: 13, fontWeight: 700 }}>{fotMobMinuteLabel(e.min)}</span></div>;
+  const minute = <div className="flex flex-col items-center shrink-0" style={{ minWidth: 34 }}><span style={{ color: t.text, fontSize: "var(--type-body)", fontWeight: 700 }}>{fotMobMinuteLabel(e.min)}</span></div>;
   if (e.side === "home") return <div className="flex items-start gap-2 py-2.5" style={{ paddingRight: 12 }}>{minute}<span className="shrink-0 mt-0.5">{icon}</span><div className="flex-1">{body("left")}</div></div>;
   return <div className="flex items-start gap-2 py-2.5 justify-end" style={{ paddingLeft: 12 }}><div className="flex-1">{body("right")}</div><span className="shrink-0 mt-0.5">{icon}</span>{minute}</div>;
 }
@@ -1135,11 +1135,11 @@ function Commentary({ t, m, d, h, a }) {
     {lines.map((line, index) => (
       <div key={`${line.sort}-${index}`} className="rounded-2xl px-4 py-4" style={{ background: t.card, marginBottom: 8 }}>
         {line.m && (
-          <div style={{ color: t.text, fontSize: 14, lineHeight: 1.2, fontWeight: 800, marginBottom: 12 }}>
+          <div style={{ color: t.text, fontSize: "var(--type-emphasis)", lineHeight: 1.2, fontWeight: 800, marginBottom: 12 }}>
             {fotMobMinuteLabel(line.m)}
           </div>
         )}
-        <div style={{ color: t.text, fontSize: 15, lineHeight: 1.55, fontWeight: 600 }}>{line.text}</div>
+        <div style={{ color: t.text, fontSize: "var(--type-emphasis)", lineHeight: 1.55, fontWeight: 600 }}>{line.text}</div>
       </div>
     ))}
   </div>;
@@ -1183,7 +1183,7 @@ function TableTab({ t, m, rows }) {
                 border: 0,
                 background: view === option ? t.segActive : "transparent",
                 color: view === option ? t.text : t.dim,
-                fontSize: 13,
+                fontSize: "var(--type-body)",
                 fontWeight: 800,
                 cursor: "pointer",
                 textTransform: "capitalize",
@@ -1205,7 +1205,7 @@ function TableTab({ t, m, rows }) {
             background: t.pill,
             color: t.text,
             padding: "0 12px",
-            fontSize: 13,
+            fontSize: "var(--type-body)",
             fontWeight: 800,
             outline: "none",
             cursor: "pointer",
@@ -1219,17 +1219,17 @@ function TableTab({ t, m, rows }) {
 
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
         <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: `1px solid ${t.divider}` }}>
-          <span aria-hidden="true" style={{ fontSize: 18 }}>🏆</span>
-          <span className="truncate" style={{ color: t.text, fontSize: 15, fontWeight: 850 }}>{m.compName || "Competition table"}</span>
+          {m.competitionLogoUrl && <Crest logo={m.competitionLogoUrl} label={m.compName || "Competition"} size={24} ring={t.divider} />}
+          <span className="truncate" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 850 }}>{m.compName || "Competition table"}</span>
           {isLive && (
-            <span className="inline-flex items-center gap-1" style={{ color: t.accent, fontSize: 10, fontWeight: 850, marginLeft: "auto", textTransform: "uppercase" }}>
+            <span className="inline-flex items-center gap-1" style={{ color: t.accent, fontSize: "var(--type-badge)", fontWeight: 850, marginLeft: "auto", textTransform: "uppercase" }}>
               <span className="rounded-full" style={{ width: 7, height: 7, background: t.accent }} />
               Live
             </span>
           )}
         </div>
 
-        <div className="flex items-center px-3 py-3" style={{ color: t.dim, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase" }}>
+        <div className="flex items-center px-3 py-3" style={{ color: t.dim, fontSize: "var(--type-badge)", fontWeight: 800, textTransform: "uppercase" }}>
           <span style={{ width: 28 }} />
           <span className="flex-1 pl-1">Team</span>
           {view === "form" ? (
@@ -1257,18 +1257,23 @@ function TableTab({ t, m, rows }) {
         {scopedRows.map((tm, index) => {
           const goalDifference = tm.gf - tm.ga;
           const highlighted = hi.includes(tm.id);
-          const qualifies = m.competitionType === "tournament" && index < Math.min(4, scopedRows.length);
+          // IMEC archive qualification markers
+          const isImecArchive = m.competitionId === "013f3c6e-4aa1-486f-a0f9-1d031265655e" && Boolean(m.editionId);
+          const qualifies = m.competitionType === "tournament" &&
+            (isImecArchive
+              ? scope === "overall" && index < 2
+              : index < Math.min(4, scopedRows.length));
           const championPosition = m.competitionType === "league" && index === 0;
           const form = (tm.form || []).slice(-5);
           return (
             <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
               <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
                 <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : qualifies ? t.accent : "transparent", marginRight: 6 }} />
-                <span className="league-table-number" style={{ color: t.dim, fontSize: 13 }}>{index + 1}</span>
+                <span className="league-table-number" style={{ color: t.dim, fontSize: "var(--type-body)" }}>{index + 1}</span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
                 <Crest color={tm.color} logo={tm.logoUrl} label={tm.name} size={24} ring={t.divider} />
-                <span className="truncate" style={{ color: t.text, fontSize: 13.5, fontWeight: 700 }}>{tm.name}</span>
+                <span className="truncate" style={{ color: t.text, fontSize: "var(--type-body)", fontWeight: 700 }}>{tm.name}</span>
                 {isLive && highlighted && <span className="rounded-full" title="Playing now" style={{ width: 7, height: 7, background: t.accent, flex: "0 0 auto" }} />}
               </div>
 
@@ -1284,14 +1289,14 @@ function TableTab({ t, m, rows }) {
                         height: 22,
                         background: result === "W" ? t.win : result === "D" ? t.drawPill : t.loss,
                         color: "#FFFFFF",
-                        fontSize: 10,
+                        fontSize: "var(--type-badge)",
                         fontWeight: 850,
                         boxShadow: resultIndex === form.length - 1 ? `inset 0 -2px 0 ${t.accent}` : "none",
                       }}
                     >
                       {result}
                     </span>
-                  )) : <span style={{ color: t.faint, fontSize: 12 }}>No results</span>}
+                  )) : <span style={{ color: t.faint, fontSize: "var(--type-label)" }}>No results</span>}
                 </span>
               ) : view === "short" ? (
                 <>
@@ -1317,13 +1322,13 @@ function TableTab({ t, m, rows }) {
       {m.competitionType === "tournament" && (
         <div className="flex items-center gap-2 px-4 py-2">
           <span style={{ width: 10, height: 10, borderRadius: 2, background: t.accent }} />
-          <span style={{ color: t.dim, fontSize: 12 }}>Advances to the knockout stage</span>
+          <span style={{ color: t.dim, fontSize: "var(--type-label)" }}>Advances to the knockout stage</span>
         </div>
       )}
       {m.competitionType === "league" && (
         <div className="flex items-center gap-2 px-4 py-2">
           <span style={{ width: 10, height: 10, borderRadius: 2, background: t.yellow }} />
-          <span style={{ color: t.dim, fontSize: 12 }}>Champion position</span>
+          <span style={{ color: t.dim, fontSize: "var(--type-label)" }}>Champion position</span>
         </div>
       )}
     </>
@@ -1335,7 +1340,7 @@ function TableHeading({ width, children }) {
 }
 
 function TableValue({ width, color, children }) {
-  return <span className="league-table-number" style={{ width, textAlign: "center", color, fontSize: 12.5, flex: "0 0 auto" }}>{children}</span>;
+  return <span className="league-table-number" style={{ width, textAlign: "center", color, fontSize: "var(--type-label)", flex: "0 0 auto" }}>{children}</span>;
 }
 
 function signedNumber(value) {
@@ -1376,17 +1381,17 @@ function H2H({ t, h, a, homeId, awayId, meetings }) {
           return (
             <Link key={meeting.id} href={`/match/${meeting.id}`} style={{ display: "block", padding: "13px 12px", borderBottom: index === meetings.length - 1 ? "none" : `1px solid ${t.divider}` }}>
               <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-                <span style={{ color: t.dim, fontSize: 10.5, fontWeight: 650 }}>{formatH2HDate(meeting.date)}</span>
-                <span style={{ color: t.dim, background: t.chip, borderRadius: 99, padding: "4px 8px", fontSize: 9.5, fontWeight: 800, textTransform: "uppercase" }}>{meeting.competitionName}</span>
+                <span style={{ color: t.dim, fontSize: "var(--type-badge)", fontWeight: 650 }}>{formatH2HDate(meeting.date)}</span>
+                <span style={{ color: t.dim, background: t.chip, borderRadius: 99, padding: "4px 8px", fontSize: "var(--type-badge)", fontWeight: 800, textTransform: "uppercase" }}>{meeting.competitionName}</span>
               </div>
               <div className="grid items-center" style={{ gridTemplateColumns: "32px minmax(0, 1fr)", columnGap: 5 }}>
-                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 22, background: t.chip, color: t.dim, fontSize: 10, fontWeight: 800 }}>FT</span>
+                <span className="inline-flex items-center justify-center rounded-full" style={{ width: 30, height: 22, background: t.chip, color: t.dim, fontSize: "var(--type-badge)", fontWeight: 800 }}>FT</span>
                 <div className="flex items-center justify-center" style={{ gap: 7, minWidth: 0 }}>
-                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{historicalHome.name}</span>
+                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "right", fontSize: "var(--type-label)", fontWeight: 700 }}>{historicalHome.name}</span>
                   <Crest color={historicalHome.color} logo={historicalHome.logoUrl} label={historicalHome.name} size={27} ring={t.divider} />
-                  <strong style={{ color: t.text, fontSize: 14, minWidth: 39, textAlign: "center", whiteSpace: "nowrap" }}>{meeting.homeScore} - {meeting.awayScore}</strong>
+                  <strong style={{ color: t.text, fontSize: "var(--type-emphasis)", minWidth: 39, textAlign: "center", whiteSpace: "nowrap" }}>{meeting.homeScore} - {meeting.awayScore}</strong>
                   <Crest color={historicalAway.color} logo={historicalAway.logoUrl} label={historicalAway.name} size={27} ring={t.divider} />
-                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "left", fontSize: 12.5, fontWeight: 700 }}>{historicalAway.name}</span>
+                  <span className="truncate" style={{ flex: 1, color: t.text, textAlign: "left", fontSize: "var(--type-label)", fontWeight: 700 }}>{historicalAway.name}</span>
                 </div>
               </div>
             </Link>
@@ -1400,8 +1405,8 @@ function H2H({ t, h, a, homeId, awayId, meetings }) {
 function H2HCount({ value, label, color, textColor, t }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="inline-flex items-center justify-center rounded-full" style={{ minWidth: 46, height: 32, padding: "0 11px", background: color, color: textColor, fontSize: 15 }}>{value}</span>
-      <span style={{ color: t.text, fontSize: 12, fontWeight: 650, marginTop: 7 }}>{label}</span>
+      <span className="inline-flex items-center justify-center rounded-full" style={{ minWidth: 46, height: 32, padding: "0 11px", background: color, color: textColor, fontSize: "var(--type-emphasis)" }}>{value}</span>
+      <span style={{ color: t.text, fontSize: "var(--type-label)", fontWeight: 650, marginTop: 7 }}>{label}</span>
     </div>
   );
 }

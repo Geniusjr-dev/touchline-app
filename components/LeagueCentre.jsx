@@ -430,23 +430,64 @@ function PitchLines() {
   return <div aria-hidden="true" className="absolute inset-3" style={{ border: "2px solid rgba(255,255,255,0.27)", borderRadius: 2 }}><span className="absolute left-0 right-0" style={{ top: "50%", height: 2, background: "rgba(255,255,255,0.27)" }} /><span className="absolute rounded-full" style={{ left: "50%", top: "50%", width: 84, height: 84, transform: "translate(-50%,-50%)", border: "2px solid rgba(255,255,255,0.27)" }} /><span className="absolute" style={{ left: "25%", right: "25%", top: 0, height: 72, border: "2px solid rgba(255,255,255,0.27)", borderTop: 0 }} /><span className="absolute" style={{ left: "25%", right: "25%", bottom: 0, height: 72, border: "2px solid rgba(255,255,255,0.27)", borderBottom: 0 }} /></div>;
 }
 
-function Seasons({ seasons, competition, t }) {
+function Seasons({ seasons, t }) {
+  if (!seasons.length) return <EmptyCard t={t}>No seasons recorded yet.</EmptyCard>;
+
   return (
-    <div style={{ padding: "6px 8px 12px" }}>
-      <div style={{ margin: "0 5px 12px" }}><h2 style={{ margin: 0, fontSize: "var(--type-subheading)" }}>Seasons</h2><p style={{ color: t.dim, fontSize: "var(--type-label)", lineHeight: 1.5, margin: "5px 0 0" }}>Champions and runners-up from each {competition.name} season.</p></div>
+    <div className="league-seasons-grid">
       {seasons.map((season) => (
-        <Link href={`/league/${season.id}`} key={season.id} className="block rounded-2xl active:opacity-70" style={{ background: t.card, border: `1px solid ${season.current ? t.accent : t.divider}`, marginBottom: 10, overflow: "hidden" }}>
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${t.divider}` }}><span style={{ fontSize: "var(--type-emphasis)", fontWeight: 850 }}>{season.label}</span>{season.current && <span className="rounded-full" style={{ color: "#07130B", background: t.accent, padding: "4px 8px", fontSize: "var(--type-badge)", fontWeight: 900 }}>CURRENT</span>}</div>
-          {season.winner ? <div style={{ padding: "8px 13px 11px" }}><SeasonTeam row={season.winner} label={season.completed ? "Winner" : "Current leader"} t={t} winner /><SeasonTeam row={season.runnerUp} label={season.completed ? "Runner-up" : "Second place"} t={t} /></div> : <div style={{ color: t.dim, fontSize: "var(--type-label)", padding: "20px 14px" }}>No standings recorded for this season.</div>}
+        <Link
+          key={season.id}
+          href={`/league/${season.id}`}
+          className="league-season-card block rounded-2xl active:opacity-70"
+          style={{ background: t.card, border: `1px solid ${t.divider}` }}
+        >
+          <h2 style={{ margin: 0, fontSize: "var(--type-emphasis)", fontWeight: 700 }}>
+            {season.label}
+          </h2>
+          {season.winner ? (
+            <div className="league-season-teams">
+              <SeasonTeam row={season.winner} label={season.completed ? "Winner" : "Current leader"} t={t} />
+              <SeasonTeam row={season.runnerUp} label={season.completed ? "Runner-up" : "Second place"} t={t} />
+            </div>
+          ) : (
+            <p style={{ margin: "24px 0 0", color: t.dim, fontSize: "var(--type-label)" }}>
+              No standings recorded yet.
+            </p>
+          )}
         </Link>
       ))}
+      <style jsx global>{`
+        .league-seasons-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+          gap: 14px;
+          padding: 12px 8px;
+        }
+        .league-season-card { min-width: 0; padding: 20px 16px; }
+        .league-season-teams { display: grid; gap: 20px; margin-top: 26px; }
+        @media (min-width: 900px) {
+          .league-seasons-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            padding-inline: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-function SeasonTeam({ row, label, t, winner = false }) {
+function SeasonTeam({ row, label, t }) {
   if (!row) return null;
-  return <div className="flex items-center gap-3" style={{ padding: "8px 2px" }}><span className="inline-flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: winner ? t.disc : t.chip }}>{winner ? <Trophy size={16} color={t.yellow} /> : <span style={{ color: t.dim, fontSize: "var(--type-label)", fontWeight: 900 }}>2</span>}</span><Crest color={row.color} logo={row.logoUrl} label={row.name} size={34} ring={t.divider} /><span className="min-w-0" style={{ flex: 1 }}><span className="block" style={{ color: t.dim, fontSize: "var(--type-badge)" }}>{label}</span><span className="block truncate" style={{ fontSize: "var(--type-body)", fontWeight: 800, marginTop: 2 }}>{row.name}</span></span><span style={{ color: t.dim, fontSize: "var(--type-caption)", fontWeight: 750 }}>{row.pts} pts</span></div>;
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <Crest logo={row.logoUrl} label={row.name} size={32} ring={t.divider} />
+      <span className="min-w-0" style={{ overflowWrap: "anywhere" }}>
+        <span className="block" style={{ fontSize: "var(--type-body)" }}>{row.name}</span>
+        <span className="block" style={{ color: t.dim, fontSize: "var(--type-caption)" }}>{label}</span>
+      </span>
+    </div>
+  );
 }
 
 function PlayerPhoto({ player, size, t, light = false }) {

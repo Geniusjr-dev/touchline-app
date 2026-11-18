@@ -120,7 +120,7 @@ function Group({ c, teams, t, now }) {
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3.5" style={{ background: t.groupHead, minHeight: 46 }}>
         <CompetitionMark competition={c} t={t} />
         <span className="fixture-competition-name" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{c.name}</span>
-        {c.sub && <span style={{ color: t.dim, fontSize: "var(--type-body)" }}>· {c.sub}</span>}
+        {c.sub?.trim() && c.sub.trim().toLowerCase() !== c.name.trim().toLowerCase() && <span style={{ color: t.dim, fontSize: "var(--type-body)" }}>· {c.sub}</span>}
         <span className="ml-auto">{open ? <ChevronUp size={18} color={t.dim} /> : <ChevronDown size={18} color={t.dim} />}</span>
       </button>
       {open && c.matches.map((m) => <MatchRow key={m.id} m={m} teams={teams} t={t} now={now} />)}
@@ -129,6 +129,16 @@ function Group({ c, teams, t, now }) {
 }
 
 function CompetitionMark({ competition, t }) {
+  const isImecLogo = competition.name === "IMEC" &&
+    /\/imec-logo\.jpeg(?:[?#]|$)/i.test(competition.logoUrl || "");
+  if (isImecLogo) {
+    return (
+      <span aria-hidden="true" className="relative inline-block shrink-0 overflow-hidden rounded-full" style={{ width: 30, height: 30 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={competition.logoUrl} alt="" style={{ position: "absolute", width: 64, height: 64, maxWidth: "none", left: -17, top: -10 }} />
+      </span>
+    );
+  }
   if (competition.logoUrl) {
     return (
       <span className="inline-flex items-center justify-center shrink-0" style={{ width: 22, height: 22 }}>

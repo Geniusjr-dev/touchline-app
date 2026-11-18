@@ -10,7 +10,7 @@ export default function CompetitionTable({ t, competition, rows }) {
 
   if (!rows.length) {
     return (
-      <div className="mx-2 my-3 rounded-2xl text-center" style={{ padding: "28px 18px", background: t.card, color: t.dim, fontSize: 13.5 }}>
+      <div className="mx-2 my-3 rounded-2xl text-center" style={{ padding: "28px 18px", background: t.card, color: t.dim, fontSize: "var(--type-body)" }}>
         The table will appear when teams are registered for this league.
       </div>
     );
@@ -46,7 +46,7 @@ export default function CompetitionTable({ t, competition, rows }) {
                 border: 0,
                 background: view === option ? t.segActive : "transparent",
                 color: view === option ? t.text : t.dim,
-                fontSize: 12,
+                fontSize: "var(--type-label)",
                 cursor: "pointer",
                 textTransform: "capitalize",
               }}
@@ -67,7 +67,7 @@ export default function CompetitionTable({ t, competition, rows }) {
             background: t.pill,
             color: t.text,
             padding: "0 12px",
-            fontSize: 12,
+            fontSize: "var(--type-label)",
             outline: "none",
             cursor: "pointer",
           }}
@@ -78,25 +78,25 @@ export default function CompetitionTable({ t, competition, rows }) {
         </select>
       </div>
 
-      <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-        <div className="flex items-center px-3 py-3" style={{ color: t.dim, fontSize: 10, textTransform: "uppercase" }}>
-          <span style={{ width: 28 }} />
+      <div className="standings-card mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
+        <div className="standings-header flex items-center px-3 py-3" style={{ color: t.dim, fontSize: "var(--type-caption)", textTransform: "uppercase" }}>
+          <span className="standings-rank-heading" style={{ width: 28, flexShrink: 0, textAlign: "center" }}>#</span>
           <span className="flex-1 pl-1">Team</span>
           {view === "form" ? (
             <span style={{ width: 126, textAlign: "right", paddingRight: 3 }}>Last matches</span>
           ) : view === "short" ? (
             <>
-              <Heading width={28}>PL</Heading>
+              <Heading width={28}>MP</Heading>
               <Heading width={38}>GD</Heading>
               <Heading width={38}>PTS</Heading>
             </>
           ) : (
             <>
-              <Heading width={26}>PL</Heading>
+              <Heading width={26}>MP</Heading>
               <Heading width={22}>W</Heading>
               <Heading width={22}>D</Heading>
               <Heading width={22}>L</Heading>
-              <Heading width={42}>+/-</Heading>
+              <Heading width={42}>G</Heading>
               <Heading width={34}>GD</Heading>
               <Heading width={34}>PTS</Heading>
             </>
@@ -111,16 +111,16 @@ export default function CompetitionTable({ t, competition, rows }) {
             <Link
               href={`/team/${team.id}`}
               key={team.id}
-              className="flex items-center px-3 active:opacity-70"
+              className={`standings-row flex items-center px-3 active:opacity-70${championPosition ? " standings-leader" : ""}`}
               style={{ minHeight: 50, borderTop: `1px solid ${t.divider}` }}
             >
-              <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
-                <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : "transparent", marginRight: 6 }} />
-                <span className="league-table-number" style={{ color: t.dim, fontSize: 12.5 }}>{index + 1}</span>
+              <div className="standings-rank flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
+                <span className="standings-stripe" style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : "transparent", marginRight: 6 }} />
+                <span className="league-table-number standings-rank-number" style={{ color: t.dim, fontSize: "var(--type-label)" }}>{index + 1}<span className="standings-rank-period">.</span></span>
               </div>
               <div className="flex-1 flex items-center gap-2 min-w-0 pl-1">
                 <Crest color={team.color} logo={team.logoUrl} label={team.name} size={24} ring={t.divider} />
-                <span className="truncate" style={{ color: t.text, fontSize: 13 }}>{team.name}</span>
+                <span className="standings-name truncate" style={{ color: t.text, fontSize: "var(--type-body)" }}>{team.name}</span>
               </div>
 
               {view === "form" ? (
@@ -135,19 +135,19 @@ export default function CompetitionTable({ t, competition, rows }) {
                         height: 22,
                         background: result === "W" ? t.win : result === "D" ? t.drawPill : t.loss,
                         color: "#FFFFFF",
-                        fontSize: 10,
+                        fontSize: "var(--type-badge)",
                         boxShadow: resultIndex === form.length - 1 ? `inset 0 -2px 0 ${t.accent}` : "none",
                       }}
                     >
                       {result}
                     </span>
-                  )) : <span style={{ color: t.faint, fontSize: 12 }}>No results</span>}
+                  )) : <span style={{ color: t.faint, fontSize: "var(--type-label)" }}>No results</span>}
                 </span>
               ) : view === "short" ? (
                 <>
                   <Value width={28} color={t.text}>{team.pl}</Value>
                   <Value width={38} color={t.dim}>{signedNumber(goalDifference)}</Value>
-                  <Value width={38} color={t.text}>{team.pts}</Value>
+                  <Value width={38} color={t.text} points>{team.pts}</Value>
                 </>
               ) : (
                 <>
@@ -155,9 +155,9 @@ export default function CompetitionTable({ t, competition, rows }) {
                   <Value width={22} color={t.dim}>{team.w}</Value>
                   <Value width={22} color={t.dim}>{team.d}</Value>
                   <Value width={22} color={t.dim}>{team.l}</Value>
-                  <Value width={42} color={t.dim}>{team.gf}-{team.ga}</Value>
+                  <Value width={42} color={t.dim}>{team.gf}:{team.ga}</Value>
                   <Value width={34} color={t.dim}>{signedNumber(goalDifference)}</Value>
-                  <Value width={34} color={t.text}>{team.pts}</Value>
+                  <Value width={34} color={t.text} points>{team.pts}</Value>
                 </>
               )}
             </Link>
@@ -165,20 +165,41 @@ export default function CompetitionTable({ t, competition, rows }) {
         })}
       </div>
 
-      <div className="flex items-center gap-2 px-4 py-2">
-        <span style={{ width: 10, height: 10, borderRadius: 2, background: t.yellow }} />
-        <span style={{ color: t.dim, fontSize: 11.5 }}>Champion position</span>
+      <div className="standings-legend flex items-center gap-2 px-4 py-2">
+        <span className="standings-legend-key" style={{ width: 10, height: 10, borderRadius: 2, background: t.yellow }} />
+        <span style={{ color: t.dim, fontSize: "var(--type-caption)" }}>Champion position</span>
       </div>
+      <style jsx global>{`
+        .standings-rank-period { display: none; }
+        @media (min-width: 900px) {
+          .standings-card, .standings-legend { max-width: 650px; margin-inline: auto; }
+          .standings-card { --standings-column-scale: 1.35; border-radius: 4px; }
+          .standings-card .standings-header { padding-block: 0; min-height: 29px; background: color-mix(in srgb, currentColor 8%, transparent); }
+          .standings-card .standings-row { min-height: 36px !important; }
+          .standings-card .standings-rank, .standings-card .standings-rank-heading { width: 32px !important; flex-shrink: 0; }
+          .standings-card .standings-stripe { display: none; }
+          .standings-card .standings-rank-period { display: inline; font-weight: inherit !important; }
+          .standings-card .standings-rank-number { display: inline-grid; grid-auto-flow: column; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 4px; }
+          .standings-card .standings-value:not(.standings-points) { font-weight: 400 !important; }
+          .standings-card .standings-leader { background: color-mix(in srgb, #409fee 12%, transparent); }
+          .standings-card .standings-leader .standings-rank-number, .standings-legend .standings-legend-key { background: #06477e !important; color: white !important; }
+          .standings-card .standings-leader .standings-name { font-weight: 650 !important; }
+        }
+      `}</style>
     </>
   );
 }
 
 function Heading({ width, children }) {
-  return <span style={{ width, textAlign: "center", flex: "0 0 auto" }}>{children}</span>;
+  return <span style={{ width: standingsColumnWidth(width), textAlign: "center", flex: "0 0 auto" }}>{children}</span>;
 }
 
-function Value({ width, color, children }) {
-  return <span className="league-table-number" style={{ width, textAlign: "center", color, fontSize: 11.5, flex: "0 0 auto" }}>{children}</span>;
+function Value({ width, color, children, points = false }) {
+  return <span className={`league-table-number standings-value${points ? " standings-points" : ""}`} style={{ width: standingsColumnWidth(width), textAlign: "center", color, fontSize: "var(--standings-value-size)", flex: "0 0 auto" }}>{children}</span>;
+}
+
+function standingsColumnWidth(width) {
+  return `calc(${width}px * var(--standings-column-scale))`;
 }
 
 function signedNumber(value) {

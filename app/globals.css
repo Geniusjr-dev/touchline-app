@@ -2,15 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
+.league-web-bar, .league-fixture-period, .league-team-mode { display: none; }
+@media (min-width: 900px) {
+  .league-web { padding-bottom: 32px !important; }
+  .league-web .league-mobile-navigation, .league-web .league-mobile-team-filter,
+  .league-web .league-outside-period, .league-fixture-mobile-detail { display: none; }
+  .league-web-bar {
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0;
+    z-index: 40; min-height: 94px; padding-inline: max(24px, calc((100% - 1600px) / 2));
+    background: var(--league-card); border-bottom: 1px solid var(--league-divider);
+  }
+  .league-web-bar > a { font-size: 32px; font-weight: 750 !important; }
+  .league-web-bar > div { display: flex; gap: 32px; font-size: 18px; }
+  .league-web > header, .league-web > main {
+    width: min(1600px, calc(100% - 48px)) !important; max-width: none !important; margin-inline: auto;
+  }
+  .league-web > header {
+    position: relative; overflow: hidden; border: 1px solid var(--league-divider);
+    box-shadow: none !important; border-radius: 0 0 20px 20px;
+    background: var(--league-card) !important; color: var(--league-text) !important;
+  }
+  .league-web > header > div:first-child :is(a, button, select) {
+    background: var(--league-inset) !important; color: var(--league-text) !important;
+  }
+  .league-web > header > div:first-child a svg { color: var(--league-text); stroke: currentColor; }
+  .league-web > header > div:nth-child(2) .truncate { color: var(--league-text) !important; }
+  .league-web > header > div:nth-child(2) > span { background: var(--league-inset) !important; }
+  .league-web > header > div:nth-child(2) > span svg { color: var(--league-text); stroke: currentColor; }
+  .league-web > main { padding-inline: 0; }
+  .league-web .league-web-tabs { justify-content: flex-start; background: var(--league-card); min-height: 76px; gap: 42px; padding-inline: 38px; }
+  .league-web .league-web-tabs button {
+    height: 76px !important; min-width: 0 !important; padding: 0 !important;
+    flex: 0 0 auto !important; color: var(--league-muted) !important;
+    font-size: 18px !important; font-weight: 600 !important;
+  }
+  .league-web .league-web-tabs button[aria-pressed="true"] { color: var(--league-text) !important; }
+  .league-web-tabs button > span { inset-inline: 0; background: var(--league-text) !important; }
+  .league-fixture-panel {
+    margin-top: 14px; padding: 0 30px 22px; background: var(--league-card);
+    border: 1px solid var(--league-divider); border-radius: 20px;
+  }
+  .league-fixture-controls { min-height: 80px; margin-inline: -30px; padding: 12px 30px; border-bottom: 1px solid var(--league-divider); }
+  .league-fixture-modes { display: flex; flex: 0 0 auto; gap: 10px; padding: 0; background: transparent !important; }
+  .league-fixture-modes button {
+    display: block; min-height: 40px; padding-inline: 24px; border: 1px solid var(--league-divider);
+    background: transparent !important; color: var(--league-text) !important; font-weight: 600 !important;
+  }
+  .league-fixture-modes button[aria-pressed="true"] { background: var(--league-text) !important; color: var(--league-card) !important; }
+  .league-fixture-period { display: flex; justify-content: space-between; align-items: center; min-height: 80px; font-size: 18px; }
+  .league-fixture-period button { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--league-inset); }
+  .league-fixture-period button:disabled { opacity: .35; }
+  .league-fixture-group { margin: 0; }
+  .league-fixture-date { min-height: 50px; border: 0 !important; border-radius: 13px; background: var(--league-inset); }
+  .league-fixture-date span { font-weight: 650 !important; }
+  .league-fixture-row { position: relative; display: grid; align-items: center; min-height: 80px; border-radius: 13px; }
+  .league-fixture-row:hover, .league-fixture-row:focus-visible { background: var(--league-inset); }
+  .league-fixture-status { position: absolute; inset-inline-start: 18px; top: 50%; transform: translateY(-50%); margin: 0 !important; }
+}
+
 html, body { margin: 0; padding: 0; background: #0A0A0A; overflow-x: hidden; overscroll-behavior-y: contain; }
-html { font-size: 14px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html {
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  --type-badge: 11px;
+  --type-caption: 12px;
+  --type-label: 14px;
+  --type-body: 15px;
+  --type-emphasis: 16px;
+  --type-subheading: 18px;
+  --type-heading: 20px;
+  --type-title: 22px;
+  --standings-column-scale: 1;
+  --standings-value-size: var(--type-label);
+}
+@media (min-width: 900px) {
+  html {
+    --type-badge: 12px;
+    --type-caption: 13px;
+    --type-label: 15px;
+    --type-body: 16px;
+    --type-emphasis: 17px;
+    --type-subheading: 19px;
+    --type-heading: 21px;
+    --type-title: 24px;
+    --standings-column-scale: 1.85;
+    --standings-value-size: var(--type-body);
+  }
+}
 body,
 button,
 input,
 select,
 textarea {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 13px;
+  font-size: var(--type-body);
   font-weight: 400;
   line-height: 1.35;
   letter-spacing: -0.01em;
@@ -91,17 +177,17 @@ html[data-theme="light"] body { background: #DFE2E6; }
 .admin-main h1 { font-size: clamp(25px, 2.4vw, 34px) !important; line-height: 1.15; letter-spacing: -0.025em; }
 .admin-main input,
 .admin-main select,
-.admin-main textarea { min-height: var(--admin-control-height); font-size: 15px !important; }
+.admin-main textarea { min-height: var(--admin-control-height); font-size: var(--type-body) !important; }
 .admin-main button,
-.admin-main a { font-size: 14px; }
+.admin-main a { font-size: var(--type-label); }
 .admin-main h1,
 .admin-main h2,
 .admin-main h3,
 .admin-main strong,
 .admin-main button,
 .admin-main summary { font-weight: 700 !important; }
-.admin-main label > span { font-size: 13px !important; font-weight: 600 !important; }
-.admin-section-title { font-size: 17px !important; font-weight: 750 !important; }
+.admin-main label > span { font-size: var(--type-label) !important; font-weight: 600 !important; }
+.admin-section-title { font-size: var(--type-subheading) !important; font-weight: 750 !important; }
 .admin-match-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 .admin-match-form-grid .admin-field-wide { grid-column: 1 / -1; }
 .admin-optional-details { margin-top: 16px; border-top: 1px solid #26282B; padding-top: 14px; }
@@ -224,3 +310,35 @@ html[data-theme="light"] body { background: #DFE2E6; }
 }
 
 .touchline-skeleton { animation: touchline-skeleton-pulse 1.35s ease-in-out infinite; }
+
+/* Compact desktop league header */
+@media (min-width: 900px) {
+  .league-web > header {
+    width: min(650px, calc(100% - 48px)) !important;
+  }
+
+  .league-web .league-web-tabs {
+    gap: 16px;
+    padding-inline: 16px;
+    min-height: 54px;
+  }
+
+  .league-web .league-web-tabs button {
+    height: 54px !important;
+    white-space: nowrap;
+  }
+
+  .league-web > main > div:has(+ .standings-card) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 650px;
+    margin-inline: auto;
+  }
+}
+
+/* Align desktop league tab content */
+@media (min-width: 900px) {
+  .league-web > main {
+    width: min(650px, calc(100% - 48px)) !important;
+  }
+}

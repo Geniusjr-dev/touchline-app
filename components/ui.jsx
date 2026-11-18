@@ -36,13 +36,13 @@ export function PitchIcon({ color }) {
   );
 }
 
-export function BottomNav({ t, active = "Matches" }) {
+export function BottomNav({ t, active = "Matches", showNews = true }) {
   const items = [
     { label: "Matches", href: "/", icon: (color) => <PitchIcon color={color} /> },
     { label: "News", href: null, icon: (color) => <Newspaper size={22} color={color} strokeWidth={2.1} /> },
     { label: "Leagues", href: "/leagues", icon: (color) => <Trophy size={22} color={color} strokeWidth={2.1} /> },
     { label: "Following", href: null, icon: (color) => <Star size={22} color={color} strokeWidth={2.1} /> },
-  ];
+  ].filter((item) => showNews || item.label !== "News");
   return (
     <div
       className="touchline-bottom-nav flex items-center gap-2 z-40 pointer-events-none"
@@ -53,7 +53,7 @@ export function BottomNav({ t, active = "Matches" }) {
           const color = selected ? t.accent : t.text;
           const contents = <>
             {item.icon(color)}
-            <span className={`public-nav-label${selected ? " is-active" : ""}`} style={{ fontSize: 11.5, color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>
+            <span className={`public-nav-label${selected ? " is-active" : ""}`} style={{ fontSize: "var(--type-caption)", color, fontWeight: selected ? 700 : 600 }}>{item.label}</span>
           </>;
           const styles = { background: selected ? t.pill : "transparent", boxShadow: selected ? `inset 0 0 0 1px ${t.pillBorder}` : "none" };
           return item.href ? (
@@ -95,13 +95,13 @@ export function StatusChip({ m, t, now }) {
     height: 22,
     padding: "0 7px",
     borderRadius: 999,
-    fontSize: 11,
+    fontSize: "var(--type-caption)",
     fontWeight: 800,
     lineHeight: 1,
     whiteSpace: "nowrap",
   };
   if (m.status === "live" || m.status === "et_live") return (
-    <span className="inline-flex items-center justify-center" style={{ ...base, color: "#07130B", background: t.green, fontSize: 12 }}>
+    <span className="inline-flex items-center justify-center" style={{ ...base, color: "#07130B", background: t.green, fontSize: "var(--type-label)" }}>
       {m.status === "et_live" ? "ET " : ""}{liveMinute(m, now)}
     </span>
   );

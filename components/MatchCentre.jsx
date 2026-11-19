@@ -10,6 +10,7 @@ import { DEFAULT_FORMATION, getFormationSlots } from "@/lib/formations";
 import { supabase } from "@/lib/supabase";
 import { Crest, BottomNav } from "@/components/ui";
 import MatchNotificationButton from "@/components/MatchNotificationButton";
+import { knockoutRound } from "@/lib/tournament.mjs";
 
 const TABS_PRE = ["Preview", "Lineup", "Table", "Stats", "H2H"];
 const TABS_LIVE = ["Facts", "Commentary", "Lineup", "Table", "Stats", "H2H"];
@@ -266,6 +267,7 @@ export default function MatchCentre({ id }) {
     .filter((item) => item !== "Table" || matchHasStandings(m))
     .filter((item) => item !== "Stats" || statsAvailable);
   const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
+  if (m.competitionType === "tournament" && m.competitionId && knockoutRound(m.round)) tabs.push("Knockout");
   const defaultTab = started ? "Facts" : "Preview";
   const activeTab = tab && tabs.includes(tab) ? tab : defaultTab;
   const selectTab = (next) => {
@@ -332,7 +334,7 @@ export default function MatchCentre({ id }) {
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
-            {ended && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>{m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
+            {ended && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>{m.shootout ? `Pen ${m.shootout.home} - ${m.shootout.away}` : m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">
             <Crest color={awayKitColor} logo={a.logoUrl} label={a.name} size={56} ring={t.divider} />
@@ -372,6 +374,9 @@ export default function MatchCentre({ id }) {
       {activeTab === "Stats" && <StatsTab t={t} stats={d?.stats} homeColor={homeKitColor} awayColor={awayKitColor} />}
       {activeTab === "Table" && <TableTab t={t} m={m} rows={d?.table || []} />}
       {activeTab === "H2H" && <H2H t={t} h={h} a={a} homeId={m.home} awayId={m.away} meetings={d?.h2h || []} />}
+      {activeTab === "Knockout" && <Link className="mx-3 my-4 block rounded-2xl p-4 font-bold"
+        style={{ background: t.card, color: t.text }}
+        href={`/league/${m.competitionId}?view=knockout&edition=${encodeURIComponent(m.editionId || "legacy")}`}>Open knockout bracket</Link>}
       </div>
 
       <BottomNav t={t} active="Matches" />

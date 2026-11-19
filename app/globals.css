@@ -342,3 +342,45 @@ html[data-theme="light"] body { background: #DFE2E6; }
     width: min(650px, calc(100% - 48px)) !important;
   }
 }
+
+
+/* Matches board polish */
+.touchline-public-shell:has(> .fixture-date-strip) {
+  --matches-row-divider: rgb(12 13 15 / 5%);
+  --matches-group-tint: #f6f7f8;
+  --matches-date-muted: #60656d;
+}
+html[data-theme="dark"] .touchline-public-shell:has(> .fixture-date-strip) {
+  --matches-row-divider: rgb(255 255 255 / 7%);
+  --matches-group-tint: #22252a;
+  --matches-date-muted: #aab0ba;
+}
+.touchline-public-shell > main > .fixture-group > button {
+  background: var(--matches-group-tint, #f6f7f8) !important;
+}
+.touchline-public-shell > main > .fixture-group > button + .fixture-match-row {
+  border-top-color: transparent !important;
+}
+.touchline-public-shell > main > .fixture-group > .fixture-match-row + .fixture-match-row {
+  border-top-color: var(--matches-row-divider) !important;
+  background-clip: padding-box;
+}
+.touchline-public-shell > main > .fixture-group .fixture-team-name {
+  font-weight: 500 !important;
+}
+.touchline-public-shell > main > .fixture-group .fixture-match-time {
+  font-variant-numeric: tabular-nums;
+}
+.fixture-date-strip > .fixture-date-button:not(.is-active) {
+  color: var(--matches-date-muted) !important;
+}
+.touchline-public-shell:has(> .fixture-date-strip) > .touchline-bottom-nav svg {
+  stroke-width: 2.2;
+}
+
+
+/* Touchline: remove fixture row separators */
+.touchline-public-shell > main > .fixture-group > .fixture-match-row {
+  border-top: 0 !important;
+  box-shadow: none !important;
+}

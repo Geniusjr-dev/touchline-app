@@ -79,11 +79,11 @@ export function BottomNav({ t, active = "Matches", showNews = true }) {
           );
         })}
       </div>
-      <div className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 62, height: 62, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
+      <Link href="/search" aria-label="Search teams, competitions and players" className="flex items-center justify-center rounded-full shrink-0 pointer-events-auto" style={{ width: 62, height: 62, background: t.nav, border: `1px solid ${t.pillBorder}`, boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
         <span className="flex items-center justify-center rounded-full" style={{ width: 50, height: 50, background: t.pill }}>
           <Search size={25} color={t.text} strokeWidth={2.2} />
         </span>
-      </div>
+      </Link>
     </div>
   );
 }

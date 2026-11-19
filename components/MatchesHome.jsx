@@ -98,6 +98,7 @@ function MatchRow({ m, teams, t, now }) {
         {showScore
           ? <span className="fixture-match-time" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 750, whiteSpace: "nowrap" }}>{m.hs} - {m.as}</span>
           : <span className="fixture-match-time" style={{ color: t.dim, fontSize: "var(--type-emphasis)", fontWeight: 700, whiteSpace: "nowrap", textDecoration: ["postponed", "cancelled"].includes(m.status) ? "line-through" : "none" }}>{m.time || "TBD"}</span>}
+        {m.shootout && <span className="block whitespace-nowrap text-xs font-semibold" style={{ color: t.dim }}>Pen {m.shootout.home}-{m.shootout.away}</span>}
       </div>
       <div className="relative z-10 flex items-center justify-start min-w-0 pointer-events-none" style={{ gap: 8 }}>
         <Crest color={a.color} logo={a.logoUrl} label={awayName} size={26} ring={t.divider} />

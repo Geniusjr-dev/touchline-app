@@ -165,6 +165,10 @@ export default function Scorer() {
       if (previewDetailsInitializedFor.current !== mm.id) {
         setPreviewDetails({
           round: mm.match_round || "",
+          ...(mm.competition?.competition_type === "tournament" ? {
+            homePenalties: String(mm.home_penalties ?? ""),
+            awayPenalties: String(mm.away_penalties ?? ""),
+          } : {}),
           venueName: mm.venue_name || "",
           venueLocation: mm.venue_location || "",
           venueCapacity: mm.venue_capacity == null ? "" : String(mm.venue_capacity),
@@ -297,6 +301,13 @@ export default function Scorer() {
     setPreviewDetailsBusy(true);
     setPreviewDetailsMessage("");
     try {
+      const { homePenalties, awayPenalties } = previewDetails;
+      if (homePenalties || awayPenalties) {
+        const valid = [homePenalties, awayPenalties].every((score) => /^\d{1,2}$/.test(score || ""));
+        if (!valid || Number(homePenalties) === Number(awayPenalties) || m.home_score !== m.away_score || !["ft", "awarded"].includes(m.status)) {
+          throw new Error("Record two different shootout scores only after a tied match is complete.");
+        }
+      }
       const result = await updateMatchPreviewDetails(id, previewDetails);
       if (result.error) throw result.error;
       setM((current) => ({ ...current, ...result.data }));
@@ -701,7 +712,7 @@ export default function Scorer() {
 
   return (
     <div className="admin-match-workspace">
-      <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
+      <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: "var(--type-body)" }}>← All matches</Link>
 
       <div className="admin-scoreboard" style={{ ...card, textAlign: "center", margin: "12px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
@@ -709,13 +720,13 @@ export default function Scorer() {
           <div style={{ fontSize: 40, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{displayedHome} <span style={{ color: "#5B6069" }}>-</span> {displayedAway}</div>
           <Badge t={away} />
         </div>
-        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: 13, fontWeight: 700 }}>
+        <div style={{ marginTop: 8, color: ["live", "et_live"].includes(m.status) ? "#F04444" : "#8E939B", fontSize: "var(--type-body)", fontWeight: 700 }}>
           {clockStatus(m, now)}
         </div>
-        {pending?.type === "goal_attribution" && <div style={{ color: "#4FC263", fontSize: 12, marginTop: 5 }}>Goal saved. Add the scorer while play continues.</div>}
+        {pending?.type === "goal_attribution" && <div style={{ color: "#4FC263", fontSize: "var(--type-label)", marginTop: 5 }}>Goal saved. Add the scorer while play continues.</div>}
       </div>
 
-      {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: 13, marginBottom: 12 }}>{error}</div>}
+      {error && <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 10, padding: 10, fontSize: "var(--type-body)", marginBottom: 12 }}>{error}</div>}
 
       {role === "admin" && (
         <MatchDecisionPanel match={m} home={homeTeam} away={awayTeam} busy={busy} onSubmit={submitMatchDecision} />
@@ -723,8 +734,8 @@ export default function Scorer() {
 
       <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={{ color: "#FFFFFF", fontSize: 13 }}>Match notifications</div>
-          <div style={{ color: notificationMessage ? "#4FC263" : "#8E939B", fontSize: 11.5, marginTop: 3 }}>
+          <div style={{ color: "#FFFFFF", fontSize: "var(--type-body)" }}>Match notifications</div>
+          <div style={{ color: notificationMessage ? "#4FC263" : "#8E939B", fontSize: "var(--type-caption)", marginTop: 3 }}>
             {notificationMessage || "Send a test to every phone following this match."}
           </div>
         </div>
@@ -741,11 +752,14 @@ export default function Scorer() {
       {role === "admin" && (
         <form onSubmit={savePreviewDetails} style={card}>
           <div style={label}>PUBLIC MATCH DETAILS</div>
-          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+          <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 14 }}>
             These details appear in the public Preview tab before and during the match.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
             <PreviewField label="Round or stage"><input value={previewDetails.round} onChange={(event) => changePreviewDetail("round", event.target.value)} placeholder="Round 2" maxLength={80} style={finp} /></PreviewField>
+            {previewDetails.homePenalties !== undefined && [
+              ["Home shootout score", "homePenalties"], ["Away shootout score", "awayPenalties"],
+            ].map(([title, key]) => <PreviewField key={key} label={title}><input type="number" min="0" max="99" value={previewDetails[key]} onChange={(event) => changePreviewDetail(key, event.target.value)} placeholder="Leave blank if none" style={finp} /></PreviewField>)}
             <PreviewField label="Venue name"><input value={previewDetails.venueName} onChange={(event) => changePreviewDetail("venueName", event.target.value)} placeholder="Buya Community Park" maxLength={120} style={finp} /></PreviewField>
             <PreviewField label="Venue location"><input value={previewDetails.venueLocation} onChange={(event) => changePreviewDetail("venueLocation", event.target.value)} placeholder="Buya, Kpandai District" maxLength={160} style={finp} /></PreviewField>
             <PreviewField label="Venue capacity"><input type="number" min="0" value={previewDetails.venueCapacity} onChange={(event) => changePreviewDetail("venueCapacity", event.target.value)} placeholder="3000" style={finp} /></PreviewField>
@@ -754,7 +768,7 @@ export default function Scorer() {
             <PreviewField label="Referee"><input value={previewDetails.refereeName} onChange={(event) => changePreviewDetail("refereeName", event.target.value)} placeholder="Referee's full name" maxLength={120} style={finp} /></PreviewField>
           </div>
           <button type="submit" disabled={previewDetailsBusy} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062", opacity: previewDetailsBusy ? 0.5 : 1 }}>{previewDetailsBusy ? "Saving…" : "Save public details"}</button>
-          {previewDetailsMessage && <div style={{ color: /saved/i.test(previewDetailsMessage) ? "#4FC263" : "#F5C518", fontSize: 12, marginTop: 10 }}>{previewDetailsMessage}</div>}
+          {previewDetailsMessage && <div style={{ color: /saved/i.test(previewDetailsMessage) ? "#4FC263" : "#F5C518", fontSize: "var(--type-label)", marginTop: 10 }}>{previewDetailsMessage}</div>}
         </form>
       )}
 
@@ -762,7 +776,7 @@ export default function Scorer() {
         <>
         <div style={card}>
           <div style={label}>START OR RECORD THIS MATCH</div>
-          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+          <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 12 }}>
             For a completed game, select the second option and enter the known events with their actual minutes. You can finish the entire record immediately.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
@@ -783,7 +797,7 @@ export default function Scorer() {
         </div>
         <div style={card}>
           <div style={label}>MATCH KITS</div>
-          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+          <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 14 }}>
             Confirm both match kits before kick-off. If the team colours clash, the away team must change kit.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
@@ -791,7 +805,7 @@ export default function Scorer() {
             <KitPicker label="Away kit" team={awayTeam} color={awayKitColor} onChange={setAwayKitColor} />
           </div>
           {!kitsAreDistinct(homeKitColor, awayKitColor) && (
-            <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 9, padding: 10, fontSize: 12, marginTop: 12 }}>
+            <div role="alert" style={{ color: "#F7B4B4", background: "#301719", border: "1px solid #5A2428", borderRadius: 9, padding: 10, fontSize: "var(--type-label)", marginTop: 12 }}>
               Kit clash detected. Select a different away kit to enable kick-off.
             </div>
           )}
@@ -803,8 +817,8 @@ export default function Scorer() {
         <>
           <div style={{ ...card, borderColor: "#4FC263" }}>
             <div style={label}>QUICK COMPLETED-MATCH RECORDING</div>
-            <div style={{ color: "#70DB82", fontSize: 13, marginBottom: 4 }}>{clockStatus(m, now)}</div>
-            <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ color: "#70DB82", fontSize: "var(--type-body)", marginBottom: 4 }}>{clockStatus(m, now)}</div>
+            <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 12 }}>
               Add only the events you know. Every event will ask for its actual match minute. You can finish immediately without waiting for the clock.
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -816,7 +830,7 @@ export default function Scorer() {
                 <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
               )}
             </div>
-            {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Reopen the result only if a correction is necessary.</div>}
+            {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: "var(--type-label)", marginTop: 10 }}>Full-time lock is active. Reopen the result only if a correction is necessary.</div>}
           </div>
 
           {!fullTimeLocked && (
@@ -824,7 +838,7 @@ export default function Scorer() {
               {[["home", home], ["away", away]].map(([side, team]) => (
                 <div key={side} style={{ ...card, marginBottom: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
+                    <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: "var(--type-emphasis)" }}>{team.name}</span>
                   </div>
                   <button disabled={busy || !canRecord} onClick={() => recordGoal(side)} style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>⚽ + GOAL</button>
                   <button disabled={busy || !canCorrect} onClick={() => undoLast("goal", side)} style={{ ...undoButton, opacity: canCorrect ? 1 : 0.45 }}>Undo last goal</button>
@@ -841,7 +855,7 @@ export default function Scorer() {
 
           <div style={card}>
             <div style={label}>RECORDED EVENTS</div>
-            {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "6px 0" }}>No events recorded. You may finish a match with no known events.</div>}
+            {events.length === 0 && <div style={{ color: "#8E939B", fontSize: "var(--type-body)", padding: "6px 0" }}>No events recorded. You may finish a match with no known events.</div>}
             {[...events].sort(eventOrder).map((event) => (
               <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} onAttributeGoal={openGoalAttribution} />
             ))}
@@ -852,7 +866,7 @@ export default function Scorer() {
       {!isRetrospective && ["live", "ht"].includes(m.status) && (
         <div style={{ ...card, borderColor: "#F5C518" }}>
           <div style={label}>IS THIS A MATCH THAT HAS ALREADY BEEN PLAYED?</div>
-          <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>
+          <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 10 }}>
             Stop the automatic clock and open manual event-time controls immediately.
           </div>
           <button disabled={busy} onClick={switchToRetrospective} style={{ ...pill, width: "100%", background: "#F5C518", color: "#241D00" }}>Switch to completed-match recording</button>
@@ -861,10 +875,10 @@ export default function Scorer() {
 
       <div style={card}>
         <div style={label}>MATCH LINEUPS</div>
-        <div style={{ color: "#AAB0BA", fontSize: 12, lineHeight: 1.5, marginBottom: 14 }}>
+        <div style={{ color: "#AAB0BA", fontSize: "var(--type-label)", lineHeight: 1.5, marginBottom: 14 }}>
           Select each team’s starters and substitutes. Saving a team lineup publishes it immediately to the public match centre.
         </div>
-        {lineupMessages.general && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, marginBottom: 12 }}>{lineupMessages.general}</div>}
+        {lineupMessages.general && <div role="alert" style={{ color: "#F7B4B4", fontSize: "var(--type-label)", marginBottom: 12 }}>{lineupMessages.general}</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <LineupTeamEditor
             team={home}
@@ -908,17 +922,17 @@ export default function Scorer() {
             <button disabled={busy} onClick={deliberatelyReopen} style={{ ...pill, background: "#2B2110", color: "#F5C518" }}>Reopen for correction</button>
           )}
         </div>
-        {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: 12, marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
-        {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: 12, marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
+        {fullTimeLocked && <div style={{ color: "#8E939B", fontSize: "var(--type-label)", marginTop: 10 }}>Full-time lock is active. Events cannot be added, changed or deleted.</div>}
+        {m.status === "ft" && !m.locked_at && <div style={{ color: "#F5C518", fontSize: "var(--type-label)", marginTop: 10 }}>This result is deliberately reopened. Make the correction, then lock full time again.</div>}
       </div>}
 
       {["live", "et_live"].includes(m.status) && !isRetrospective && (
         <div style={card}>
           <div style={label}>STOPPAGE TIME</div>
-          <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+          <div style={{ color: "#fff", fontSize: "var(--type-emphasis)", fontWeight: 700, marginBottom: 4 }}>
             {periodName(m.current_period)} · {announcedStoppageMinutes(m) > 0 ? `+${announcedStoppageMinutes(m)} announced` : "none announced"}
           </div>
-          <div style={{ color: "#8E939B", fontSize: 12, marginBottom: 12 }}>
+          <div style={{ color: "#8E939B", fontSize: "var(--type-label)", marginBottom: 12 }}>
             Tap the minimum added time indicated by the referee. The clock will continue until you end the period.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 7 }}>
@@ -944,7 +958,7 @@ export default function Scorer() {
         {[["home", home], ["away", away]].map(([side, team]) => (
           <div key={side} style={{ ...card, marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: 14 }}>{team.name}</span>
+              <Badge t={team} size={24} /><span style={{ fontWeight: 700, fontSize: "var(--type-emphasis)" }}>{team.name}</span>
             </div>
             <button disabled={busy || !canRecord} onClick={() => recordGoal(side)}
               style={{ ...goalButton, opacity: canRecord ? 1 : 0.45 }}>
@@ -978,7 +992,7 @@ export default function Scorer() {
 
       {!isRetrospective && <div style={card}>
         <div style={label}>EVENT LOG</div>
-        {events.length === 0 && <div style={{ color: "#8E939B", fontSize: 14, padding: "8px 0" }}>No events yet.</div>}
+        {events.length === 0 && <div style={{ color: "#8E939B", fontSize: "var(--type-emphasis)", padding: "8px 0" }}>No events yet.</div>}
         {[...events].sort(eventOrder).map((event) => (
           <EventRow key={event.id} event={event} match={m} locked={!canCorrect} onRemove={removeEvent} onAttributeGoal={openGoalAttribution} />
         ))}
@@ -1036,7 +1050,7 @@ export default function Scorer() {
 
 function AdminMatchShell({ error, onRetry }) {
   return <div>
-    <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: 13 }}>← All matches</Link>
+    <Link href="/admin/matches" style={{ color: "#8E939B", fontSize: "var(--type-body)" }}>← All matches</Link>
     <div style={{ ...card, textAlign: "center", margin: "12px 0" }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 18 }}>
         <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#24262A" }} />
@@ -1045,7 +1059,7 @@ function AdminMatchShell({ error, onRetry }) {
       </div>
     </div>
     {error && <div style={{ ...card, color: "#F7B4B4" }}>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{error}</div>
+      <div style={{ fontSize: "var(--type-body)", fontWeight: 700 }}>{error}</div>
       <button onClick={onRetry} style={{ ...pill, marginTop: 12, background: "#4FC263", color: "#062" }}>Try again</button>
     </div>}
   </div>;
@@ -1106,17 +1120,17 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Badge t={team} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "#8E939B", fontSize: 11 }}>{selectedStarterIds.length} of 11 starters, {selectedSubstitutes.length} substitutes, {reserves.length} reserves</span>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: "var(--type-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: "var(--type-caption)" }}>{selectedStarterIds.length} of 11 starters, {selectedSubstitutes.length} substitutes, {reserves.length} reserves</span>
         </div>
       </div>
 
-      <label style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
+      <label style={{ display: "block", color: "#8E939B", fontSize: "var(--type-caption)", fontWeight: 700, marginBottom: 6 }}>FORMATION</label>
       <select disabled={disabled} value={formation} onChange={(event) => onFormationChange(event.target.value)} style={{ ...finp, marginBottom: 12 }}>
         {FORMATION_OPTIONS.map((formationOption) => <option key={formationOption} value={formationOption}>{formationOption}</option>)}
       </select>
 
-      <div style={{ color: "#8E939B", fontSize: 10.5, lineHeight: 1.45, marginBottom: 8 }}>
+      <div style={{ color: "#8E939B", fontSize: "var(--type-badge)", lineHeight: 1.45, marginBottom: 8 }}>
         Select any outfield player in any outfield position. Drag one starter onto another, or tap two starter circles, to swap them.
       </div>
 
@@ -1162,7 +1176,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
                   }
                 }}
                 className="inline-flex items-center justify-center rounded-full"
-                style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: selectedSwapSlot === slot.index ? "3px solid #4FC263" : "2px solid rgba(255,255,255,.35)", boxShadow: selectedSwapSlot === slot.index ? "0 0 0 3px rgba(79,194,99,.22)" : "0 2px 6px rgba(0,0,0,.45)", fontSize: 10.5, fontWeight: 850, cursor: player && !disabled ? "grab" : "default" }}
+                style={{ width: 34, height: 34, background: player ? team.color : "#292D32", color: player ? readableAdminTextColor(team.color) : "#AAB0BA", border: selectedSwapSlot === slot.index ? "3px solid #4FC263" : "2px solid rgba(255,255,255,.35)", boxShadow: selectedSwapSlot === slot.index ? "0 0 0 3px rgba(79,194,99,.22)" : "0 2px 6px rgba(0,0,0,.45)", fontSize: "var(--type-badge)", fontWeight: 850, cursor: player && !disabled ? "grab" : "default" }}
               >
                 {player?.number ?? slot.label}
               </span>
@@ -1171,7 +1185,7 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
                 aria-label={`${slot.label} player`}
                 value={playerId}
                 onChange={(event) => onStarterChange(slot.index, event.target.value)}
-                style={{ display: "block", width: "100%", height: 27, marginTop: 3, padding: "0 4px", border: "1px solid #3A3E44", borderRadius: 7, background: "rgba(14,15,17,.94)", color: player ? "#FFFFFF" : "#9BA1AA", fontSize: 10, fontWeight: 750, textAlign: "center", outline: "none" }}
+                style={{ display: "block", width: "100%", height: 27, marginTop: 3, padding: "0 4px", border: "1px solid #3A3E44", borderRadius: 7, background: "rgba(14,15,17,.94)", color: player ? "#FFFFFF" : "#9BA1AA", fontSize: "var(--type-badge)", fontWeight: 750, textAlign: "center", outline: "none" }}
               >
                 <option value="">{slot.label}</option>
                 {options.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.number != null ? `${candidate.number} ` : ""}{candidate.name}</option>)}
@@ -1202,13 +1216,13 @@ function LineupTeamEditor({ team, squad, lineup, busy, disabled, message, onForm
         onPlayerAction={onSubstituteChange}
       />
 
-      {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
-      {validationError && <div role="alert" style={{ color: "#F5C518", fontSize: 11, lineHeight: 1.4, marginTop: 10 }}>{validationError}</div>}
+      {squad.length === 0 && <div style={{ color: "#8E939B", fontSize: "var(--type-label)", padding: "12px 0" }}>Add players to this team’s squad before selecting a lineup.</div>}
+      {validationError && <div role="alert" style={{ color: "#F5C518", fontSize: "var(--type-caption)", lineHeight: 1.4, marginTop: 10 }}>{validationError}</div>}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)", gap: 8, marginTop: 12 }}>
         <button type="button" disabled={disabled || busy} onClick={onReset} style={{ ...pill, background: "transparent", color: "#C4C8CE", opacity: disabled || busy ? 0.45 : 1 }}>Reset draft</button>
         <button type="button" disabled={disabled || busy || Boolean(validationError)} onClick={onSave} style={{ ...pill, background: "#4FC263", color: "#062", opacity: disabled || busy || validationError ? 0.45 : 1 }}>{busy ? "Saving…" : "Save and publish"}</button>
       </div>
-      {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
+      {message && <div role="status" style={{ color: success ? "#4FC263" : "#F04444", fontSize: "var(--type-caption)", marginTop: 8, lineHeight: 1.4 }}>{message}</div>}
     </section>
   );
 }
@@ -1219,12 +1233,12 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
   return (
     <div style={{ marginTop: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
-        <span style={{ color: "#8E939B", fontSize: 10.5, fontWeight: 800 }}>{title}</span>
-        <span style={{ color: "#6F757E", fontSize: 10.5, fontWeight: 750 }}>{count}</span>
+        <span style={{ color: "#8E939B", fontSize: "var(--type-badge)", fontWeight: 800 }}>{title}</span>
+        <span style={{ color: "#6F757E", fontSize: "var(--type-badge)", fontWeight: 750 }}>{count}</span>
       </div>
       {groupedPlayers.map((group) => (
         <div key={group.key} style={{ marginTop: 9 }}>
-          <div style={{ color: "#737982", fontSize: 9.5, fontWeight: 800, marginBottom: 5 }}>{group.label.toUpperCase()}</div>
+          <div style={{ color: "#737982", fontSize: "var(--type-badge)", fontWeight: 800, marginBottom: 5 }}>{group.label.toUpperCase()}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
             {group.players.map((player) => (
               <button
@@ -1233,7 +1247,7 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
                 disabled={disabled}
                 aria-label={`${actionLabel}: ${player.name}`}
                 onClick={() => onPlayerAction(player.id)}
-                style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: isSubstitute ? "1px solid #4FC263" : "1px solid #2E3136", background: isSubstitute ? "#14351D" : "#17191C", color: isSubstitute ? "#70DB82" : "#C4C8CE", fontSize: 10.5, fontWeight: 750, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+                style={{ minHeight: 34, padding: "6px 9px", borderRadius: 9, border: isSubstitute ? "1px solid #4FC263" : "1px solid #2E3136", background: isSubstitute ? "#14351D" : "#17191C", color: isSubstitute ? "#70DB82" : "#C4C8CE", fontSize: "var(--type-badge)", fontWeight: 750, opacity: disabled ? 0.45 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
               >
                 {player.number != null ? `${player.number} ` : ""}{player.name}
               </button>
@@ -1241,7 +1255,7 @@ function LineupRoleGroup({ title, count, players, disabled, actionLabel, tone, e
           </div>
         </div>
       ))}
-      {players.length === 0 && <div style={{ color: "#737982", fontSize: 10.5, lineHeight: 1.45, padding: "4px 0" }}>{emptyText}</div>}
+      {players.length === 0 && <div style={{ color: "#737982", fontSize: "var(--type-badge)", lineHeight: 1.45, padding: "4px 0" }}>{emptyText}</div>}
     </div>
   );
 }
@@ -1290,13 +1304,13 @@ function MatchStatsBoard({ home, away, stats, busy, message, onChange, onSave })
         {rows.map(([rowLabel, homeKey, awayKey]) => (
           <div key={rowLabel} style={{ display: "contents" }}>
             <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[homeKey]} onChange={(event) => onChange(homeKey, event.target.value)} style={statInput} />
-            <span style={{ color: "#AAB0BA", fontSize: 13, textAlign: "center" }}>{rowLabel}</span>
+            <span style={{ color: "#AAB0BA", fontSize: "var(--type-body)", textAlign: "center" }}>{rowLabel}</span>
             <input disabled={busy} type="number" min="0" max={rowLabel === "Ball possession (%)" ? 100 : undefined} value={stats[awayKey]} onChange={(event) => onChange(awayKey, event.target.value)} style={statInput} />
           </div>
         ))}
       </div>
       <button disabled={busy} onClick={onSave} style={{ ...pill, marginTop: 14, background: "#0E0F11", color: "#fff" }}>{busy ? "Saving…" : "Save stats"}</button>
-      {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: 12, marginTop: 8 }}>{message}</div>}
+      {message && <div style={{ color: message === "Stats saved." ? "#4FC263" : "#F04444", fontSize: "var(--type-label)", marginTop: 8 }}>{message}</div>}
     </div>
   );
 }
@@ -1305,13 +1319,13 @@ function KitPicker({ label: kitLabel, team, color, onChange }) {
   const selectedColor = normalizeKitColor(color, team.color || "#18A558");
   return (
     <label style={{ display: "block", background: "#0E0F11", border: "1px solid #2A2C30", borderRadius: 12, padding: 12, cursor: "pointer" }}>
-      <span style={{ display: "block", color: "#8E939B", fontSize: 11, fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
+      <span style={{ display: "block", color: "#8E939B", fontSize: "var(--type-caption)", fontWeight: 700, marginBottom: 8 }}>{kitLabel}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <KitShirt color={selectedColor} />
         <Badge t={team} size={30} />
         <span style={{ minWidth: 0, flex: 1 }}>
-          <strong style={{ display: "block", color: "#FFFFFF", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
-          <span style={{ color: "#8E939B", fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
+          <strong style={{ display: "block", color: "#FFFFFF", fontSize: "var(--type-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.name}</strong>
+          <span style={{ color: "#8E939B", fontSize: "var(--type-caption)", fontFamily: "ui-monospace, monospace" }}>{selectedColor}</span>
         </span>
         <input aria-label={`${team.name} ${kitLabel}`} type="color" value={selectedColor} onChange={(event) => onChange(event.target.value.toUpperCase())} style={{ width: 38, height: 38, padding: 2, border: "1px solid #3A3D42", borderRadius: 9, background: "#161719", cursor: "pointer" }} />
       </span>
@@ -1336,9 +1350,9 @@ function RecordingModeAction({ primary = false, title, note, onClick, disabled }
       disabled={disabled}
       style={{ minHeight: 100, padding: 12, borderRadius: 12, border: `1px solid ${primary ? "#4FC263" : "#2A2C30"}`, background: primary ? "#172C1C" : "#0E0F11", color: "#FFFFFF", textAlign: "left", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }}
     >
-      <span style={{ display: "block", fontSize: 13, fontWeight: 800, color: primary ? "#70DB82" : "#FFFFFF" }}>{title}</span>
-      <span style={{ display: "block", color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginTop: 5 }}>{note}</span>
-      <span style={{ display: "block", color: primary ? "#70DB82" : "#C4C8CE", fontSize: 11, fontWeight: 800, marginTop: 8 }}>Open controls →</span>
+      <span style={{ display: "block", fontSize: "var(--type-body)", fontWeight: 800, color: primary ? "#70DB82" : "#FFFFFF" }}>{title}</span>
+      <span style={{ display: "block", color: "#8E939B", fontSize: "var(--type-caption)", lineHeight: 1.45, marginTop: 5 }}>{note}</span>
+      <span style={{ display: "block", color: primary ? "#70DB82" : "#C4C8CE", fontSize: "var(--type-caption)", fontWeight: 800, marginTop: 8 }}>Open controls →</span>
     </button>
   );
 }
@@ -1414,24 +1428,24 @@ function EventRow({ event, match, locked, onRemove, onAttributeGoal }) {
   const reasonLabel = event.card_reason ? CARD_REASON_LABELS[event.card_reason] : null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid #26282B" }}>
-      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: 13 }}>{scorerEventMinute(event, match)}</span>
-      <span style={{ fontSize: 14 }}>{emoji}</span>
+      <span style={{ fontFamily: "monospace", color: "#8E939B", width: 46, fontSize: "var(--type-body)" }}>{scorerEventMinute(event, match)}</span>
+      <span style={{ fontSize: "var(--type-emphasis)" }}>{emoji}</span>
       {event.type === "sub" ? (
-        <span style={{ flex: 1, fontSize: 14 }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
+        <span style={{ flex: 1, fontSize: "var(--type-emphasis)" }}><span style={{ color: "#3FC463" }}>{event.player}</span> <span style={{ color: "#5B6069" }}>for</span> <span style={{ color: "#F04444" }}>{event.assist}</span></span>
       ) : (
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "#fff" }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: "var(--type-emphasis)", color: "#fff" }}>
           <span style={{ display: "block" }}>{eventName}{event.type === "goal" ? ` · ${goalTypeLabel(event.goal_type)}` : event.type === "miss" ? " · Missed penalty" : isCard ? ` · ${cardLabel}` : ""}</span>
-          {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>Assist by {event.assist}</span>}
-          {isCard && reasonLabel && <span style={{ display: "block", color: "#8E939B", fontSize: 12, marginTop: 2 }}>{reasonLabel}</span>}
+          {event.type === "goal" && event.assist && <span style={{ display: "block", color: "#8E939B", fontSize: "var(--type-label)", marginTop: 2 }}>Assist by {event.assist}</span>}
+          {isCard && reasonLabel && <span style={{ display: "block", color: "#8E939B", fontSize: "var(--type-label)", marginTop: 2 }}>{reasonLabel}</span>}
         </span>
       )}
-      <span style={{ color: "#5B6069", fontSize: 12, width: 42 }}>{event.side}</span>
+      <span style={{ color: "#5B6069", fontSize: "var(--type-label)", width: 42 }}>{event.side}</span>
       {event.type === "goal" && (
-        <button disabled={locked} onClick={() => onAttributeGoal(event)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#4FC263", cursor: locked ? "not-allowed" : "pointer", fontSize: 12, whiteSpace: "nowrap" }}>
+        <button disabled={locked} onClick={() => onAttributeGoal(event)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#4FC263", cursor: locked ? "not-allowed" : "pointer", fontSize: "var(--type-label)", whiteSpace: "nowrap" }}>
           {event.player ? "Edit goal" : "Add scorer"}
         </button>
       )}
-      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: 12 }}>Delete</button>
+      <button disabled={locked} onClick={() => onRemove(event.id)} style={{ background: "none", border: "none", color: locked ? "#474A50" : "#8E939B", cursor: locked ? "not-allowed" : "pointer", fontSize: "var(--type-label)" }}>Delete</button>
     </div>
   );
 }
@@ -1490,8 +1504,8 @@ function EventTimeModal({ pending, match, busy, onCancel, onContinue }) {
   return (
     <div style={overlay} onClick={onCancel}>
       <form onSubmit={submit} role="dialog" aria-modal="true" aria-label="Enter event time" style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 390 }} onClick={(event) => event.stopPropagation()}>
-        <strong style={{ display: "block", fontSize: 16 }}>When did the {eventTypeTitle(pending.eventType)} happen?</strong>
-        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginTop: 5, marginBottom: 14 }}>
+        <strong style={{ display: "block", fontSize: "var(--type-subheading)" }}>When did the {eventTypeTitle(pending.eventType)} happen?</strong>
+        <div style={{ color: "#8E939B", fontSize: "var(--type-label)", lineHeight: 1.45, marginTop: 5, marginBottom: 14 }}>
           Enter the official match minute. Added time can be written as {half}+2 or {half * 2}+4.
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 110px", gap: 10 }}>
@@ -1502,7 +1516,7 @@ function EventTimeModal({ pending, match, busy, onCancel, onContinue }) {
             <input type="number" min="0" max="59" value={seconds} onChange={(event) => { setSeconds(event.target.value); setTimeError(""); }} style={{ ...finp, display: "block", marginTop: 6 }} />
           </label>
         </div>
-        {timeError && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, marginTop: 10 }}>{timeError}</div>}
+        {timeError && <div role="alert" style={{ color: "#F7B4B4", fontSize: "var(--type-label)", marginTop: 10 }}>{timeError}</div>}
         <button type="submit" disabled={busy} style={{ width: "100%", marginTop: 14, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, opacity: busy ? 0.45 : 1 }}>{busy ? "Saving…" : "Continue"}</button>
         <button type="button" disabled={busy} onClick={onCancel} style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff" }}>Cancel</button>
       </form>
@@ -1545,9 +1559,9 @@ function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlaye
       <div role="dialog" aria-modal="true" aria-label="Add goal details" style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 440, maxHeight: "90vh", overflow: "auto" }} onClick={(modalEvent) => modalEvent.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}><Badge t={scoringTeam} size={30} /><strong>Goal recorded</strong></div>
-          <span style={{ color: secondsLeft > 0 ? "#4FC263" : "#F5C518", fontSize: 12, fontWeight: 750 }}>{secondsLeft > 0 ? `00:${String(secondsLeft).padStart(2, "0")}` : "Still editable"}</span>
+          <span style={{ color: secondsLeft > 0 ? "#4FC263" : "#F5C518", fontSize: "var(--type-label)", fontWeight: 750 }}>{secondsLeft > 0 ? `00:${String(secondsLeft).padStart(2, "0")}` : "Still editable"}</span>
         </div>
-        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 14 }}>
+        <div style={{ color: "#8E939B", fontSize: "var(--type-label)", lineHeight: 1.45, marginBottom: 14 }}>
           {retrospective
             ? "Select the scorer from the registered squad. This completed-match recording remains private until you finish it."
             : "The score and first alert are already live. Add the scorer now to send the separate player alert. Only players who were on the field at the time of the goal are shown."}
@@ -1563,7 +1577,7 @@ function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlaye
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <Badge t={scorerTeam} size={24} />
-          <span style={{ color: "#FFFFFF", fontSize: 13 }}>{goalType === "own_goal" ? `Own-goal scorer from ${opponentTeam.name}` : `Scorer from ${scoringTeam.name}`}</span>
+          <span style={{ color: "#FFFFFF", fontSize: "var(--type-body)" }}>{goalType === "own_goal" ? `Own-goal scorer from ${opponentTeam.name}` : `Scorer from ${scoringTeam.name}`}</span>
         </div>
         <input autoFocus value={query} onChange={(inputEvent) => setQuery(inputEvent.target.value)} placeholder="Search on-field players" style={{ ...finp, marginBottom: 8 }} />
         <div style={{ display: "grid", gap: 7 }}>
@@ -1572,8 +1586,8 @@ function GoalAttributionModal({ pending, scoringTeam, opponentTeam, scoringPlaye
               <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
             </button>
           ))}
-          {eligibleScorers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 12, lineHeight: 1.45, padding: "8px 0" }}>{retrospective ? "No players are registered for this squad. Add the player to the team squad, or leave this goal without a player name." : "No eligible on-field players were found. Publish a complete lineup before kick-off, or leave this goal without a player name."}</div>}
-          {eligibleScorers.length > 0 && filteredScorers.length === 0 && <div style={{ color: "#8E939B", fontSize: 12, padding: "8px 0" }}>No on-field player matches that search.</div>}
+          {eligibleScorers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: "var(--type-label)", lineHeight: 1.45, padding: "8px 0" }}>{retrospective ? "No players are registered for this squad. Add the player to the team squad, or leave this goal without a player name." : "No eligible on-field players were found. Publish a complete lineup before kick-off, or leave this goal without a player name."}</div>}
+          {eligibleScorers.length > 0 && filteredScorers.length === 0 && <div style={{ color: "#8E939B", fontSize: "var(--type-label)", padding: "8px 0" }}>No on-field player matches that search.</div>}
         </div>
         <button type="button" disabled={busy} onClick={() => { setSelectedPlayer(null); setSelectedAssist(null); }} style={{ ...playerButton, width: "100%", marginTop: 9, color: "#F5C518", borderColor: !selectedPlayer ? "#F5C518" : "#2A2C30" }}>Leave player name unconfirmed</button>
 
@@ -1663,7 +1677,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
     <div style={overlay} onClick={onCancel}>
       <div role="dialog" aria-modal="true" aria-label={title} style={{ background: "#161719", border: "1px solid #2A2C30", borderRadius: 16, padding: 18, width: "100%", maxWidth: 420, maxHeight: "88vh", overflow: "auto" }} onClick={(event) => event.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}><Badge t={scorerTeam} size={30} /><strong>{title}</strong></div>
-        <div style={{ color: "#8E939B", fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+        <div style={{ color: "#8E939B", fontSize: "var(--type-label)", lineHeight: 1.45, marginBottom: 12 }}>
           {isGoal
             ? goalType === "own_goal"
               ? `The goal benefits ${scoringTeam.name}. Select the scorer from ${opponentTeam.name}.`
@@ -1725,7 +1739,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
                   <span style={{ color: "#8E939B", width: 28 }}>{player.number ?? ""}</span><span>{player.name}</span>
                 </button>
               ))}
-              {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: 13, padding: "8px 0" }}>No players are registered for this squad.</div>}
+              {scorerSquad.length === 0 && <div style={{ color: "#8E939B", fontSize: "var(--type-body)", padding: "8px 0" }}>No players are registered for this squad.</div>}
             </div>
             <button disabled={busy} onClick={() => chooseScorer(null)} style={{ ...playerButton, width: "100%", marginTop: 10, color: "#F5C518", borderColor: hasChosenRecipient && !selectedPlayer ? "#F5C518" : "#2A2C30" }}>{isGoal ? "Record without scorer name" : isMissedPenalty ? "Record without penalty taker" : "Record without player name"}</button>
           </>
@@ -1742,7 +1756,7 @@ function AttributionModal({ pending, scoringTeam, scoringSquad, opponentTeam, op
         )}
 
         {isCard && cardType === "second_yellow" && (
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: "#0E0F11", border: "1px solid #2A2C30", color: "#C9CDD3", fontSize: 13 }}>Reason: second booking</div>
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, background: "#0E0F11", border: "1px solid #2A2C30", color: "#C9CDD3", fontSize: "var(--type-body)" }}>Reason: second booking</div>
         )}
 
         {isGoal && hasChosenRecipient && goalType === "normal_goal" && (
@@ -1785,7 +1799,7 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
     <div style={overlay} onClick={onCancel}>
       <div role="dialog" aria-modal="true" style={{ background: "#161719", borderRadius: 14, padding: 18, width: "100%", maxWidth: 340 }} onClick={(event) => event.stopPropagation()}>
         <div style={{ fontWeight: 800, marginBottom: 12 }}>Substitution · {team.name}</div>
-        <div style={{ color: "#8E939B", fontSize: 11, lineHeight: 1.45, marginBottom: 10 }}>
+        <div style={{ color: "#8E939B", fontSize: "var(--type-caption)", lineHeight: 1.45, marginBottom: 10 }}>
           Only current on-field players can leave. Only announced substitutes can enter.
         </div>
         <label style={flabel}>Player going off</label>
@@ -1806,8 +1820,8 @@ function SubForm({ side, team, pools, busy, onCancel, onSave }) {
             </optgroup>
           ))}
         </select>
-        {pools.onFieldPlayers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>Save the starting eleven before recording a substitution.</div>}
-        {pools.onFieldPlayers.length > 0 && pools.availableSubstitutes.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: 11, marginTop: 8 }}>No announced substitutes are available for this team.</div>}
+        {pools.onFieldPlayers.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: "var(--type-caption)", marginTop: 8 }}>Save the starting eleven before recording a substitution.</div>}
+        {pools.onFieldPlayers.length > 0 && pools.availableSubstitutes.length === 0 && <div role="alert" style={{ color: "#F7B4B4", fontSize: "var(--type-caption)", marginTop: 8 }}>No announced substitutes are available for this team.</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           <button disabled={busy} onClick={onCancel} style={{ flex: 1, padding: 11, borderRadius: 9, border: "1px solid #2A2C30", background: "transparent", color: "#fff", cursor: "pointer" }}>Cancel</button>
           <button disabled={busy || !canSubmit} onClick={() => onSave(side, incomingPlayer, outgoingPlayer)} style={{ flex: 1, padding: 11, borderRadius: 9, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, cursor: busy || !canSubmit ? "not-allowed" : "pointer", opacity: busy || !canSubmit ? 0.45 : 1 }}>Add</button>
@@ -1822,18 +1836,18 @@ function Badge({ t, size = 40 }) {
 }
 
 function PreviewField({ label: fieldLabel, children }) {
-  return <label style={{ display: "flex", flexDirection: "column", gap: 5 }}><span style={{ color: "#8E939B", fontSize: 11.5, fontWeight: 650 }}>{fieldLabel}</span>{children}</label>;
+  return <label style={{ display: "flex", flexDirection: "column", gap: 5 }}><span style={{ color: "#8E939B", fontSize: "var(--type-caption)", fontWeight: 650 }}>{fieldLabel}</span>{children}</label>;
 }
 
 const card = { background: "#161719", border: "1px solid #26282B", borderRadius: 14, padding: 16, marginBottom: 14 };
-const label = { color: "#8E939B", fontSize: 12, fontWeight: 700, marginBottom: 10 };
-const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
-const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", fontSize: 13, fontWeight: 700, cursor: "pointer" };
-const goalButton = { width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: 18, cursor: "pointer", marginBottom: 8 };
-const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid #2A2C30", background: "transparent", color: "#8E939B", fontSize: 12, cursor: "pointer", marginBottom: 10 };
+const label = { color: "#8E939B", fontSize: "var(--type-label)", fontWeight: 700, marginBottom: 10 };
+const pill = { padding: "8px 14px", borderRadius: 9, border: "1px solid #2A2C30", fontSize: "var(--type-body)", fontWeight: 700, cursor: "pointer" };
+const half = { flex: 1, padding: 10, borderRadius: 8, border: "1px solid #2A2C30", fontSize: "var(--type-body)", fontWeight: 700, cursor: "pointer" };
+const goalButton = { width: "100%", padding: 16, borderRadius: 10, border: "none", background: "#4FC263", color: "#062", fontWeight: 800, fontSize: "var(--type-heading)", cursor: "pointer", marginBottom: 8 };
+const undoButton = { width: "100%", padding: 8, borderRadius: 8, border: "1px solid #2A2C30", background: "transparent", color: "#8E939B", fontSize: "var(--type-label)", cursor: "pointer", marginBottom: 10 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 20 };
-const flabel = { display: "block", color: "#8E939B", fontSize: 12, fontWeight: 600, margin: "8px 0 4px" };
-const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, outline: "none" };
-const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: 14 };
-const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: 12, fontWeight: 800, cursor: "pointer" };
-const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: 14, textAlign: "center", outline: "none" };
+const flabel = { display: "block", color: "#8E939B", fontSize: "var(--type-label)", fontWeight: 600, margin: "8px 0 4px" };
+const finp = { width: "100%", padding: 10, borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: "var(--type-emphasis)", outline: "none" };
+const playerButton = { display: "flex", alignItems: "center", gap: 8, textAlign: "left", padding: "10px 11px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", cursor: "pointer", fontSize: "var(--type-emphasis)" };
+const stoppageButton = { padding: "9px 4px", borderRadius: 8, border: "1px solid #2A2C30", fontSize: "var(--type-label)", fontWeight: 800, cursor: "pointer" };
+const statInput = { width: "100%", minWidth: 0, padding: "10px 6px", borderRadius: 9, border: "1px solid #2A2C30", background: "#0E0F11", color: "#fff", fontSize: "var(--type-emphasis)", textAlign: "center", outline: "none" };

@@ -57,30 +57,32 @@ export default function LeaguesHome() {
         <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, letterSpacing: -0.4 }}>Leagues</h1>
         <label className="flex items-center rounded-full" style={{ height: 48, marginTop: 16, padding: "0 15px", background: t.pill, border: `1px solid ${t.pillBorder}` }}>
           <Search size={20} color={t.dim} />
-          <input aria-label="Find leagues" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find leagues" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: t.text, padding: "0 10px", fontSize: 14 }} />
+          <input aria-label="Find competitions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find competitions" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: t.text, padding: "0 10px", fontSize: "var(--type-emphasis)" }} />
         </label>
       </header>
 
       <main className="touchline-public-content" style={{ paddingTop: 15, paddingBottom: 15 }}>
-        <div className="flex items-center" style={{ margin: "0 4px 15px" }}>
-          <h2 style={{ margin: 0, fontSize: 17 }}>Following</h2>
-        </div>
         {!data && !loadError && <LeagueListShell t={t} />}
         {loadError && (
           <div className="rounded-2xl text-center" style={{ background: t.card, padding: 24 }}>
-            <div style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{loadError}</div>
-            <button type="button" onClick={() => load(true)} className="rounded-full" style={{ marginTop: 12, background: t.accent, color: "#07130B", padding: "9px 16px", fontSize: 13, fontWeight: 800 }}>Try again</button>
+            <div style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{loadError}</div>
+            <button type="button" onClick={() => load(true)} className="rounded-full" style={{ marginTop: 12, background: t.accent, color: "#07130B", padding: "9px 16px", fontSize: "var(--type-body)", fontWeight: 800 }}>Try again</button>
           </div>
         )}
         {data && competitions.length === 0 && (
           <div className="rounded-2xl text-center" style={{ background: t.card, padding: "36px 24px" }}>
             <Trophy size={34} color={t.dim} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontSize: 15, fontWeight: 800 }}>No leagues available</div>
-            <div style={{ color: t.dim, fontSize: 13, marginTop: 5 }}>Competitions will appear here when available.</div>
+            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 800 }}>No leagues available</div>
+            <div style={{ color: t.dim, fontSize: "var(--type-body)", marginTop: 5 }}>Competitions will appear here when available.</div>
           </div>
         )}
         {data && competitions.length > 0 && visibleCompetitions.length === 0 && <div style={{ minHeight: 110 }} />}
-        {visibleCompetitions.map((competition) => (
+        {["league", "tournament"].map((type) => {
+          const entries = visibleCompetitions.filter((competition) => competition.competitionType === type);
+          if (!entries.length) return null;
+          return <section key={type} className="mb-5">
+            <h2 className="mb-3 px-1" style={{ fontSize: "var(--type-subheading)" }}>{type === "league" ? "Leagues" : "Tournaments"}</h2>
+            {entries.map((competition) => (
           <Link
             href={`/league/${competition.id}`}
             key={competition.id}
@@ -93,13 +95,15 @@ export default function LeaguesHome() {
                 : <Trophy size={28} color={competition.themeColor || t.accent} />}
             </span>
             <span className="min-w-0" style={{ flex: 1, paddingLeft: 15 }}>
-              <span className="block truncate" style={{ color: t.text, fontSize: 14 }}>{competition.name}</span>
+              <span className="block truncate" style={{ color: t.text, fontSize: "var(--type-emphasis)" }}>{competition.name}</span>
             </span>
             {competition.liveCount > 0 && (
-              <span className="rounded-full" style={{ color: "#07130B", background: t.accent, padding: "5px 8px", fontSize: 9.5, fontWeight: 900, marginRight: 5 }}>LIVE</span>
+              <span className="rounded-full" style={{ color: "#07130B", background: t.accent, padding: "5px 8px", fontSize: "var(--type-badge)", fontWeight: 900, marginRight: 5 }}>LIVE</span>
             )}
           </Link>
-        ))}
+            ))}
+          </section>;
+        })}
       </main>
 
       <BottomNav t={t} active="Leagues" />

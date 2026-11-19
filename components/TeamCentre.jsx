@@ -78,11 +78,11 @@ function Photo({ src, name, size = 40, color = "#30343A" }) {
   );
 }
 
-export default function TeamCentre({ id }) {
+export default function TeamCentre({ id, initialTab = "Overview" }) {
   const { t } = useTheme();
   const router = useRouter();
   const [state, setState] = useState(null);
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState(initialTab);
   const [following, setFollowing] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
@@ -124,7 +124,7 @@ export default function TeamCentre({ id }) {
           <div className="flex items-center rounded-full" style={{ height: 40, padding: 3, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
             <span className="flex items-center justify-center" style={{ width: 34 }}><ShieldCheck size={19} /></span>
             <span className="flex items-center justify-center" style={{ width: 34 }}><Bell size={18} /></span>
-            <button onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: following ? t.accent : t.text, color: following ? "#07130B" : t.bg, fontWeight: 850, fontSize: 12.5 }}>
+            <button onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: following ? t.accent : t.text, color: following ? "#07130B" : t.bg, fontWeight: 850, fontSize: "var(--type-label)" }}>
               {following ? "Following" : "Follow"}
             </button>
           </div>
@@ -132,13 +132,13 @@ export default function TeamCentre({ id }) {
         <div className="flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
           <Crest color={team.color} logo={team.logoUrl} label={team.name} size={64} ring={t.divider} />
           <div className="min-w-0">
-            <h1 style={{ fontSize: 20, lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
-            <div style={{ color: t.dim, fontSize: 14, fontWeight: 650, marginTop: 6 }}>{team.country}</div>
+            <h1 style={{ fontSize: "var(--type-title)", lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
+            <div style={{ color: t.dim, fontSize: "var(--type-emphasis)", fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
         <nav className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
           {tabs.map((item) => (
-            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: activeTab === item ? t.text : t.tab, fontSize: 14, fontWeight: activeTab === item ? 800 : 650 }}>
+            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: activeTab === item ? t.text : t.tab, fontSize: "var(--type-emphasis)", fontWeight: activeTab === item ? 800 : 650 }}>
               {item}
               {activeTab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: t.accent }} />}
             </button>
@@ -174,8 +174,8 @@ function TeamPageShell({ t, onBack, error, onRetry }) {
     </div>
     <div style={{ height: 48, background: t.card, borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }} />
     {error && <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card }}>
-      <div style={{ fontSize: 14, fontWeight: 700 }}>{error}</div>
-      <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: 13, fontWeight: 800 }}>Try again</button>
+      <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{error}</div>
+      <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: "var(--type-body)", fontWeight: 800 }}>Try again</button>
     </div>}
     <BottomNav t={t} active="Matches" />
   </div>;
@@ -188,7 +188,7 @@ function Card({ t, children, style }) {
 function SectionTitle({ children, action, t }) {
   return (
     <div className="flex items-center justify-between" style={{ padding: "15px 16px 10px" }}>
-      <h2 style={{ margin: 0, color: t.text, fontSize: 16, fontWeight: 800 }}>{children}</h2>
+      <h2 style={{ margin: 0, color: t.text, fontSize: "var(--type-subheading)", fontWeight: 800 }}>{children}</h2>
       {action && <button onClick={action} aria-label="Open section"><ChevronRight size={19} color={t.dim} /></button>}
     </div>
   );
@@ -204,9 +204,9 @@ function Overview({ state, t, onMatches }) {
       {nextMatch && (
         <Card t={t}>
           <SectionTitle t={t}>Next match</SectionTitle>
-          <div className="flex items-center justify-between px-5" style={{ color: t.dim, fontSize: 13, fontWeight: 700 }}>
+          <div className="flex items-center justify-between px-5" style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700 }}>
             <span>{dayLabel(nextMatch.date)}</span>
-            <span className="rounded-full" style={{ background: t.chip, padding: "5px 10px", textTransform: "uppercase", fontSize: 10.5 }}>{nextMatch.competitionName}</span>
+            <span className="rounded-full" style={{ background: t.chip, padding: "5px 10px", textTransform: "uppercase", fontSize: "var(--type-badge)" }}>{nextMatch.competitionName}</span>
           </div>
           <TeamMatchLine match={nextMatch} teams={teams} t={t} large />
         </Card>
@@ -222,7 +222,7 @@ function Overview({ state, t, onMatches }) {
               const resultColor = match.result === "W" ? t.green : match.result === "L" ? t.red : t.drawPill;
               return (
                 <Link href={`/match/${match.id}`} key={match.id} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="flex flex-col items-center shrink-0" style={{ gap: 8, width: 48 }}>
-                  <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "4px 7px", fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
+                  <span className="rounded-md" style={{ background: resultColor, color: "#fff", padding: "4px 7px", fontSize: "var(--type-label)", fontWeight: 800, whiteSpace: "nowrap" }}>{scored} - {conceded}</span>
                   <Crest color={opponent?.color || "#555"} logo={opponent?.logoUrl} label={opponent?.name || "Team"} size={30} ring={t.divider} />
                 </Link>
               );
@@ -254,9 +254,9 @@ function MatchList({ title, matches, teams, t }) {
       <SectionTitle t={t}>{title}</SectionTitle>
       {matches.map((match) => (
         <div key={match.id} style={{ borderTop: `1px solid ${t.divider}` }}>
-          <div className="flex items-center justify-between px-4 pt-3" style={{ color: t.dim, fontSize: 11.5, fontWeight: 650 }}>
+          <div className="flex items-center justify-between px-4 pt-3" style={{ color: t.dim, fontSize: "var(--type-caption)", fontWeight: 650 }}>
             <span>{dayLabel(match.date)}</span>
-            <span className="rounded-full" style={{ background: t.chip, padding: "4px 8px", textTransform: "uppercase", fontSize: 9.5 }}>{match.competitionName}</span>
+            <span className="rounded-full" style={{ background: t.chip, padding: "4px 8px", textTransform: "uppercase", fontSize: "var(--type-badge)" }}>{match.competitionName}</span>
           </div>
           <TeamMatchLine match={match} teams={teams} t={t} />
         </div>
@@ -298,11 +298,11 @@ function Table({ state, t }) {
       {state.tableCompetition && <SectionTitle t={t}>{state.tableCompetition.name}</SectionTitle>}
       {state.table.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <div className="grid items-center px-3 pb-2" style={{ minWidth: 440, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", color: t.dim, fontSize: 10.5 }}>
+          <div className="grid items-center px-3 pb-2" style={{ minWidth: 440, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", color: t.dim, fontSize: "var(--type-badge)" }}>
             <span>#</span><span>Team</span><span>PL</span><span>W</span><span>D</span><span>L</span><span>GD</span><span>PTS</span><span>Form</span>
           </div>
           {state.table.map((row, index) => (
-            <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", borderTop: `1px solid ${t.divider}`, background: row.id === state.team.id ? t.hl : "transparent", fontSize: 12.5 }}>
+            <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", borderTop: `1px solid ${t.divider}`, background: row.id === state.team.id ? t.hl : "transparent", fontSize: "var(--type-label)" }}>
               <span className="league-table-number">{index + 1}</span>
               <span className="flex items-center gap-2 min-w-0"><Crest color={row.color} logo={row.logoUrl} label={row.name} size={26} ring={t.divider} /><span>{row.name}</span></span>
               <span className="league-table-number">{row.pl}</span><span className="league-table-number">{row.w}</span><span className="league-table-number">{row.d}</span><span className="league-table-number">{row.l}</span><span className="league-table-number">{row.gf - row.ga}</span><span className="league-table-number">{row.pts}</span>
@@ -325,8 +325,8 @@ function Stats({ state, t }) {
   return (
     <>
       <Card t={t} style={{ padding: 18 }}>
-        <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 800 }}>Team statistics</h2>
-        <div style={{ color: t.dim, fontSize: 12.5, marginBottom: 8 }}>Average possession</div>
+        <h2 style={{ margin: "0 0 12px", fontSize: "var(--type-subheading)", fontWeight: 800 }}>Team statistics</h2>
+        <div style={{ color: t.dim, fontSize: "var(--type-label)", marginBottom: 8 }}>Average possession</div>
         <div className="rounded-full overflow-hidden" style={{ height: 32, background: t.track }}>
           <div className="flex items-center px-3 h-full" style={{ width: `${Math.max(4, Math.min(100, s.averagePossession))}%`, background: t.accent, color: "#07130B", fontWeight: 900 }}>{s.averagePossession}%</div>
         </div>
@@ -335,8 +335,8 @@ function Stats({ state, t }) {
         <div className="grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
           {metrics.map(([label, value]) => (
             <div key={label} style={{ padding: "15px 12px", borderBottom: `1px solid ${t.divider}` }}>
-              <div style={{ fontSize: 17 }}>{value}</div>
-              <div style={{ color: t.dim, fontSize: 12.5, marginTop: 3 }}>{label}</div>
+              <div style={{ fontSize: "var(--type-subheading)" }}>{value}</div>
+              <div style={{ color: t.dim, fontSize: "var(--type-label)", marginTop: 3 }}>{label}</div>
             </div>
           ))}
         </div>
@@ -361,13 +361,13 @@ function Squad({ state, t }) {
     <>
       {state.team.coach && (
         <Card t={t}>
-          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: 14 }}>Coach</strong><span style={{ color: t.dim, fontSize: 11.5 }}>Age</span></div>
+          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: "var(--type-emphasis)" }}>Coach</strong><span style={{ color: t.dim, fontSize: "var(--type-caption)" }}>Age</span></div>
           <PersonRow person={state.team.coach} t={t} />
         </Card>
       )}
       {grouped.map(([name, players]) => (
         <Card t={t} key={name}>
-          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: 14 }}>{name}</strong><span style={{ color: t.dim, fontSize: 11.5 }}>Age</span></div>
+          <div className="flex justify-between px-4 pt-4"><strong style={{ fontSize: "var(--type-emphasis)" }}>{name}</strong><span style={{ color: t.dim, fontSize: "var(--type-caption)" }}>Age</span></div>
           {players.map((player) => <PersonRow key={player.id} person={player} t={t} player />)}
         </Card>
       ))}
@@ -382,10 +382,10 @@ function PersonRow({ person, t, player = false }) {
     <div className="flex items-center gap-3 px-4" style={{ minHeight: 68 }}>
       <Photo src={person.photoUrl} name={person.name} />
       <div className="min-w-0 flex-1">
-        <div style={{ color: t.text, fontSize: 14, fontWeight: 700 }}>{player && person.number != null ? `${person.number} ` : ""}{person.name}</div>
-        {person.country && <div style={{ color: t.dim, fontSize: 12, marginTop: 3 }}>{flagFor(person.country)} <span style={{ marginLeft: 4 }}>{person.country}</span></div>}
+        <div style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{player && person.number != null ? `${person.number} ` : ""}{person.name}</div>
+        {person.country && <div style={{ color: t.dim, fontSize: "var(--type-label)", marginTop: 3 }}>{flagFor(person.country)} <span style={{ marginLeft: 4 }}>{person.country}</span></div>}
       </div>
-      <span style={{ color: t.text, fontSize: 14, fontWeight: 650 }}>{age ?? ""}</span>
+      <span style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 650 }}>{age ?? ""}</span>
     </div>
   );
 }
@@ -398,8 +398,8 @@ function Trophies({ state, t }) {
         <div key={trophy.id} className="flex items-center gap-3 px-4" style={{ minHeight: 76, borderTop: `1px solid ${t.divider}` }}>
           {trophy.imageUrl ? <Photo src={trophy.imageUrl} name={trophy.name} size={46} color="transparent" /> : <span className="flex items-center justify-center rounded-full" style={{ width: 46, height: 46, background: t.chip }}><Trophy size={24} color={t.yellow} /></span>}
           <div className="flex-1">
-            <div style={{ fontSize: 14, fontWeight: 750 }}>{trophy.name}</div>
-            {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: 12, marginTop: 4 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
+            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 750 }}>{trophy.name}</div>
+            {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: "var(--type-label)", marginTop: 4 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
           </div>
         </div>
       )) : <div style={{ height: 110 }} />}

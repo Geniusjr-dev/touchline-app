@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import CompetitionTable from "@/components/CompetitionTable";
+import TournamentCentre from "@/components/TournamentCentre";
 import { BottomNav, Crest, StatusChip } from "@/components/ui";
 import { getLeagueCentre } from "@/lib/db";
 import { cachePublicMatch } from "@/lib/matchCache";
@@ -34,7 +35,7 @@ function dateLabel(date, includeYear = true) {
   }).format(value);
 }
 
-export default function LeagueCentre({ id }) {
+export default function LeagueCentre({ id, tournamentView, tournamentEdition }) {
   const { t } = useTheme();
   const router = useRouter();
   const [state, setState] = useState(null);
@@ -86,6 +87,9 @@ export default function LeagueCentre({ id }) {
 
   if (!state) return <LeagueShell t={t} error={loadError} onRetry={load} />;
   const themeColor = state.competition.themeColor || "#4B125F";
+  if (state.competition.competitionType === "tournament") {
+    return <TournamentCentre key={`${id}:${tournamentView}:${tournamentEdition}`} state={state} t={t} initialTab={tournamentView} initialEdition={tournamentEdition} />;
+  }
 
   return (
     <div className="touchline-public-shell league-web" style={{ "--league-card": t.card, "--league-text": t.text, "--league-muted": t.dim, "--league-divider": t.divider, "--league-inset": t.seg, background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>

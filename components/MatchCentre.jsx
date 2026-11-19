@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Share2, MapPin, Calendar, Disc3, ArrowUp, ArrowDown, X } from "lucide-react";
 import { useTheme } from "@/lib/theme";
-import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable } from "@/lib/db";
+import { announcedStoppageMinutes, EMPTY_MATCH_STATS, formatMatchClock, getMatch, getMatchTable, matchHasStandings } from "@/lib/db";
 import { cachePublicMatch, readPublicMatch } from "@/lib/matchCache";
 import { DEFAULT_FORMATION, getFormationSlots } from "@/lib/formations";
 import { supabase } from "@/lib/supabase";
@@ -231,7 +231,7 @@ export default function MatchCentre({ id }) {
 
   useEffect(() => {
     const match = state?.match;
-    if (!match || match.competitionType === "friendly") return;
+    if (!matchHasStandings(match)) return;
     const signature = `${match.id}:${match.status}:${match.hs}:${match.as}`;
     if (tableRequestRef.current === signature) return;
     tableRequestRef.current = signature;
@@ -263,7 +263,7 @@ export default function MatchCentre({ id }) {
   const statsAvailable = statsAvailableForMatch(m, availabilityNow);
   const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
   const availableTabs = (started ? TABS_LIVE : TABS_PRE)
-    .filter((item) => item !== "Table" || m.competitionType !== "friendly")
+    .filter((item) => item !== "Table" || matchHasStandings(m))
     .filter((item) => item !== "Stats" || statsAvailable);
   const tabs = availableTabs.filter((item) => item !== "Lineup" || hasLineups);
   const defaultTab = started ? "Facts" : "Preview";

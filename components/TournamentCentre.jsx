@@ -182,8 +182,8 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
   const season = state.seasons.find((item) => keyFor(item) === selection) || state.seasons[0];
   const { competition, teams } = state;
   return <div className="min-h-screen pb-24" style={{ background: t.bg, color: t.text }}>
-    <header style={{ background: `linear-gradient(135deg,#14294b,${/^#[0-9a-f]{6}$/i.test(competition.themeColor || "") ? competition.themeColor : "#382953"})`, color: "white" }}>
-      <div className="mx-auto max-w-4xl px-3 pt-5 sm:px-4 sm:pt-6">
+    <header className="touchline-public-header" style={{ background: `linear-gradient(135deg,#14294b,${/^#[0-9a-f]{6}$/i.test(competition.themeColor || "") ? competition.themeColor : "#382953"})`, color: "white" }}>
+      <div className="touchline-header-inner px-3 pt-5 sm:px-4 sm:pt-6">
         <div className="flex min-h-20 items-center gap-3 py-3 sm:min-h-28">
           <Link href="/leagues" aria-label="Back to competitions" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/30"><ChevronLeft size={22} /></Link>
           <Crest logo={competition.logoUrl} size={42} />

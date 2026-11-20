@@ -71,39 +71,41 @@ export default function SearchCentre() {
     : !current ? "Searching…" : current.error ? "Search is unavailable right now." : !current.groups.length ? "No matching names." : "";
 
   return (
-    <main className="touchline-public-content mx-auto min-h-screen px-4 py-4" style={{ background: t.bg, color: t.text }}>
-      <header className="mb-4 flex items-center gap-3">
+    <div className="touchline-public-shell min-h-screen" style={{ background: t.bg, color: t.text }}>
+      <header className="touchline-public-header-row flex items-center gap-3 px-4 py-4">
         <button type="button" aria-label="Go back" className="grid h-11 w-11 place-items-center rounded-full"
           style={{ background: t.pill }} onClick={() => window.history.length > 1 ? router.back() : router.push("/")}>
           <ChevronLeft size={22} />
         </button>
         <h1 className="text-xl font-bold">Search</h1>
       </header>
-      <div role="search" className="flex min-h-12 items-center gap-3 rounded-2xl px-3" style={{ background: t.card }}>
-        <Search size={20} aria-hidden="true" />
-        <input autoFocus type="text" inputMode="search" maxLength={80} aria-label="Search teams, competitions and players"
-          placeholder="Teams, competitions or players" value={value} onChange={(event) => { setValue(event.target.value); setResult(null); }}
-          className="min-w-0 flex-1 bg-transparent py-3 text-base" style={{ color: t.text }} />
-        {value && <button type="button" aria-label="Clear search" className="grid h-10 w-10 place-items-center"
-          onClick={() => { setValue(""); setResult(null); }}><X size={19} /></button>}
-      </div>
-      <p role="status" className="my-4 text-sm" style={{ color: t.dim }}>{status}</p>
-      {current?.groups?.map(({ title, rows }) => (
-        <section key={title} className="mb-5">
-          <h2 className="mb-2 text-base font-semibold">{title}</h2>
-          <ul className="overflow-hidden rounded-2xl" style={{ background: t.card }}>
-            {rows.map((row) => {
-              const contents = <><Crest size={32} logo={row.image} ring={t.divider} /><span>
-                <span className="block font-medium">{row.name}</span>
-                {row.detail && <span className="block text-sm" style={{ color: t.dim }}>{row.detail}</span>}
-              </span></>;
-              const classes = "flex min-h-14 items-center gap-3 px-3 py-2";
-              return <li key={row.id}>{row.href ? <Link href={row.href} className={classes}>{contents}</Link>
-                : <div className={classes}>{contents}</div>}</li>;
-            })}
-          </ul>
-        </section>
-      ))}
-    </main>
+      <main className="touchline-public-content mx-auto px-4">
+        <div role="search" className="flex min-h-12 items-center gap-3 rounded-2xl px-3" style={{ background: t.card }}>
+          <Search size={20} aria-hidden="true" />
+          <input autoFocus type="text" inputMode="search" maxLength={80} aria-label="Search teams, competitions and players"
+            placeholder="Teams, competitions or players" value={value} onChange={(event) => { setValue(event.target.value); setResult(null); }}
+            className="min-w-0 flex-1 bg-transparent py-3 text-base" style={{ color: t.text }} />
+          {value && <button type="button" aria-label="Clear search" className="grid h-10 w-10 place-items-center"
+            onClick={() => { setValue(""); setResult(null); }}><X size={19} /></button>}
+        </div>
+        <p role="status" className="my-4 text-sm" style={{ color: t.dim }}>{status}</p>
+        {current?.groups?.map(({ title, rows }) => (
+          <section key={title} className="mb-5">
+            <h2 className="mb-2 text-base font-semibold">{title}</h2>
+            <ul className="overflow-hidden rounded-2xl" style={{ background: t.card }}>
+              {rows.map((row) => {
+                const contents = <><Crest size={32} logo={row.image} ring={t.divider} /><span>
+                  <span className="block font-medium">{row.name}</span>
+                  {row.detail && <span className="block text-sm" style={{ color: t.dim }}>{row.detail}</span>}
+                </span></>;
+                const classes = "flex min-h-14 items-center gap-3 px-3 py-2";
+                return <li key={row.id}>{row.href ? <Link href={row.href} className={classes}>{contents}</Link>
+                  : <div className={classes}>{contents}</div>}</li>;
+              })}
+            </ul>
+          </section>
+        ))}
+      </main>
+    </div>
   );
 }

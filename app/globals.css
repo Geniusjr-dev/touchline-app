@@ -14,12 +14,12 @@
   }
   .league-web-bar > a { font-size: 32px; font-weight: 750 !important; }
   .league-web-bar > div { display: flex; gap: 32px; font-size: 18px; }
-  .league-web > header, .league-web > main {
+  .league-web > main {
     width: min(1600px, calc(100% - 48px)) !important; max-width: none !important; margin-inline: auto;
   }
   .league-web > header {
-    position: relative; overflow: hidden; border: 1px solid var(--league-divider);
-    box-shadow: none !important; border-radius: 0 0 20px 20px;
+    position: relative; width: 100%; overflow: hidden; border-bottom: 1px solid var(--league-divider);
+    box-shadow: none !important;
     background: var(--league-card) !important; color: var(--league-text) !important;
   }
   .league-web > header > div:first-child :is(a, button, select) {
@@ -33,7 +33,7 @@
   .league-web .league-web-tabs { justify-content: flex-start; background: var(--league-card); min-height: 76px; gap: 42px; padding-inline: 38px; }
   .league-web .league-web-tabs button {
     height: 76px !important; min-width: 0 !important; padding: 0 !important;
-    flex: 0 0 auto !important; color: var(--league-muted) !important;
+    flex: 1 1 0 !important; color: var(--league-muted) !important;
     font-size: 18px !important; font-weight: 600 !important;
   }
   .league-web .league-web-tabs button[aria-pressed="true"] { color: var(--league-text) !important; }
@@ -239,16 +239,25 @@ html[data-theme="light"] body { background: #DFE2E6; }
   bottom: max(18px, env(safe-area-inset-bottom));
 }
 
-/* Public app: preserve the compact native-phone experience on small screens,
-   then use a genuinely wide workspace on laptops and desktop monitors. */
-.touchline-public-shell { width: 100%; }
+/* Page headers span the shell; reading columns retain their own widths. */
+.touchline-public-shell { width: 100%; max-width: none !important; }
+
+.touchline-public-header,
+.touchline-public-header-row,
+.match-centre-header {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media (min-width: 481px) and (max-width: 899px) {
+  .touchline-public-content {
+    max-width: 480px;
+    margin-inline: auto;
+  }
+}
 
 @media (min-width: 900px) {
   :root { --touchline-public-width: 56rem; }
-  .touchline-public-shell {
-    max-width: none !important;
-    width: 100%;
-  }
   .touchline-public-content {
     width: min(100%, var(--touchline-public-width));
     margin-left: auto;
@@ -259,27 +268,23 @@ html[data-theme="light"] body { background: #DFE2E6; }
   .touchline-public-header > nav,
   .touchline-public-header > .touchline-header-inner,
   .touchline-public-header-row,
-  .fixture-date-strip {
-    width: min(100%, var(--touchline-public-width));
-    margin-inline: auto;
+  .league-web > header > div,
+  .fixture-date-strip,
+  .match-centre-toolbar,
+  .match-centre-identity,
+  .match-centre-tabs {
+    box-sizing: border-box;
+    width: 100%;
+    padding-inline: clamp(24px, 3vw, 56px);
   }
-  .league-web > header,
-  .league-web > main {
-    width: min(var(--touchline-public-width), calc(100% - 48px)) !important;
-  }
-  .touchline-public-header > nav > button {
+  .touchline-public-header > nav > button,
+  .match-centre-tabs > button,
+  .fixture-date-strip > button {
     flex: 1 1 0;
     max-width: none;
   }
   .touchline-bottom-nav {
     width: min(720px, calc(100vw - 64px));
-  }
-  .match-centre-toolbar,
-  .match-centre-identity,
-  .match-centre-tabs {
-    width: min(100%, var(--touchline-public-width));
-    margin-left: auto;
-    margin-right: auto;
   }
 }
 
@@ -320,15 +325,11 @@ html[data-theme="light"] body { background: #DFE2E6; }
 
 .touchline-skeleton { animation: touchline-skeleton-pulse 1.35s ease-in-out infinite; }
 
-/* Compact desktop league header */
+/* Desktop league tabs and standings controls */
 @media (min-width: 900px) {
-  .league-web > header {
-    width: min(650px, calc(100% - 48px)) !important;
-  }
-
   .league-web .league-web-tabs {
     gap: 16px;
-    padding-inline: 16px;
+    padding-inline: clamp(24px, 3vw, 56px);
     min-height: 54px;
   }
 

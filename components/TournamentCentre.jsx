@@ -38,7 +38,7 @@ function GroupCard({ title, rows, statuses, view, t }) {
         const color = status === "direct" || status === "third" ? "#23ad67" : status ? "#dda92e" : "transparent";
         const gd = row.gf - row.ga;
         const values = { PL: row.pl, W: row.w, D: row.d, L: row.l, "+/-": `${row.gf}-${row.ga}`, GD: gd > 0 ? `+${gd}` : gd, PTS: row.pts, Form: row.form?.slice(-5).join(" ") || "·" };
-        return <tr key={row.id} style={{ borderTop: `1px solid ${t.divider}` }}>
+        return <tr key={row.id}>
           <th scope="row" className="relative text-left font-medium">
             <span aria-hidden="true" className="absolute inset-y-1 left-0 w-1 rounded-full" style={{ background: color }} />
             <Link href={`/team/${row.id}`} className="flex min-h-12 items-center gap-2 py-2 pl-2 pr-1">
@@ -207,7 +207,6 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
           {champion ? <>
             <div className="mt-4 flex flex-wrap gap-5">{[[champion, "Winner"], [runnerUp, "Runner-up"]].map(([id, label]) =>
               <Link key={label} href={`/team/${id}`} className="flex items-center gap-2"><TeamMark id={id} teams={teams} t={t} size={30} /><span><small className="block" style={{ color: t.dim }}>{label}</small><strong>{teamName(teams, id)}</strong></span></Link>)}</div>
-            <Link href={`/match/${decidingMatch.id}`} className="mt-4 inline-block rounded-full border px-3 py-2 text-sm font-bold" style={{ borderColor: t.divider }}>View final · {decidingMatch.hs} - {decidingMatch.as}{decidingMatch.shootout && ` (Pen ${decidingMatch.shootout.home} - ${decidingMatch.shootout.away})`}</Link>
           </> : <p className="mt-3 text-sm" style={{ color: t.dim }}>No confirmed champion yet.</p>}
         </article>;
       })}

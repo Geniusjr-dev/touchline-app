@@ -8,7 +8,7 @@ import { Bell, ChevronDown, ChevronLeft, ChevronRight, Trophy } from "lucide-rea
 import CompetitionTable from "@/components/CompetitionTable";
 import TournamentCentre from "@/components/TournamentCentre";
 import { BottomNav, Crest, StatusChip } from "@/components/ui";
-import { getLeagueCentre } from "@/lib/db";
+import { getLeagueCentre, peekLeagueCentre } from "@/lib/db";
 import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
@@ -38,15 +38,15 @@ function dateLabel(date, includeYear = true) {
 export default function LeagueCentre({ id, tournamentView, tournamentEdition }) {
   const { t } = useTheme();
   const router = useRouter();
-  const [state, setState] = useState(null);
+  const [state, setState] = useState(() => peekLeagueCentre(id));
   const [tab, setTab] = useState("Table");
   const [loadError, setLoadError] = useState("");
   const [following, setFollowing] = useState(false);
   const [now, setNow] = useState(0);
   const tabRefs = useRef({});
 
-  const load = useCallback(() => {
-    withDeadline(getLeagueCentre(id))
+  const load = useCallback((force = false) => {
+    withDeadline(getLeagueCentre(id, { force: force === true }))
       .then((result) => {
         setState(result);
         setLoadError(result ? "" : "This competition is unavailable.");
@@ -58,7 +58,7 @@ export default function LeagueCentre({ id, tournamentView, tournamentEdition }) 
     let refreshTimer;
     const scheduleRefresh = () => {
       window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(load, 160);
+      refreshTimer = window.setTimeout(() => load(true), 160);
     };
     load();
     setNow(Date.now());
@@ -524,49 +524,18 @@ function EmptyCard({ t, children }) {
 
 function LeagueShell({ t, error, onRetry }) {
   return (
-    <div className="touchline-public-shell" style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header style={{ height: 144, background: "#4B125F" }}>
-        <div className="flex items-center px-3" style={{ height: 48, gap: 8 }}>
-          <span className="touchline-skeleton rounded-full" style={{ width: 34, height: 34, background: "rgba(255,255,255,0.18)" }} />
-          <span className="touchline-skeleton rounded-full" style={{ width: 104, height: 34, marginLeft: "auto", background: "rgba(255,255,255,0.18)" }} />
-          <span className="touchline-skeleton rounded-full" style={{ width: 86, height: 34, background: "rgba(255,255,255,0.18)" }} />
-        </div>
-        <div className="flex items-center px-4" style={{ height: 54, gap: 11 }}>
-          <span className="touchline-skeleton rounded-xl" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.18)" }} />
-          <span style={{ flex: 1 }}>
-            <span className="touchline-skeleton block rounded" style={{ width: "58%", height: 13, background: "rgba(255,255,255,0.2)" }} />
-            <span className="touchline-skeleton block rounded" style={{ width: 62, height: 9, marginTop: 7, background: "rgba(255,255,255,0.14)" }} />
-          </span>
-        </div>
-        <div className="flex items-center" style={{ height: 42, borderTop: "1px solid rgba(255,255,255,0.16)", padding: "0 14px", gap: 26 }}>
-          {[52, 62, 48, 74].map((width, index) => <span key={index} className="touchline-skeleton rounded" style={{ width, height: 10, background: "rgba(255,255,255,0.16)" }} />)}
-        </div>
-      </header>
-
-      {error ? (
-        <div className="mx-3 mt-4 rounded-2xl text-center" style={{ padding: 22, background: t.card }}>
-          <div style={{ fontSize: "var(--type-emphasis)" }}>{error}</div>
-          <button type="button" onClick={onRetry} className="rounded-full" style={{ marginTop: 12, padding: "9px 16px", background: t.accent, color: "#07130B", fontSize: "var(--type-body)" }}>Try again</button>
-        </div>
-      ) : (
-        <div aria-hidden="true">
-          <div className="flex gap-2 px-2 pt-2">
-            <span className="touchline-skeleton rounded-full" style={{ flex: 1, height: 42, background: t.pill }} />
-            <span className="touchline-skeleton rounded-full" style={{ width: 112, height: 42, background: t.pill }} />
+    <div style={{ background: t.bg, color: t.text, minHeight: "100vh", paddingBottom: 82 }}>
+      <main className="mx-auto max-w-4xl px-4 py-6">
+        <Link href="/leagues" className="inline-flex min-h-11 items-center gap-2 font-semibold">
+          <ChevronLeft size={20} aria-hidden="true" /> Competitions
+        </Link>
+        {error ? (
+          <div className="mt-4 rounded-2xl p-5 text-center" style={{ background: t.card }}>
+            <p role="alert">{error}</p>
+            <button type="button" onClick={onRetry} className="mt-3 rounded-full px-4 py-2 font-bold" style={{ background: t.accent, color: "#07130B" }}>Try again</button>
           </div>
-          <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-            <div style={{ height: 44, borderBottom: `1px solid ${t.divider}` }} />
-            {[0, 1, 2, 3, 4, 5].map((row) => (
-              <div key={row} className="flex items-center px-3" style={{ height: 50, borderTop: row ? `1px solid ${t.divider}` : "none" }}>
-                <span className="touchline-skeleton rounded" style={{ width: 14, height: 11, background: t.chip }} />
-                <span className="touchline-skeleton rounded-full" style={{ width: 24, height: 24, marginLeft: 12, background: t.chip }} />
-                <span className="touchline-skeleton rounded" style={{ width: 112, height: 11, marginLeft: 9, background: t.chip }} />
-                <span className="touchline-skeleton rounded" style={{ width: 96, height: 11, marginLeft: "auto", background: t.chip }} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        ) : null}
+      </main>
       <BottomNav t={t} active="Leagues" />
     </div>
   );

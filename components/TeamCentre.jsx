@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronLeft, ChevronRight, ShieldCheck, Trophy } from "lucide-react";
-import { getTeamCentre, liveMinute } from "@/lib/db";
+import { getTeamCentre, liveMinute, peekTeamCentre } from "@/lib/db";
 import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
@@ -81,13 +81,13 @@ function Photo({ src, name, size = 40, color = "#30343A" }) {
 export default function TeamCentre({ id, initialTab = "Overview" }) {
   const { t } = useTheme();
   const router = useRouter();
-  const [state, setState] = useState(null);
+  const [state, setState] = useState(() => peekTeamCentre(id));
   const [tab, setTab] = useState(initialTab);
   const [following, setFollowing] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  const load = useCallback(() => {
-    withDeadline(getTeamCentre(id))
+  const load = useCallback((force = false) => {
+    withDeadline(getTeamCentre(id, { force: force === true }))
       .then((result) => { setState(result); setLoadError(!result); })
       .catch(() => setLoadError(true));
   }, [id]);
@@ -96,12 +96,13 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
     load();
     let channel;
     if (supabase) {
+      const refresh = () => load(true);
       channel = supabase.channel(`team-centre-${id}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `team_id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "team_trophies", filter: `team_id=eq.${id}` }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, load)
-        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `id=eq.${id}` }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `team_id=eq.${id}` }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "team_trophies", filter: `team_id=eq.${id}` }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_statistics" }, refresh)
         .subscribe();
     }
     return () => { if (channel) supabase.removeChannel(channel); };

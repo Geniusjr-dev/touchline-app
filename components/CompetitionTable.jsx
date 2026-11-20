@@ -112,7 +112,7 @@ export default function CompetitionTable({ t, competition, rows }) {
               href={`/team/${team.id}`}
               key={team.id}
               className={`standings-row flex items-center px-3 active:opacity-70${championPosition ? " standings-leader" : ""}`}
-              style={{ minHeight: 50, borderTop: `1px solid ${t.divider}` }}
+              style={{ minHeight: 50 }}
             >
               <div className="standings-rank flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
                 <span className="standings-stripe" style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : "transparent", marginRight: 6 }} />

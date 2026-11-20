@@ -5,6 +5,6 @@ export const dynamic = "force-dynamic";
 export default async function Page({ params, searchParams }) {
   const { id } = await params;
   const query = await searchParams;
-  return <LeagueCentre id={id} tournamentView={query?.view === "knockout" ? "Knockout" : undefined}
+  return <LeagueCentre key={id} id={id} tournamentView={query?.view === "knockout" ? "Knockout" : undefined}
     tournamentEdition={typeof query?.edition === "string" ? query.edition : undefined} />;
 }

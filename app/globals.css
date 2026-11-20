@@ -60,7 +60,7 @@
   .league-fixture-status { position: absolute; inset-inline-start: 18px; top: 50%; transform: translateY(-50%); margin: 0 !important; }
 }
 
-html, body { margin: 0; padding: 0; background: #0A0A0A; overflow-x: hidden; overscroll-behavior-y: contain; }
+html, body { margin: 0; padding: 0; background: #0A0A0A; overflow-x: clip; }
 html {
   font-size: 14px;
   -webkit-text-size-adjust: 100%;

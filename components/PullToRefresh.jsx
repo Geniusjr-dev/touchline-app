@@ -17,7 +17,11 @@ export default function PullToRefresh() {
     const interactive = (target) => target instanceof Element && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 
     const onTouchStart = (event) => {
-      if (window.scrollY > 0 || event.touches.length !== 1 || interactive(event.target)) return;
+      if (window.scrollY > 0 || event.touches.length !== 1 || interactive(event.target)) {
+        startRef.current = null;
+        setDistance(0);
+        return;
+      }
       const touch = event.touches[0];
       startRef.current = { x: touch.clientX, y: touch.clientY, vertical: null };
     };
@@ -30,6 +34,7 @@ export default function PullToRefresh() {
       const dy = touch.clientY - start.y;
       if (start.vertical == null && Math.max(Math.abs(dx), Math.abs(dy)) > 8) start.vertical = Math.abs(dy) > Math.abs(dx) * 1.2;
       if (!start.vertical || dy <= 0 || window.scrollY > 0) return;
+      if (!event.cancelable) return;
       event.preventDefault();
       setDistance(Math.min(maximumDistance, Math.round(Math.sqrt(dy) * 8.2)));
     };
@@ -47,15 +52,20 @@ export default function PullToRefresh() {
       });
     };
 
+    const cancel = () => {
+      startRef.current = null;
+      setDistance(0);
+    };
+
     document.addEventListener("touchstart", onTouchStart, { passive: true });
     document.addEventListener("touchmove", onTouchMove, { passive: false });
     document.addEventListener("touchend", finish, { passive: true });
-    document.addEventListener("touchcancel", finish, { passive: true });
+    document.addEventListener("touchcancel", cancel, { passive: true });
     return () => {
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", finish);
-      document.removeEventListener("touchcancel", finish);
+      document.removeEventListener("touchcancel", cancel);
     };
   }, []);
 

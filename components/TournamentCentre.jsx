@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { BottomNav, Crest } from "@/components/ui";
+import { IMEC_ID } from "@/lib/competition-name.mjs";
 import { formatMatchDate as dated } from "@/lib/match-date.mjs";
 import { fixtureStages, knockoutRound, matchWinner, qualification, seasonFinal } from "@/lib/tournament.mjs";
 
@@ -74,7 +76,7 @@ function Standings({ season, t }) {
   </>;
 }
 
-function MatchLink({ match, teams, t, bracket = false, final = false }) {
+function MatchLink({ match, teams, t, bracket = false, final = false, finalTrophy = null }) {
   const winner = (bracket || match.shootout) && knockoutRound(match.round) ? matchWinner(match) : null;
   const side = (id) => winner && id !== winner ? { color: t.dim, textDecoration: "line-through" } : undefined;
   const showScore = match.abandoned || ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status);
@@ -87,7 +89,12 @@ function MatchLink({ match, teams, t, bracket = false, final = false }) {
         <span className="w-full truncate text-xs font-bold" title={teamName(teams, match[key])}>{teamName(teams, match[key])}</span>
         <strong className="text-sm tabular-nums">{showScore ? match[key === "home" ? "hs" : "as"] : "·"}</strong>
       </div>)}
-      <Trophy aria-hidden="true" className="col-start-2 row-start-1 mt-2 h-5 w-5 text-[#f5d889] sm:h-8 sm:w-8" />
+      {finalTrophy ? (
+        <Image src={finalTrophy} alt="IMEC trophy" width={255} height={320} unoptimized
+          className="col-start-2 row-start-1 h-[68px] w-[54px] self-center object-contain drop-shadow-md sm:h-[84px] sm:w-[67px]" />
+      ) : (
+        <Trophy aria-hidden="true" className="col-start-2 row-start-1 mt-2 h-5 w-5 text-[#f5d889] sm:h-8 sm:w-8" />
+      )}
     </div>
     <p className="mt-2 text-center text-xs text-white/85">{[match.abandoned ? "Abandoned" : pens ? "Pen" : null, dated(match.date), match.venueName].filter(Boolean).join(" · ")}</p>
   </Link>;
@@ -126,7 +133,7 @@ function FixtureSections({ matches, teams, t }) {
   </div>;
 }
 
-function Knockout({ matches, teams, t }) {
+function Knockout({ matches, teams, t, finalTrophy }) {
   const [stage, setStage] = useState(null);
   const rounds = new Map();
   matches.forEach((match) => {
@@ -162,7 +169,7 @@ function Knockout({ matches, teams, t }) {
           <div className="relative" style={{ height }}>
             {(index === 0 ? left : right).map(({ match, y }) => (
               <div key={match.id} className="absolute inset-x-0" style={{ top: y }}>
-                <MatchLink match={match} teams={teams} t={t} bracket final={round.name === "Final"} />
+                <MatchLink match={match} teams={teams} t={t} bracket final={round.name === "Final"} finalTrophy={finalTrophy} />
               </div>
             ))}
           </div>
@@ -199,7 +206,7 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
     </header>
     <main className="mx-auto max-w-4xl px-3 py-4">
       {tab === "Group Tables" && <Standings season={season} t={t} />}
-      {tab === "Knockout" && <Knockout key={keyFor(season)} matches={season.matches.filter((match) => knockoutRound(match.round))} teams={teams} t={t} />}
+      {tab === "Knockout" && <Knockout key={keyFor(season)} matches={season.matches.filter((match) => knockoutRound(match.round))} teams={teams} t={t} finalTrophy={competition.id === IMEC_ID ? "/imec-final-trophy.webp" : null} />}
       {tab === "Fixtures" && (season.matches.length
         ? <FixtureSections matches={season.matches} teams={teams} t={t} />
         : <Empty t={t}>No fixtures in this edition.</Empty>)}

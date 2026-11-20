@@ -37,7 +37,7 @@ async function searchNames(query, signal) {
     }))),
     group("Competitions", merge(requests.slice(5)).map((row) => ({
       id: row.id, name: row.id === imecId ? "IMEC" : row.name, image: row.logo_url,
-      detail: row.id === imecId ? row.name : null, href: `/league/${row.id}`,
+      href: `/league/${row.id}`,
     }))),
     group("Players", merge(requests.slice(3, 5)).map((row) => ({
       id: row.id, name: label(row), image: row.photo_url, detail: row.team ? label(row.team) : null,

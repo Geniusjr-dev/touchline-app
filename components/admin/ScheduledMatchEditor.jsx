@@ -1,5 +1,6 @@
 "use client";
 
+import { competitionLabel } from "@/lib/competition-name.mjs";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -121,7 +122,7 @@ export default function ScheduledMatchEditor({ id }) {
             <SelectedTeam team={selectedAway} fallback="Choose away team" away />
           </div>
           <div style={formGrid}>
-            <Field label="Competition"><select value={values.competitionId} onChange={(event) => setValues((current) => ({ ...current, competitionId: event.target.value, groupNumber: "", homeId: "", awayId: "" }))} style={inp}><option value="">Choose competition</option>{competitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.name} · {competition.competition_type}</option>)}</select></Field>
+            <Field label="Competition"><select value={values.competitionId} onChange={(event) => setValues((current) => ({ ...current, competitionId: event.target.value, groupNumber: "", homeId: "", awayId: "" }))} style={inp}><option value="">Choose competition</option>{competitions.map((competition) => <option key={competition.id} value={competition.id}>{competitionLabel(competition.name, competition.id)} · {competition.competition_type}</option>)}</select></Field>
             {selectedCompetition?.competition_type === "tournament" && <Field label="Tournament group"><select value={values.groupNumber} onChange={(event) => setValues((current) => ({ ...current, groupNumber: event.target.value, homeId: "", awayId: "" }))} style={inp}><option value="">Choose group</option>{Array.from({ length: Number(selectedCompetition.group_count) || 0 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Group {String.fromCharCode(64 + number)}</option>)}</select></Field>}
             <Field label="Home team"><select value={values.homeId} onChange={(event) => set("homeId", event.target.value)} style={inp}><option value="">Choose home team</option>{eligibleTeams.map((team) => <option key={team.id} value={team.id}>{team.display_name || team.name}</option>)}</select></Field>
             <Field label="Away team"><select value={values.awayId} onChange={(event) => set("awayId", event.target.value)} style={inp}><option value="">Choose away team</option>{eligibleTeams.filter((team) => team.id !== values.homeId).map((team) => <option key={team.id} value={team.id}>{team.display_name || team.name}</option>)}</select></Field>

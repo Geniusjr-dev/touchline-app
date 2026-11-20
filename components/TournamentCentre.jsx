@@ -35,7 +35,7 @@ function GroupCard({ title, rows, statuses, view, t }) {
       </tr></thead>
       <tbody>{rows.map((row, index) => {
         const status = statuses.get(row.id);
-        const color = status === "direct" || status === "third" ? "#23ad67" : status ? "#dda92e" : "transparent";
+        const color = status === "direct" ? "#23ad67" : status ? "#f5c518" : "transparent";
         const gd = row.gf - row.ga;
         const values = { PL: row.pl, W: row.w, D: row.d, L: row.l, "+/-": `${row.gf}-${row.ga}`, GD: gd > 0 ? `+${gd}` : gd, PTS: row.pts, Form: row.form?.slice(-5).join(" ") || "·" };
         return <tr key={row.id}>
@@ -68,16 +68,17 @@ function Standings({ season, t }) {
     {result.ranked.length > 0 && <GroupCard title="Best third-placed teams" rows={result.ranked} statuses={result.status} view={view} t={t} />}
     <div className="space-y-2 px-1 text-sm" style={{ color: t.dim }}>
       <p><span className="mr-2 inline-block h-3 w-3 rounded-sm bg-[#23ad67]" />Qualification to the next stage</p>
-      <p><span className="mr-2 inline-block h-3 w-3 rounded-sm bg-[#dda92e]" />Possible qualification to the next stage</p>
+      <p><span className="mr-2 inline-block h-3 w-3 rounded-sm bg-[#f5c518]" />Third-place or provisional qualification</p>
       {result.wanted > 0 && <p>{result.wanted} third-placed {result.wanted === 1 ? "team advances" : "teams advance"}; ranked by points, goal difference, then goals scored.</p>}
     </div>
   </>;
 }
 
 function MatchLink({ match, teams, t, bracket = false, final = false }) {
-  const winner = knockoutRound(match.round) ? matchWinner(match) : null;
+  const winner = (bracket || match.shootout) && knockoutRound(match.round) ? matchWinner(match) : null;
   const side = (id) => winner && id !== winner ? { color: final ? "#d5dbea" : t.dim, textDecoration: "line-through" } : undefined;
-  const score = ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status) ? `${match.hs} - ${match.as}` : match.time || "TBD";
+  const showScore = match.abandoned || ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status);
+  const score = showScore ? `${match.hs} - ${match.as}` : match.time || "TBD";
   const pens = match.shootout && `Pen ${match.shootout.home} - ${match.shootout.away}`;
   return <Link href={`/match/${match.id}`} className={bracket ? "block rounded-xl px-3 py-2" : "grid min-h-16 grid-cols-[minmax(0,1fr)_66px_minmax(0,1fr)] items-center gap-1 px-2 py-2"}
     style={{ background: final ? "linear-gradient(125deg,#152f56,#432c61 58%,#75405a)" : bracket ? t.card : undefined, color: final ? "white" : t.text }}>
@@ -86,21 +87,20 @@ function MatchLink({ match, teams, t, bracket = false, final = false }) {
       {[["home", "hs"], ["away", "as"]].map(([key, metric]) => <div key={key} className="flex min-h-7 items-center gap-2 text-sm">
         <TeamMark id={match[key]} teams={teams} t={t} size={20} />
         <span className="min-w-0 flex-1 truncate" style={side(match[key])}>{teamName(teams, match[key])}</span>
-        <strong className={final ? "mr-7" : ""}>{score === "TBD" || !["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status) ? "·" : match[metric]}{match.shootout ? ` (${match.shootout[key]})` : ""}</strong>
+        <strong className={final ? "mr-7" : ""}>{showScore ? match[metric] : "·"}{match.shootout ? ` (${match.shootout[key]})` : ""}</strong>
       </div>)}
-      <p className="truncate text-xs" style={{ color: final ? "#e5deef" : t.dim }}>{[pens, match.venueName].filter(Boolean).join(" · ") || dated(match.date)}</p>
+      <p className="truncate text-xs" style={{ color: final ? "#e5deef" : t.dim }}>{[match.abandoned ? "Abandoned" : pens, match.venueName].filter(Boolean).join(" · ") || dated(match.date)}</p>
     </> : <>
       <span className="flex min-w-0 items-center justify-end gap-2 text-right text-sm font-semibold"><span className="min-w-0 break-words" style={side(match.home)}>{teamName(teams, match.home)}</span><TeamMark id={match.home} teams={teams} t={t} /></span>
-      <span className="text-center font-bold tabular-nums">{score}{pens && <small className="block whitespace-nowrap text-xs" style={{ color: t.dim }}>{pens}</small>}</span>
+      <span className="text-center font-bold tabular-nums">{score}{(match.abandoned || pens) && <small className="block whitespace-nowrap text-xs" style={{ color: t.dim }}>{match.abandoned ? "Abandoned" : pens}</small>}</span>
       <span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><TeamMark id={match.away} teams={teams} t={t} /><span className="min-w-0 break-words" style={side(match.away)}>{teamName(teams, match.away)}</span></span>
     </>}
   </Link>;
 }
 
-function Fixtures({ season, teams, t }) {
-  if (!season.matches.length) return <Empty t={t}>No fixtures in this edition.</Empty>;
+function FixtureSections({ matches, teams, t }) {
   return <div className="space-y-4">
-    {fixtureStages(season.matches).map(({ title, matches }) => (
+    {fixtureStages(matches).map(({ title, matches }) => (
       <section key={title} className="overflow-hidden rounded-2xl pb-3" style={{ background: t.card }}>
         <h2 className="mx-4 border-b py-4 text-lg font-extrabold sm:mx-6 sm:text-xl" style={{ borderColor: t.divider }}>{title}</h2>
         {matches.map((match, index) => <div key={match.id}>
@@ -108,16 +108,17 @@ function Fixtures({ season, teams, t }) {
             <h3 className="px-4 pt-3 text-sm font-semibold sm:px-6" style={{ color: t.dim }}>{dated(match.date)}</h3>
           )}
           <MatchLink match={match} teams={teams} t={t} />
+          {match.abandoned && <p className="px-4 pb-2 text-center text-xs" style={{ color: t.dim }}>{match.decisionReason}</p>}
         </div>)}
       </section>
     ))}
   </div>;
 }
 
-function Bracket({ season, teams, t }) {
+function Knockout({ matches, teams, t }) {
   const [stage, setStage] = useState(null);
   const rounds = new Map();
-  season.matches.forEach((match) => {
+  matches.forEach((match) => {
     const round = knockoutRound(match.round);
     if (!round) return;
     if (!rounds.has(round.name)) rounds.set(round.name, { ...round, matches: [] });
@@ -164,6 +165,9 @@ function Bracket({ season, teams, t }) {
         </div>
       </div>
     </div>
+    <div className="mt-6">
+      <FixtureSections matches={matches} teams={teams} t={t} />
+    </div>
   </>;
 }
 
@@ -194,15 +198,17 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
     </header>
     <main className="mx-auto max-w-4xl px-3 py-4">
       {tab === "Group Tables" && <Standings season={season} t={t} />}
-      {tab === "Knockout" && <Bracket key={keyFor(season)} season={season} teams={teams} t={t} />}
-      {tab === "Fixtures" && <Fixtures season={season} teams={teams} t={t} />}
+      {tab === "Knockout" && <Knockout key={keyFor(season)} matches={season.matches.filter((match) => knockoutRound(match.round))} teams={teams} t={t} />}
+      {tab === "Fixtures" && (season.matches.length
+        ? <FixtureSections matches={season.matches} teams={teams} t={t} />
+        : <Empty t={t}>No fixtures in this edition.</Empty>)}
       {tab === "Seasons" && state.seasons.map((item) => {
         const decidingMatch = seasonFinal(item.matches);
         const champion = decidingMatch && matchWinner(decidingMatch);
         const runnerUp = decidingMatch && (champion === decidingMatch.home ? decidingMatch.away : decidingMatch.home);
         return <article key={keyFor(item)} className="mb-3 rounded-2xl p-4" style={{ background: t.card, border: `1px solid ${t.divider}` }}>
           <button type="button" className="flex w-full items-center justify-between gap-2 text-left font-extrabold" onClick={() => { setSelection(keyFor(item)); setTab(champion ? "Knockout" : "Group Tables"); }}>
-            <span>{item.label}</span><span className="text-sm" style={{ color: t.dim }}>Open edition</span>
+            <span>{item.label}</span>
           </button>
           {champion ? <>
             <div className="mt-4 flex flex-wrap gap-5">{[[champion, "Winner"], [runnerUp, "Runner-up"]].map(([id, label]) =>

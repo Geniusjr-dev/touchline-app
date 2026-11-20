@@ -1,4 +1,5 @@
 "use client";
+import { competitionLabel } from "@/lib/competition-name.mjs";
 import { useCallback, useEffect, useState } from "react";
 import {
   addCompetition,
@@ -175,7 +176,7 @@ function CompetitionEditor({ competition, teams, onSaved }) {
   }
 
   async function removeCompetition() {
-    const confirmed = window.confirm(`Delete ${competition.name}? Its existing matches will remain in Touchline without this competition label.`);
+    const confirmed = window.confirm(`Delete ${competitionLabel(competition.name, competition.id)}? Its existing matches will remain in Touchline without this competition label.`);
     if (!confirmed) return;
     setMessage("");
     const { error } = await deleteCompetition(competition.id);
@@ -187,7 +188,7 @@ function CompetitionEditor({ competition, teams, onSaved }) {
   return (
     <div style={{ ...card, padding: 0, marginBottom: 12, overflow: "hidden" }}>
       <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, border: 0, background: "transparent", color: "#fff", cursor: "pointer" }}>
-        <span style={{ fontSize: 15, fontWeight: 750, textAlign: "left", flex: 1 }}>{competition.name}</span>
+        <span style={{ fontSize: 15, fontWeight: 750, textAlign: "left", flex: 1 }}>{competitionLabel(competition.name, competition.id)}</span>
         <span style={formatPill(competition.competition_type)}>{competition.competition_type || "tournament"}</span>
         <span style={editPill(open)}>{open ? "Close" : "Edit"}</span>
       </button>

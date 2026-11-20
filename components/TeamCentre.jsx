@@ -276,7 +276,7 @@ function MatchList({ title, matches, teams, t }) {
 function TeamMatchLine({ match, teams, t, large = false }) {
   const home = teams[match.home] || { name: "TBD", color: "#555" };
   const away = teams[match.away] || { name: "TBD", color: "#555" };
-  const score = match.status === "scheduled"
+  const score = match.abandoned ? `${match.hs} - ${match.as} (Abandoned)` : match.status === "scheduled"
     ? (match.time || "TBD")
     : match.status === "postponed"
       ? "Postponed"

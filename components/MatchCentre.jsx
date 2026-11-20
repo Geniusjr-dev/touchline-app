@@ -259,7 +259,7 @@ export default function MatchCentre({ id }) {
   const awayKitColor = m.awayKitColor || a.color || "#2563EB";
   const live = ["live", "ht", "et_live", "et_ht"].includes(m.status);
   const ended = ["ft", "awarded"].includes(m.status);
-  const unavailable = ["cancelled", "postponed"].includes(m.status);
+  const unavailable = !m.abandoned && ["cancelled", "postponed"].includes(m.status);
   const started = live || ended;
   const statsAvailable = statsAvailableForMatch(m, availabilityNow);
   const hasLineups = Object.values(d?.lineups || {}).some((lineup) => lineup.starters?.length || lineup.substitutes?.length);
@@ -334,6 +334,7 @@ export default function MatchCentre({ id }) {
             {m.status === "ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Half time · {breakClock(m)}</span>}
             {m.status === "et_ht" && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>Extra-time break · {breakClock(m)}</span>}
             {(m.status === "live" || m.status === "et_live") && <LiveMatchClock match={m} theme={t} announcedStoppage={announcedStoppage} />}
+            {m.abandoned && <span className="mt-1 text-sm font-bold" style={{ color: t.dim }}>Abandoned</span>}
             {ended && <span style={{ color: t.dim, fontSize: "var(--type-body)", fontWeight: 700, marginTop: 4 }}>{m.shootout ? `Pen ${m.shootout.home} - ${m.shootout.away}` : m.status === "awarded" ? "Awarded result" : "Full time"}</span>}
           </div>
           <Link aria-label={a.name} href={`/team/${m.away}`} className="flex flex-col items-center min-w-0">

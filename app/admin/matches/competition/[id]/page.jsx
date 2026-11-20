@@ -1,5 +1,6 @@
 "use client";
 
+import { competitionLabel } from "@/lib/competition-name.mjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -58,7 +59,7 @@ export default function CompetitionMatchesPage() {
     () => competitions.find((item) => item.id === competitionId),
     [competitionId, competitions]
   );
-  const competitionName = competition?.name || (competitionId === "unassigned" ? "Unassigned matches" : "Competition matches");
+  const competitionName = competitionLabel(competition?.name, competitionId) || (competitionId === "unassigned" ? "Unassigned matches" : "Competition matches");
 
   async function assignScorer(matchId, scorerId) {
     setError("");

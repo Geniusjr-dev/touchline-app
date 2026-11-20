@@ -1,4 +1,5 @@
 "use client";
+import { competitionLabel } from "@/lib/competition-name.mjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -104,7 +105,7 @@ export default function Matches() {
           <Field label="Competition" className="admin-field-wide">
             <select value={comp} onChange={(e) => { setComp(e.target.value); setGroupNumber(""); setHome(""); setAway(""); }} style={inp}>
               <option value="">Choose format and competition</option>
-              {comps.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.competition_type || "tournament"}{c.sub ? ` · ${c.sub}` : ""}</option>)}
+              {comps.map((c) => <option key={c.id} value={c.id}>{competitionLabel(c.name, c.id)} · {c.competition_type || "tournament"}{c.sub ? ` · ${c.sub}` : ""}</option>)}
             </select>
           </Field>
           {selectedCompetition?.competition_type === "tournament" && (
@@ -190,7 +191,7 @@ export default function Matches() {
           return (
             <Link key={competition.id} href={`/admin/matches/competition/${competition.id}`} className="admin-competition-card w-full flex items-center" style={{ ...card, padding: "16px 18px", gap: 14, color: "#FFFFFF", textAlign: "left", textDecoration: "none" }}>
                 <span className="inline-flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "#22252A", color: "#4FC263", fontSize: 16 }}>🏆</span>
-                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 16, fontWeight: 700 }}>{competition.name}</span><span className="block" style={{ color: "#8E939B", fontSize: 13, marginTop: 4 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
+                <span style={{ flex: 1, minWidth: 0 }}><span className="block truncate" style={{ fontSize: 16, fontWeight: 700 }}>{competitionLabel(competition.name, competition.id)}</span><span className="block" style={{ color: "#8E939B", fontSize: 13, marginTop: 4 }}>{competition.matches.length} {competition.matches.length === 1 ? "match" : "matches"} · {scheduledCount} scheduled</span></span>
                 <ChevronRight size={22} color="#8E939B" />
             </Link>
           );

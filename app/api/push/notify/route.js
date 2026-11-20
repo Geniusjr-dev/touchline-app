@@ -19,13 +19,13 @@ export async function POST(request) {
     if (["event", "scorer"].includes(kind) && !eventId) {
       return Response.json({ error: "An event is required for this notification." }, { status: 400 });
     }
-    const { admin } = await requireMatchScorer(request, matchId);
+    const { admin, match } = await requireMatchScorer(request, matchId);
     const message = await buildMatchNotification(admin, matchId, kind, eventId, previousStatus);
     if (!message) return Response.json({ skipped: true, reason: "event_not_notifiable" });
-    const result = await sendMatchNotification(admin, matchId, message);
+    const result = await sendMatchNotification(admin, match, message, kind !== "test");
     if (!result.linked) {
       return Response.json({
-        error: "No phones are subscribed to this match. Open this exact match on the phone and turn on its notification bell.",
+        error: "No devices are subscribed to this match or either team.",
         ...result,
       }, { status: 409 });
     }

@@ -315,7 +315,7 @@ export default function MatchCentre({ id }) {
               <Share2 size={21} color={t.text} />
             </button>
             <span style={{ width: 1, height: 26, background: t.divider }} />
-            <MatchNotificationButton matchId={m.id} status={m.status} color={t.text} />
+            <MatchNotificationButton key={m.id} matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
 

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { BottomNav, Crest } from "@/components/ui";
+import { formatMatchDate as dated } from "@/lib/match-date.mjs";
 import { fixtureStages, knockoutRound, matchWinner, qualification, seasonFinal } from "@/lib/tournament.mjs";
 
 const tabs = ["Group Tables", "Knockout", "Fixtures", "Seasons"];
 const finished = (match) => ["ft", "awarded", "cancelled"].includes(match.status);
-const dated = (date) => date ? new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Date to be confirmed";
 const teamName = (teams, id) => teams[id]?.name || "TBD";
 const keyFor = (season) => season.id || "legacy";
 
@@ -76,23 +76,34 @@ function Standings({ season, t }) {
 
 function MatchLink({ match, teams, t, bracket = false, final = false }) {
   const winner = (bracket || match.shootout) && knockoutRound(match.round) ? matchWinner(match) : null;
-  const side = (id) => winner && id !== winner ? { color: final ? "#d5dbea" : t.dim, textDecoration: "line-through" } : undefined;
+  const side = (id) => winner && id !== winner ? { color: t.dim, textDecoration: "line-through" } : undefined;
   const showScore = match.abandoned || ["live", "ht", "et_live", "et_ht", "ft", "awarded"].includes(match.status);
   const score = showScore ? `${match.hs} - ${match.as}` : match.time || "TBD";
-  const pens = match.shootout && `Pen ${match.shootout.home} - ${match.shootout.away}`;
+  const pens = Boolean(match.shootout);
+  if (final) return <Link href={`/match/${match.id}`} className="block rounded-xl bg-gradient-to-br from-[#172f57] to-[#713c5a] px-2 py-3 text-white sm:px-4">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-1 text-center sm:gap-3">
+      {["home", "away"].map((key) => <div key={key} className={`flex min-w-0 flex-col items-center gap-1 ${key === "home" ? "col-start-1" : "col-start-3"} row-start-1`}>
+        <TeamMark id={match[key]} teams={teams} t={t} size={28} />
+        <span className="w-full truncate text-xs font-bold" title={teamName(teams, match[key])}>{teamName(teams, match[key])}</span>
+        <strong className="text-sm tabular-nums">{showScore ? match[key === "home" ? "hs" : "as"] : "·"}</strong>
+      </div>)}
+      <Trophy aria-hidden="true" className="col-start-2 row-start-1 mt-2 h-5 w-5 text-[#f5d889] sm:h-8 sm:w-8" />
+    </div>
+    <p className="mt-2 text-center text-xs text-white/85">{[match.abandoned ? "Abandoned" : pens ? "Pen" : null, dated(match.date), match.venueName].filter(Boolean).join(" · ")}</p>
+  </Link>;
   return <Link href={`/match/${match.id}`} className={bracket ? "block rounded-xl px-3 py-2" : "grid min-h-16 grid-cols-[minmax(0,1fr)_66px_minmax(0,1fr)] items-center gap-1 px-2 py-2"}
-    style={{ background: final ? "linear-gradient(125deg,#152f56,#432c61 58%,#75405a)" : bracket ? t.card : undefined, color: final ? "white" : t.text }}>
+    style={{ background: bracket ? t.card : undefined, color: t.text }}>
     {bracket ? <>
-      {final && <Trophy aria-hidden="true" size={19} color="#f5d889" className="absolute right-3 top-2" />}
       {[["home", "hs"], ["away", "as"]].map(([key, metric]) => <div key={key} className="flex min-h-7 items-center gap-2 text-sm">
         <TeamMark id={match[key]} teams={teams} t={t} size={20} />
         <span className="min-w-0 flex-1 truncate" style={side(match[key])}>{teamName(teams, match[key])}</span>
-        <strong className={final ? "mr-7" : ""}>{showScore ? match[metric] : "·"}{match.shootout ? ` (${match.shootout[key]})` : ""}</strong>
+        <strong className="shrink-0 tabular-nums">{showScore ? match[metric] : "·"}</strong>
       </div>)}
-      <p className="truncate text-xs" style={{ color: final ? "#e5deef" : t.dim }}>{[match.abandoned ? "Abandoned" : pens, match.venueName].filter(Boolean).join(" · ") || dated(match.date)}</p>
+      <p className="text-xs" style={{ color: t.dim }}>{[match.abandoned ? "Abandoned" : pens ? "Pen" : null, dated(match.date)].filter(Boolean).join(" · ")}</p>
+      {match.venueName && <p className="truncate text-xs" title={match.venueName} style={{ color: t.dim }}>{match.venueName}</p>}
     </> : <>
       <span className="flex min-w-0 items-center justify-end gap-2 text-right text-sm font-semibold"><span className="min-w-0 break-words" style={side(match.home)}>{teamName(teams, match.home)}</span><TeamMark id={match.home} teams={teams} t={t} /></span>
-      <span className="text-center font-bold tabular-nums">{score}{(match.abandoned || pens) && <small className="block whitespace-nowrap text-xs" style={{ color: t.dim }}>{match.abandoned ? "Abandoned" : pens}</small>}</span>
+      <span className="text-center font-bold tabular-nums">{score}{(match.abandoned || pens) && <small className="block whitespace-nowrap text-xs" style={{ color: t.dim }}>{match.abandoned ? "Abandoned" : "Pen"}</small>}</span>
       <span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><TeamMark id={match.away} teams={teams} t={t} /><span className="min-w-0 break-words" style={side(match.away)}>{teamName(teams, match.away)}</span></span>
     </>}
   </Link>;
@@ -102,7 +113,7 @@ function FixtureSections({ matches, teams, t }) {
   return <div className="space-y-4">
     {fixtureStages(matches).map(({ title, matches }) => (
       <section key={title} className="overflow-hidden rounded-2xl pb-3" style={{ background: t.card }}>
-        <h2 className="mx-4 border-b py-4 text-lg font-extrabold sm:mx-6 sm:text-xl" style={{ borderColor: t.divider }}>{title}</h2>
+        <h2 className="mx-4 py-4 text-lg font-extrabold sm:mx-6 sm:text-xl">{title}</h2>
         {matches.map((match, index) => <div key={match.id}>
           {(index === 0 || matches[index - 1].date !== match.date) && (
             <h3 className="px-4 pt-3 text-sm font-semibold sm:px-6" style={{ color: t.dim }}>{dated(match.date)}</h3>
@@ -130,43 +141,33 @@ function Knockout({ matches, teams, t }) {
   const currentRound = ordered[start];
   const nextRound = currentRound.name === "Third place" ? null : ordered.slice(start + 1).find((round) => round.name !== "Third place");
   const columns = nextRound ? [currentRound, nextRound] : [currentRound];
-  const width = 225;
-  const gap = 28;
-  const step = 106;
-  const left = columns[0].matches.map((match, index) => ({ match, y: index * step }));
-  const connected = (source, target) => {
-    const winner = matchWinner(source);
-    return winner && (target.home === winner || target.away === winner);
-  };
+  const step = 152;
+  const left = currentRound.matches.map((match, index) => ({ match, y: index * step }));
   const right = [];
-  columns[1]?.matches.forEach((match, index) => {
-    const feeds = columns[1].name === "Third place" ? [] : left.filter((entry) => connected(entry.match, match));
+  nextRound?.matches.forEach((match, index) => {
+    const feeds = left.filter(({ match: source }) => {
+      const winner = matchWinner(source);
+      return winner && (match.home === winner || match.away === winner);
+    });
     const ideal = feeds.length ? feeds.reduce((sum, entry) => sum + entry.y, 0) / feeds.length : index * step;
-    right.push({ match, feeds, y: Math.max(ideal, right.length ? right.at(-1).y + step : 0) });
+    right.push({ match, y: Math.max(ideal, right.length ? right.at(-1).y + step : 0) });
   });
-  const height = Math.max(96, ...[...left, ...right].map((item) => item.y + 96));
+  const height = Math.max(step, ...[...left, ...right].map(({ y }) => y + step));
   return <>
-    <Controls label="Knockout rounds" options={ordered.map(({ name }) => name)} selected={columns[0].name} onChange={setStage} t={t} />
-    <div className="mt-4 overflow-x-auto pb-3">
-      <div style={{ width: columns.length === 2 ? 2 * width + gap : width }}>
-        <div className="flex" style={{ gap }}>
-          {columns.map((round) => <div key={round.name} style={{ width }} className="mb-3 shrink-0 px-1">
-            <h2 className="font-bold">{round.name}</h2>
-            <p className="text-xs" style={{ color: t.dim }}>{dated(round.matches[0]?.date)}</p>
-          </div>)}
-        </div>
-        <div className="relative" style={{ height }}>
-          {right.length > 0 && <svg aria-hidden="true" className="pointer-events-none absolute inset-0" width={2 * width + gap} height={height}>
-            {right.flatMap(({ match, y, feeds }) => feeds.map((feed) => <path key={`${feed.match.id}-${match.id}`} d={`M ${width} ${feed.y + 43} H ${width + gap / 2} V ${y + 43} H ${width + gap}`} fill="none" stroke={t.dim} strokeWidth="1.5" />))}
-          </svg>}
-          {[left, right].map((items, col) => items.map(({ match, y }) => <div key={match.id} className="absolute" style={{ width, top: y, left: col * (width + gap) }}>
-            <MatchLink match={match} teams={teams} t={t} bracket final={columns[col].name === "Final"} />
-          </div>))}
-        </div>
-      </div>
-    </div>
-    <div className="mt-6">
-      <FixtureSections matches={matches} teams={teams} t={t} />
+    <Controls label="Knockout rounds" options={ordered.map(({ name }) => name)} selected={currentRound.name} onChange={setStage} t={t} />
+    <div className={`mt-4 grid gap-2 sm:gap-4 ${nextRound ? "grid-cols-2" : "grid-cols-1"}`}>
+      {columns.map((round, index) => (
+        <section key={round.name} className="min-w-0">
+          <h2 className="mb-2 px-1 text-sm font-bold sm:text-base">{round.name}</h2>
+          <div className="relative" style={{ height }}>
+            {(index === 0 ? left : right).map(({ match, y }) => (
+              <div key={match.id} className="absolute inset-x-0" style={{ top: y }}>
+                <MatchLink match={match} teams={teams} t={t} bracket final={round.name === "Final"} />
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   </>;
 }

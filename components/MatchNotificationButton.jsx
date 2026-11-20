@@ -36,41 +36,41 @@ async function browserSubscription() {
   return { registration, subscription: await registration.pushManager.getSubscription() };
 }
 
-async function savePreference(matchId, subscription, action, method = "POST") {
+async function savePreference(target, subscription, action, method = "POST") {
   const response = await fetch("/api/push/subscriptions", {
     method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ matchId, subscription: subscription.toJSON(), action }),
+    body: JSON.stringify({ ...target, subscription: subscription.toJSON(), action }),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || "The match alert could not be changed.");
+  if (!response.ok) throw new Error(result.error || "The notification preference could not be changed.");
   return result;
 }
 
-export default function MatchNotificationButton({ matchId, status, color = "#FFFFFF", size = 19, compact = false }) {
+export default function MatchNotificationButton({ matchId, teamId, status, color = "#FFFFFF", size = 19, compact = false }) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
-  const acceptsAlerts = !["ft", "awarded", "cancelled"].includes(status);
+  const acceptsAlerts = Boolean(teamId) || !["ft", "awarded", "cancelled"].includes(status);
+  const notificationType = teamId ? "team" : "match";
 
   useEffect(() => {
     let alive = true;
-    if (!acceptsAlerts || typeof window === "undefined" || !supported()) return undefined;
+    if (typeof window === "undefined" || !supported()) return undefined;
     browserSubscription()
       .then(async ({ subscription }) => {
         if (!subscription) return;
-        const result = await savePreference(matchId, subscription, "status");
+        const result = await savePreference({ matchId, teamId }, subscription, "status");
         if (alive) setEnabled(Boolean(result.enabled));
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, [matchId, acceptsAlerts]);
-
-  if (!acceptsAlerts) return null;
+  }, [matchId, teamId]);
 
   async function toggle() {
-    if (busy) return;
+    if (busy || (!acceptsAlerts && !enabled)) return;
+    const target = { matchId, teamId };
     if (!supported()) {
-      window.alert("Match notifications are not supported by this browser.");
+      window.alert("Notifications are not supported by this browser.");
       return;
     }
     if (!enabled && iPhoneNeedsInstallation()) {
@@ -81,7 +81,7 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
     try {
       if (enabled) {
         const current = await browserSubscription();
-        if (current.subscription) await savePreference(matchId, current.subscription, "unsubscribe", "DELETE");
+        if (current.subscription) await savePreference(target, current.subscription, "unsubscribe", "DELETE");
         setEnabled(false);
         return;
       }
@@ -94,7 +94,7 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
       const current = await browserSubscription();
       const configResponse = await fetch("/api/push/config", { cache: "no-store" });
       const config = await configResponse.json();
-      if (!config.ready || !config.publicKey) throw new Error("Match notifications are not configured yet.");
+      if (!config.ready || !config.publicKey) throw new Error("Notifications are not configured yet.");
       let subscription = current.subscription;
       const savedApplicationKey = applicationServerKey(subscription);
       if (subscription && savedApplicationKey && savedApplicationKey !== config.publicKey) {
@@ -105,10 +105,10 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(config.publicKey),
       });
-      await savePreference(matchId, subscription, "subscribe");
+      await savePreference(target, subscription, "subscribe");
       setEnabled(true);
     } catch (error) {
-      window.alert(error.message || "The match alert could not be changed.");
+      window.alert(error.message || "The notification preference could not be changed.");
     } finally {
       setBusy(false);
     }
@@ -118,10 +118,11 @@ export default function MatchNotificationButton({ matchId, status, color = "#FFF
   return (
     <button
       type="button"
-      aria-label={enabled ? "Turn off match notifications" : "Turn on match notifications"}
+      aria-label={`Turn ${enabled ? "off" : "on"} ${notificationType} notifications`}
+      disabled={busy || (!acceptsAlerts && !enabled)}
       aria-pressed={enabled}
       aria-busy={busy}
-      title={enabled ? "Match notifications on" : "Turn on match notifications"}
+      title={!acceptsAlerts && !enabled ? "This match has ended" : `Turn ${enabled ? "off" : "on"} ${notificationType} notifications`}
       onClick={toggle}
       className="flex items-center justify-center"
       style={{ width: compact ? 28 : 40, height: compact ? 28 : 38, opacity: busy ? 0.55 : 1 }}

@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronLeft, ChevronRight, ShieldCheck, Trophy } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShieldCheck, Trophy } from "lucide-react";
 import { getTeamCentre, liveMinute, peekTeamCentre } from "@/lib/db";
 import { cachePublicMatch } from "@/lib/matchCache";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/theme";
+import MatchNotificationButton from "@/components/MatchNotificationButton";
+import { formatMatchDate } from "@/lib/match-date.mjs";
+import { matchWinner } from "@/lib/tournament.mjs";
 import { BottomNav, Crest } from "@/components/ui";
 
 const TABS = ["Overview", "Matches", "Table", "Stats", "Squad", "Trophies"];
@@ -45,20 +48,11 @@ function ageFromDate(date) {
 }
 
 function matchSortValue(match) {
-  return `${match.date || "0000-00-00"}T${match.time || "00:00"}`;
+  return `${match.date || "9999-12-31"}T${match.time || "00:00"}`;
 }
 
-function dayLabel(date, includeRelative = true) {
-  if (!date) return "Date TBC";
-  const target = new Date(`${date}T12:00:00`);
-  const today = new Date();
-  const todayKey = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const targetKey = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-  const difference = Math.round((targetKey - todayKey) / 86400000);
-  if (includeRelative && difference === 0) return "Today";
-  if (includeRelative && difference === 1) return "Tomorrow";
-  if (includeRelative && difference === -1) return "Yesterday";
-  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(target);
+function dayLabel(date, weekday = true) {
+  return formatMatchDate(date, { weekday, fallback: "Date TBC" });
 }
 
 function scoreForTeam(match, teamId) {
@@ -131,7 +125,7 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
           </button>
           <div className="flex items-center rounded-full" style={{ height: 40, padding: 3, background: headerTint, border: `1px solid ${headerBorder}` }}>
             <span className="flex items-center justify-center" style={{ width: 34 }}><ShieldCheck size={19} /></span>
-            <span className="flex items-center justify-center" style={{ width: 34 }}><Bell size={18} /></span>
+            <MatchNotificationButton key={team.id} teamId={team.id} color={headerText} compact />
             <button aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: headerText, color: lightClub ? "#FFFFFF" : "#000000", fontWeight: 850, fontSize: "var(--type-label)" }}>
               {following ? "Following" : "Follow"}
             </button>
@@ -144,7 +138,7 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
             <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
-        <nav aria-label="Club sections" className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${headerBorder}` }}>
+        <nav aria-label="Club sections" className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48 }}>
           {tabs.map((item) => (
             <button key={item} aria-pressed={activeTab === item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: headerText, fontSize: "var(--type-emphasis)", fontWeight: activeTab === item ? 800 : 600 }}>
               {item}
@@ -180,7 +174,7 @@ function TeamPageShell({ t, onBack, error, onRetry }) {
         <div className="rounded-md" style={{ width: 82, height: 12, background: t.chip, marginTop: 10 }} />
       </div>
     </div>
-    <div style={{ height: 48, background: t.card, borderTop: `1px solid ${t.divider}`, borderBottom: `1px solid ${t.divider}` }} />
+    <div style={{ height: 48, background: t.card }} />
     {error && <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card }}>
       <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{error}</div>
       <button onClick={onRetry} style={{ marginTop: 12, padding: "8px 14px", borderRadius: 9, background: t.accent, color: "#07130B", fontSize: "var(--type-body)", fontWeight: 800 }}>Try again</button>
@@ -245,25 +239,18 @@ function Overview({ state, t, onMatches }) {
 
 function Matches({ state, t }) {
   const ordered = [...state.matches].sort((a, b) => matchSortValue(a).localeCompare(matchSortValue(b)));
-  const previous = ordered.filter((match) => ["ft", "awarded"].includes(match.status)).reverse();
-  const upcoming = ordered.filter((match) => !["ft", "awarded"].includes(match.status));
-  return (
-    <>
-      {previous.length > 0 && <MatchList title="Previous matches" matches={previous} teams={state.teams} t={t} />}
-      {upcoming.length > 0 && <MatchList title="Upcoming matches" matches={upcoming} teams={state.teams} t={t} />}
-      {previous.length === 0 && upcoming.length === 0 && <Card t={t} style={{ height: 150 }} />}
-    </>
-  );
+  return ordered.length
+    ? <MatchList matches={ordered} teams={state.teams} t={t} />
+    : <Card t={t} style={{ height: 150 }} />;
 }
 
-function MatchList({ title, matches, teams, t }) {
+function MatchList({ matches, teams, t }) {
   return (
     <Card t={t}>
-      <SectionTitle t={t}>{title}</SectionTitle>
       {matches.map((match) => (
-        <div key={match.id} style={{ borderTop: `1px solid ${t.divider}` }}>
+        <div key={match.id}>
           <div className="flex items-center justify-between px-4 pt-3" style={{ color: t.dim, fontSize: "var(--type-caption)", fontWeight: 650 }}>
-            <span>{dayLabel(match.date)}</span>
+            <span>{dayLabel(match.date, false)}</span>
             <span className="rounded-full" style={{ background: t.chip, padding: "4px 8px", textTransform: "uppercase", fontSize: "var(--type-badge)" }}>{match.competitionName}</span>
           </div>
           <TeamMatchLine match={match} teams={teams} t={t} />
@@ -276,6 +263,9 @@ function MatchList({ title, matches, teams, t }) {
 function TeamMatchLine({ match, teams, t, large = false }) {
   const home = teams[match.home] || { name: "TBD", color: "#555" };
   const away = teams[match.away] || { name: "TBD", color: "#555" };
+  const shootoutWinner = match.competitionType === "tournament" && match.shootout ? matchWinner(match) : null;
+  const teamDecoration = (teamId) => shootoutWinner && teamId !== shootoutWinner ? "line-through" : undefined;
+  const resultColor = { W: "#16814d", L: "#b52d35", D: "#616975" }[match.result];
   const score = match.abandoned ? `${match.hs} - ${match.as} (Abandoned)` : match.status === "scheduled"
     ? (match.time || "TBD")
     : match.status === "postponed"
@@ -288,13 +278,16 @@ function TeamMatchLine({ match, teams, t, large = false }) {
   return (
     <Link href={`/match/${match.id}`} onPointerDown={() => cachePublicMatch(match, teams)} onClick={() => cachePublicMatch(match, teams)} className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: large ? 10 : 8, minHeight: large ? 88 : 70, padding: "11px 15px" }}>
       <div className="flex items-center justify-end gap-2 min-w-0">
-        <span className="text-right" style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
+        <span className="text-right" style={{ color: t.text, textDecoration: teamDecoration(match.home), fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{home.name}</span>
         <Crest color={home.color} logo={home.logoUrl} label={home.name} size={large ? 34 : 28} ring={t.divider} />
       </div>
-      <span style={{ color: match.status === "live" ? t.green : match.status === "scheduled" ? t.dim : t.text, fontSize: large ? 16 : 14, fontWeight: 800, whiteSpace: "nowrap" }}>{score}</span>
+      <div className="text-center">
+        <span className="inline-block rounded-md px-2 py-1 tabular-nums" style={{ background: resultColor, color: resultColor ? "#fff" : match.status === "live" ? t.green : t.text, fontSize: large ? 16 : 14, fontWeight: 800, whiteSpace: "nowrap" }}>{score}</span>
+        {shootoutWinner && <small className="block" style={{ color: t.dim }}>Pen</small>}
+      </div>
       <div className="flex items-center gap-2 min-w-0">
         <Crest color={away.color} logo={away.logoUrl} label={away.name} size={large ? 34 : 28} ring={t.divider} />
-        <span style={{ color: t.text, fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{away.name}</span>
+        <span style={{ color: t.text, textDecoration: teamDecoration(match.away), fontSize: large ? 14 : 13, fontWeight: 700, lineHeight: 1.15 }}>{away.name}</span>
       </div>
     </Link>
   );

@@ -14,38 +14,50 @@ function validSubscription(subscription) {
 async function parseRequest(request) {
   if (!sameOriginRequest(request)) throw new Error("The notification request origin is invalid.");
   const body = await request.json();
-  if (!body?.matchId || !validSubscription(body.subscription)) {
-    throw new Error("A valid match and device subscription are required.");
+  if (Boolean(body?.matchId) === Boolean(body?.teamId) || !validSubscription(body.subscription)) {
+    throw new Error("A valid team or match and device subscription are required.");
   }
-  return body;
+  const team = Boolean(body.teamId);
+  return {
+    ...body,
+    targetId: team ? body.teamId : body.matchId,
+    targetTable: team ? "teams" : "matches",
+    linkTable: team ? "team_push_subscriptions" : "match_push_subscriptions",
+    targetColumn: team ? "team_id" : "match_id",
+  };
 }
 
 export async function POST(request) {
   try {
     if (!pushIsConfigured()) return Response.json({ error: "Match notifications are not configured." }, { status: 503 });
-    const { matchId, subscription, action = "subscribe" } = await parseRequest(request);
+    const { targetId, targetTable, linkTable, targetColumn, subscription, action = "subscribe" } = await parseRequest(request);
     const admin = getPushAdminClient();
-    const { data: match } = await admin.from("matches").select("id,status").eq("id", matchId).maybeSingle();
-    if (!match) return Response.json({ error: "Match not found." }, { status: 404 });
+    const { data: target, error: targetError } = await admin.from(targetTable)
+      .select(targetTable === "matches" ? "id,status" : "id").eq("id", targetId).maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) return Response.json({ error: "Team or match not found." }, { status: 404 });
 
-    const { data: existing } = await admin
+    const { data: existing, error: existingError } = await admin
       .from("push_subscriptions")
       .select("id")
       .eq("endpoint", subscription.endpoint)
       .maybeSingle();
 
+    if (existingError) throw existingError;
+
     if (action === "status") {
       if (!existing) return Response.json({ enabled: false });
-      const { data: link } = await admin
-        .from("match_push_subscriptions")
-        .select("match_id")
+      const { data: link, error: lookupError } = await admin
+        .from(linkTable)
+        .select(targetColumn)
         .eq("push_subscription_id", existing.id)
-        .eq("match_id", matchId)
+        .eq(targetColumn, targetId)
         .maybeSingle();
+      if (lookupError) throw lookupError;
       return Response.json({ enabled: Boolean(link) });
     }
 
-    if (["ft", "cancelled"].includes(match.status)) {
+    if (["ft", "awarded", "cancelled"].includes(target.status)) {
       return Response.json({ error: "This match is no longer accepting new alerts." }, { status: 409 });
     }
 
@@ -63,8 +75,8 @@ export async function POST(request) {
       .single();
     if (saveError) throw saveError;
     const { error: linkError } = await admin
-      .from("match_push_subscriptions")
-      .upsert({ push_subscription_id: saved.id, match_id: matchId }, { onConflict: "push_subscription_id,match_id" });
+      .from(linkTable)
+      .upsert({ push_subscription_id: saved.id, [targetColumn]: targetId }, { onConflict: `push_subscription_id,${targetColumn}` });
     if (linkError) throw linkError;
     return Response.json({ enabled: true });
   } catch (error) {
@@ -75,24 +87,21 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     if (!pushIsConfigured()) return Response.json({ error: "Match notifications are not configured." }, { status: 503 });
-    const { matchId, subscription } = await parseRequest(request);
+    const { targetId, linkTable, targetColumn, subscription } = await parseRequest(request);
     const admin = getPushAdminClient();
-    const { data: saved } = await admin
+    const { data: saved, error: lookupError } = await admin
       .from("push_subscriptions")
       .select("id")
       .eq("endpoint", subscription.endpoint)
       .maybeSingle();
+    if (lookupError) throw lookupError;
     if (!saved) return Response.json({ enabled: false });
-    await admin
-      .from("match_push_subscriptions")
+    const { error: removeError } = await admin
+      .from(linkTable)
       .delete()
       .eq("push_subscription_id", saved.id)
-      .eq("match_id", matchId);
-    const { count } = await admin
-      .from("match_push_subscriptions")
-      .select("match_id", { count: "exact", head: true })
-      .eq("push_subscription_id", saved.id);
-    if (!count) await admin.from("push_subscriptions").delete().eq("id", saved.id);
+      .eq(targetColumn, targetId);
+    if (removeError) throw removeError;
     return Response.json({ enabled: false });
   } catch (error) {
     return Response.json({ error: error.message || "The notification preference could not be removed." }, { status: 400 });

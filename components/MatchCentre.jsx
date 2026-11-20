@@ -304,8 +304,7 @@ export default function MatchCentre({ id }) {
 
   return (
     <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
-      {/* The complete match identity, score and tabs remain visible while content scrolls. */}
-      <div className="match-centre-header" style={{ position: "sticky", top: 0, zIndex: 70, background: t.bg, boxShadow: `0 1px 0 ${t.divider}`, transform: "translateZ(0)", isolation: "isolate" }}>
+      <div className="match-centre-header" style={{ background: t.bg }}>
         <div className="match-centre-toolbar flex items-center justify-between px-4" style={{ height: 64 }}>
           <button aria-label="Return to matches" onClick={goBack} className="flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: t.pill, border: `1px solid ${t.pillBorder}`, boxShadow: "0 5px 16px rgba(0,0,0,0.08)" }}>
             <ChevronLeft size={27} color={t.text} />
@@ -314,7 +313,6 @@ export default function MatchCentre({ id }) {
             <button aria-label="Share match" onClick={shareMatch} className="flex items-center justify-center" style={{ width: 48, height: 48 }}>
               <Share2 size={21} color={t.text} />
             </button>
-            <span style={{ width: 1, height: 26, background: t.divider }} />
             <MatchNotificationButton key={m.id} matchId={m.id} status={m.status} color={t.text} />
           </div>
         </div>
@@ -355,7 +353,7 @@ export default function MatchCentre({ id }) {
           </div>
         )}
 
-        <div ref={tabStripRef} className="match-centre-tabs flex items-center gap-7 px-5 overflow-x-auto no-scrollbar" style={{ height: 54, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }}>
+        <div ref={tabStripRef} className="match-centre-tabs flex items-center gap-7 px-5 overflow-x-auto no-scrollbar" style={{ height: 54 }}>
           {tabs.map((tb) => {
             const on = tb === activeTab;
             return (
@@ -399,7 +397,7 @@ function MatchPageShell({ t, onBack, error, onRetry }) {
         <div className="rounded-lg mx-auto" style={{ width: 54, height: 24, background: t.card }} />
         <div className="rounded-full mx-auto" style={{ width: 44, height: 44, background: t.card }} />
       </div>
-      <div style={{ height: 46, borderBottom: `1px solid ${t.divider}`, borderTop: `1px solid ${t.divider}` }} />
+      <div style={{ height: 46 }} />
       {error && (
         <div className="mx-3 mt-4 rounded-2xl" style={{ padding: 18, background: t.card, color: t.text }}>
           <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 700 }}>{error}</div>
@@ -1224,7 +1222,7 @@ function TableTab({ t, m, rows }) {
       </div>
 
       <div className="mx-2 my-2 rounded-2xl overflow-hidden" style={{ background: t.card }}>
-        <div className="flex items-center gap-2 px-4 py-4" style={{ borderBottom: `1px solid ${t.divider}` }}>
+        <div className="flex items-center gap-2 px-4 py-4">
           {m.competitionLogoUrl && <Crest logo={m.competitionLogoUrl} label={m.compName || "Competition"} size={24} ring={t.divider} />}
           <span className="truncate" style={{ color: t.text, fontSize: "var(--type-emphasis)", fontWeight: 850 }}>{m.compName || "Competition table"}</span>
           {isLive && (
@@ -1258,7 +1256,6 @@ function TableTab({ t, m, rows }) {
             </>
           )}
         </div>
-        <div style={{ height: 1, background: t.divider }} />
 
         {scopedRows.map((tm, index) => {
           const goalDifference = tm.gf - tm.ga;
@@ -1272,7 +1269,7 @@ function TableTab({ t, m, rows }) {
           const championPosition = m.competitionType === "league" && index === 0;
           const form = (tm.form || []).slice(-5);
           return (
-            <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent", borderBottom: `1px solid ${t.divider}` }}>
+            <div key={tm.id} className="flex items-center px-3" style={{ minHeight: 54, background: highlighted ? t.hl : "transparent" }}>
               <div className="flex items-center" style={{ width: 28, alignSelf: "stretch" }}>
                 <span style={{ width: 3, height: "100%", maxHeight: 46, borderRadius: 2, background: championPosition ? t.yellow : qualifies ? t.accent : "transparent", marginRight: 6 }} />
                 <span className="league-table-number" style={{ color: t.dim, fontSize: "var(--type-body)" }}>{index + 1}</span>

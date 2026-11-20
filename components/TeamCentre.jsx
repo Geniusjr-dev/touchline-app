@@ -113,19 +113,26 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
   }
 
   const { team } = state;
-  const tabs = state.tableCompetition ? TABS : TABS.filter((item) => item !== "Table");
+  const tabs = TABS.filter((item) => (item !== "Table" || state.tableCompetition) && (item !== "Trophies" || state.trophies.length));
+  const clubColor = /^#[0-9a-f]{6}$/i.test(team.color || "") ? team.color : "#253448";
+  const channels = clubColor.slice(1).match(/../g).map((channel) => parseInt(channel, 16) / 255)
+    .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const lightClub = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722 > 0.179;
+  const headerText = lightClub ? "#000000" : "#FFFFFF";
+  const headerTint = lightClub ? "rgb(0 0 0 / 9%)" : "rgb(255 255 255 / 12%)";
+  const headerBorder = lightClub ? "rgb(0 0 0 / 28%)" : "rgb(255 255 255 / 30%)";
   const activeTab = tabs.includes(tab) ? tab : "Overview";
   return (
     <div className="touchline-public-shell" style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
-      <header className="touchline-public-header" style={{ background: t.card }}>
+      <header className="touchline-public-header" style={{ background: `linear-gradient(155deg, transparent, ${lightClub ? "rgb(255 255 255 / 15%)" : "rgb(0 0 0 / 18%)"}), ${clubColor}`, color: headerText }}>
         <div className="touchline-header-inner flex items-center justify-between px-3" style={{ height: 56 }}>
-          <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: headerTint, border: `1px solid ${headerBorder}` }}>
             <ChevronLeft size={22} />
           </button>
-          <div className="flex items-center rounded-full" style={{ height: 40, padding: 3, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
+          <div className="flex items-center rounded-full" style={{ height: 40, padding: 3, background: headerTint, border: `1px solid ${headerBorder}` }}>
             <span className="flex items-center justify-center" style={{ width: 34 }}><ShieldCheck size={19} /></span>
             <span className="flex items-center justify-center" style={{ width: 34 }}><Bell size={18} /></span>
-            <button onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: following ? t.accent : t.text, color: following ? "#07130B" : t.bg, fontWeight: 850, fontSize: "var(--type-label)" }}>
+            <button aria-pressed={following} onClick={() => setFollowing((value) => !value)} className="rounded-full" style={{ height: 32, padding: "0 15px", background: headerText, color: lightClub ? "#FFFFFF" : "#000000", fontWeight: 850, fontSize: "var(--type-label)" }}>
               {following ? "Following" : "Follow"}
             </button>
           </div>
@@ -133,15 +140,15 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
         <div className="touchline-header-inner flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
           <Crest color={team.color} logo={team.logoUrl} label={team.name} size={64} ring={t.divider} />
           <div className="min-w-0">
-            <h1 style={{ fontSize: "var(--type-title)", lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
-            <div style={{ color: t.dim, fontSize: "var(--type-emphasis)", fontWeight: 650, marginTop: 6 }}>{team.country}</div>
+            <h1 style={{ fontSize: "var(--type-title)", fontWeight: 850, lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
+            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
-        <nav aria-label="Club sections" className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
+        <nav aria-label="Club sections" className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${headerBorder}` }}>
           {tabs.map((item) => (
-            <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: activeTab === item ? t.text : t.tab, fontSize: "var(--type-emphasis)", fontWeight: activeTab === item ? 800 : 650 }}>
+            <button key={item} aria-pressed={activeTab === item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: headerText, fontSize: "var(--type-emphasis)", fontWeight: activeTab === item ? 800 : 600 }}>
               {item}
-              {activeTab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: t.accent }} />}
+              {activeTab === item && <span className="absolute left-3 right-3 bottom-0 rounded-full" style={{ height: 3, background: headerText }} />}
             </button>
           ))}
         </nav>
@@ -393,18 +400,44 @@ function PersonRow({ person, t, player = false }) {
 }
 
 function Trophies({ state, t }) {
+  const groups = new Map();
+  for (const trophy of state.trophies) {
+    const key = trophy.name.trim().toLowerCase();
+    const group = groups.get(key) || { name: trophy.name, results: new Map() };
+    group.imageUrl ||= trophy.imageUrl;
+    group.competitionId ||= trophy.competitionId;
+    group.country ||= trophy.country;
+    const entries = group.results.get(trophy.placement) || [];
+    entries.push(trophy);
+    group.results.set(trophy.placement, entries);
+    groups.set(key, group);
+  }
   return (
     <Card t={t}>
-      <SectionTitle t={t}>Trophies</SectionTitle>
-      {state.trophies.length > 0 ? state.trophies.map((trophy) => (
-        <div key={trophy.id} className="flex items-center gap-3 px-4" style={{ minHeight: 76, borderTop: `1px solid ${t.divider}` }}>
-          {trophy.imageUrl ? <Photo src={trophy.imageUrl} name={trophy.name} size={46} color="transparent" /> : <span className="flex items-center justify-center rounded-full" style={{ width: 46, height: 46, background: t.chip }}><Trophy size={24} color={t.yellow} /></span>}
-          <div className="flex-1">
-            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 750 }}>{trophy.competitionId ? <Link href={`/league/${trophy.competitionId}`}>{trophy.name}</Link> : trophy.name}</div>
-            {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: "var(--type-label)", marginTop: 4 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
-          </div>
-        </div>
-      )) : <p className="px-4 pb-6" style={{ color: t.dim }}>No trophies recorded yet.</p>}
+      <div className="grid gap-4 p-4">
+        {[...groups].map(([key, group]) => (
+          <article key={key} className="overflow-hidden rounded-xl" style={{ border: `1px solid ${t.divider}` }}>
+            <div className="flex items-center gap-3 p-4" style={{ background: t.chip }}>
+              {group.imageUrl ? <Photo src={group.imageUrl} name={group.name} size={32} color="transparent" /> : <Trophy size={28} color={t.yellow} />}
+              <div>
+                <h2 className="font-bold">{group.competitionId ? <Link href={`/league/${group.competitionId}`}>{group.name}</Link> : group.name}</h2>
+                {group.country && <p style={{ color: t.dim }}>{group.country}</p>}
+              </div>
+            </div>
+            {["Winner", "Runner-up"].map((placement) => {
+              const entries = group.results.get(placement);
+              if (!entries?.length) return null;
+              const seasons = entries.map(({ season, wonOn }) => season || (wonOn ? dayLabel(wonOn, false) : null)).filter(Boolean);
+              return (
+                <div key={placement} className="grid grid-cols-[2rem_1fr] gap-3 px-4 py-3">
+                  <span className="text-center font-bold tabular-nums" style={{ color: t.dim }}>{entries.length}</span>
+                  <div><span className="font-semibold">{placement}</span>{seasons.length > 0 && <span style={{ color: t.dim }}> ({seasons.join(" · ")})</span>}</div>
+                </div>
+              );
+            })}
+          </article>
+        ))}
+      </div>
     </Card>
   );
 }

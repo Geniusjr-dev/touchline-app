@@ -399,11 +399,11 @@ function Trophies({ state, t }) {
         <div key={trophy.id} className="flex items-center gap-3 px-4" style={{ minHeight: 76, borderTop: `1px solid ${t.divider}` }}>
           {trophy.imageUrl ? <Photo src={trophy.imageUrl} name={trophy.name} size={46} color="transparent" /> : <span className="flex items-center justify-center rounded-full" style={{ width: 46, height: 46, background: t.chip }}><Trophy size={24} color={t.yellow} /></span>}
           <div className="flex-1">
-            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 750 }}>{trophy.name}</div>
+            <div style={{ fontSize: "var(--type-emphasis)", fontWeight: 750 }}>{trophy.competitionId ? <Link href={`/league/${trophy.competitionId}`}>{trophy.name}</Link> : trophy.name}</div>
             {(trophy.season || trophy.wonOn) && <div style={{ color: t.dim, fontSize: "var(--type-label)", marginTop: 4 }}>{trophy.season || dayLabel(trophy.wonOn, false)}</div>}
           </div>
         </div>
-      )) : <div style={{ height: 110 }} />}
+      )) : <p className="px-4 pb-6" style={{ color: t.dim }}>No trophies recorded yet.</p>}
     </Card>
   );
 }

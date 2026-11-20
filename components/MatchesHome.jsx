@@ -270,7 +270,7 @@ export default function MatchesHome() {
 
   return (
     <div className="touchline-public-shell" style={{ background: t.bg, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 74 }}>
-      <div className="flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
+      <div className="touchline-public-header-row flex items-center justify-between px-4 sticky top-0 z-30" style={{ background: t.bg, height: 52 }}>
         <span className="fixture-brand inline-flex items-center" style={{ color: t.text, fontSize: "var(--type-heading)", fontWeight: 800, letterSpacing: -0.6, gap: 3 }}>
           <Zap size={18} color={t.accent} fill={t.accent} strokeWidth={1.7} />Touchline
         </span>

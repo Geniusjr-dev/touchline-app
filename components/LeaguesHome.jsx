@@ -53,7 +53,7 @@ export default function LeaguesHome() {
   }, [competitions, query]);
   return (
     <div className="touchline-public-shell" style={{ background: t.bg, color: t.text, maxWidth: 480, margin: "0 auto", minHeight: "100vh", paddingBottom: 82 }}>
-      <header style={{ padding: "22px 16px 10px" }}>
+      <header className="touchline-public-header-row" style={{ padding: "22px 16px 10px" }}>
         <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, letterSpacing: -0.4 }}>Leagues</h1>
         <label className="flex items-center rounded-full" style={{ height: 48, marginTop: 16, padding: "0 15px", background: t.pill, border: `1px solid ${t.pillBorder}` }}>
           <Search size={20} color={t.dim} />

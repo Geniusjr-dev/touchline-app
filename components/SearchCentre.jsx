@@ -71,7 +71,7 @@ export default function SearchCentre() {
     : !current ? "Searching…" : current.error ? "Search is unavailable right now." : !current.groups.length ? "No matching names." : "";
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-4 py-4" style={{ background: t.bg, color: t.text }}>
+    <main className="touchline-public-content mx-auto min-h-screen px-4 py-4" style={{ background: t.bg, color: t.text }}>
       <header className="mb-4 flex items-center gap-3">
         <button type="button" aria-label="Go back" className="grid h-11 w-11 place-items-center rounded-full"
           style={{ background: t.pill }} onClick={() => window.history.length > 1 ? router.back() : router.push("/")}>

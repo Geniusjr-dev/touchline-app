@@ -117,8 +117,8 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
   const activeTab = tabs.includes(tab) ? tab : "Overview";
   return (
     <div className="touchline-public-shell" style={{ minHeight: "100vh", maxWidth: 480, margin: "0 auto", background: t.bg, color: t.text, paddingBottom: 82 }}>
-      <header style={{ background: t.card }}>
-        <div className="flex items-center justify-between px-3" style={{ height: 56 }}>
+      <header className="touchline-public-header" style={{ background: t.card }}>
+        <div className="touchline-header-inner flex items-center justify-between px-3" style={{ height: 56 }}>
           <button onClick={() => router.back()} aria-label="Go back" className="flex items-center justify-center rounded-full" style={{ width: 38, height: 38, background: t.pill, border: `1px solid ${t.pillBorder}` }}>
             <ChevronLeft size={22} />
           </button>
@@ -130,14 +130,14 @@ export default function TeamCentre({ id, initialTab = "Overview" }) {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
+        <div className="touchline-header-inner flex items-center gap-4 px-5" style={{ minHeight: 132, paddingBottom: 18 }}>
           <Crest color={team.color} logo={team.logoUrl} label={team.name} size={64} ring={t.divider} />
           <div className="min-w-0">
             <h1 style={{ fontSize: "var(--type-title)", lineHeight: 1.1, margin: 0 }}>{team.fullName}</h1>
             <div style={{ color: t.dim, fontSize: "var(--type-emphasis)", fontWeight: 650, marginTop: 6 }}>{team.country}</div>
           </div>
         </div>
-        <nav className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
+        <nav aria-label="Club sections" className="flex items-center overflow-x-auto no-scrollbar" style={{ height: 48, borderTop: `1px solid ${t.divider}` }}>
           {tabs.map((item) => (
             <button key={item} onClick={() => setTab(item)} className="relative h-full shrink-0" style={{ padding: "0 14px", color: activeTab === item ? t.text : t.tab, fontSize: "var(--type-emphasis)", fontWeight: activeTab === item ? 800 : 650 }}>
               {item}
@@ -296,14 +296,14 @@ function TeamMatchLine({ match, teams, t, large = false }) {
 function Table({ state, t }) {
   return (
     <Card t={t}>
-      {state.tableCompetition && <SectionTitle t={t}>{state.tableCompetition.name}</SectionTitle>}
+      {state.tableCompetition && <SectionTitle t={t}>{state.tableCompetition.name}{state.tableCompetition.groupNumber > 0 ? ` · Group ${String.fromCharCode(64 + state.tableCompetition.groupNumber)}` : ""}</SectionTitle>}
       {state.table.length > 0 && (
         <div style={{ overflowX: "auto" }}>
           <div className="grid items-center px-3 pb-2" style={{ minWidth: 440, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", color: t.dim, fontSize: "var(--type-badge)" }}>
             <span>#</span><span>Team</span><span>PL</span><span>W</span><span>D</span><span>L</span><span>GD</span><span>PTS</span><span>Form</span>
           </div>
           {state.table.map((row, index) => (
-            <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", borderTop: `1px solid ${t.divider}`, background: row.id === state.team.id ? t.hl : "transparent", fontSize: "var(--type-label)" }}>
+            <Link href={`/team/${row.id}`} key={row.id} className="grid items-center px-3" style={{ minWidth: 440, minHeight: 52, gridTemplateColumns: "28px minmax(150px,1fr) repeat(6,34px) 72px", background: row.id === state.team.id ? t.hl : "transparent", fontSize: "var(--type-label)" }}>
               <span className="league-table-number">{index + 1}</span>
               <span className="flex items-center gap-2 min-w-0"><Crest color={row.color} logo={row.logoUrl} label={row.name} size={26} ring={t.divider} /><span>{row.name}</span></span>
               <span className="league-table-number">{row.pl}</span><span className="league-table-number">{row.w}</span><span className="league-table-number">{row.d}</span><span className="league-table-number">{row.l}</span><span className="league-table-number">{row.gf - row.ga}</span><span className="league-table-number">{row.pts}</span>
@@ -312,6 +312,7 @@ function Table({ state, t }) {
           ))}
         </div>
       )}
+      {!state.table.length && <p className="px-4 pb-4" style={{ color: t.dim }}>No standings available for this club.</p>}
     </Card>
   );
 }

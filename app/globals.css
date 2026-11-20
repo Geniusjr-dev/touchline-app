@@ -244,23 +244,32 @@ html[data-theme="light"] body { background: #DFE2E6; }
 .touchline-public-shell { width: 100%; }
 
 @media (min-width: 900px) {
+  :root { --touchline-public-width: 56rem; }
   .touchline-public-shell {
     max-width: none !important;
     width: 100%;
   }
   .touchline-public-content {
-    width: min(100%, 1280px);
+    width: min(100%, var(--touchline-public-width));
     margin-left: auto;
     margin-right: auto;
     padding-left: clamp(16px, 2.5vw, 36px);
     padding-right: clamp(16px, 2.5vw, 36px);
   }
-  .touchline-public-header > nav {
-    justify-content: center;
+  .touchline-public-header > nav,
+  .touchline-public-header > .touchline-header-inner,
+  .touchline-public-header-row,
+  .fixture-date-strip {
+    width: min(100%, var(--touchline-public-width));
+    margin-inline: auto;
+  }
+  .league-web > header,
+  .league-web > main {
+    width: min(var(--touchline-public-width), calc(100% - 48px)) !important;
   }
   .touchline-public-header > nav > button {
     flex: 1 1 0;
-    max-width: 180px;
+    max-width: none;
   }
   .touchline-bottom-nav {
     width: min(720px, calc(100vw - 64px));
@@ -268,7 +277,7 @@ html[data-theme="light"] body { background: #DFE2E6; }
   .match-centre-toolbar,
   .match-centre-identity,
   .match-centre-tabs {
-    width: min(100%, 920px);
+    width: min(100%, var(--touchline-public-width));
     margin-left: auto;
     margin-right: auto;
   }

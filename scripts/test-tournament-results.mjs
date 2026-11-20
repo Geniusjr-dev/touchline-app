@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { matchWinner, qualification, seasonFinal, shootoutScore, knockoutRound } from "../lib/tournament.mjs";
+import { fixtureStages, matchWinner, qualification, seasonFinal, shootoutScore, knockoutRound } from "../lib/tournament.mjs";
 
 function groups(size) {
   return Array.from({ length: size }, (_, index) => ({
@@ -34,4 +34,15 @@ assert.equal(seasonFinal([semi, final]).id, "final");
 assert.equal(matchWinner(final), "Puma");
 assert.equal(seasonFinal([{ ...final, status: "scheduled" }]), null);
 assert.equal(shootoutScore({ ...semi, hs: 3, home_penalties: 2, away_penalties: 4 }), null);
+const fixtures = fixtureStages([
+  final, { round: "Bronze-final" }, semi, { round: "Quarter-final" },
+  { round: "Matchday 3", groupNumber: 1 }, { round: "Round 2", groupNumber: 2 },
+  { id: "late", round: "Matchday 1", groupNumber: 1, date: "2025-04-16", time: "16:45" },
+  { id: "early", round: "Round 1", groupNumber: 2, date: "2025-04-16", time: "08:00" },
+]);
+assert.deepEqual(fixtures.map((stage) => stage.title), [
+  "Round 1", "Round 2", "Round 3", "Quarter-finals", "Semi-finals", "Bronze final", "Final",
+]);
+assert.deepEqual(fixtures[0].matches.map((match) => match.id), ["early", "late"]);
+assert.deepEqual(fixtureStages([final, semi]).map((stage) => stage.title), ["Semi-finals", "Final"]);
 console.log("Tournament rules: all checks passed.");

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { BottomNav, Crest } from "@/components/ui";
-import { knockoutRound, matchWinner, qualification, seasonFinal } from "@/lib/tournament.mjs";
+import { fixtureStages, knockoutRound, matchWinner, qualification, seasonFinal } from "@/lib/tournament.mjs";
 
 const tabs = ["Group Tables", "Knockout", "Fixtures", "Seasons"];
 const finished = (match) => ["ft", "awarded", "cancelled"].includes(match.status);
@@ -99,13 +99,18 @@ function MatchLink({ match, teams, t, bracket = false, final = false }) {
 
 function Fixtures({ season, teams, t }) {
   if (!season.matches.length) return <Empty t={t}>No fixtures in this edition.</Empty>;
-  const dates = new Map();
-  season.matches.forEach((match) => dates.set(match.date, [...(dates.get(match.date) || []), match]));
-  return <div className="overflow-hidden rounded-2xl py-1" style={{ background: t.card }}>
-    {[...dates].map(([date, matches]) => <section key={date || "undated"} className="pb-2">
-      <h2 className="px-4 pb-1 pt-4 text-sm font-bold" style={{ color: t.dim }}>{dated(date)}</h2>
-      {matches.map((match) => <MatchLink key={match.id} match={match} teams={teams} t={t} />)}
-    </section>)}
+  return <div className="space-y-4">
+    {fixtureStages(season.matches).map(({ title, matches }) => (
+      <section key={title} className="overflow-hidden rounded-2xl pb-3" style={{ background: t.card }}>
+        <h2 className="mx-4 border-b py-4 text-lg font-extrabold sm:mx-6 sm:text-xl" style={{ borderColor: t.divider }}>{title}</h2>
+        {matches.map((match, index) => <div key={match.id}>
+          {(index === 0 || matches[index - 1].date !== match.date) && (
+            <h3 className="px-4 pt-3 text-sm font-semibold sm:px-6" style={{ color: t.dim }}>{dated(match.date)}</h3>
+          )}
+          <MatchLink match={match} teams={teams} t={t} />
+        </div>)}
+      </section>
+    ))}
   </div>;
 }
 
@@ -118,10 +123,12 @@ function Bracket({ season, teams, t }) {
     if (!rounds.has(round.name)) rounds.set(round.name, { ...round, matches: [] });
     rounds.get(round.name).matches.push(match);
   });
-  const ordered = [...rounds.values()].sort((a, b) => (a.name === "Third place" ? 101 : a.order) - (b.name === "Third place" ? 101 : b.order));
+  const ordered = [...rounds.values()].sort((a, b) => a.order - b.order);
   if (!ordered.length) return <Empty t={t}>No knockout matches yet.</Empty>;
   const start = Math.max(0, ordered.findIndex((round) => round.name === stage));
-  const columns = ordered.slice(start, start + 2);
+  const currentRound = ordered[start];
+  const nextRound = currentRound.name === "Third place" ? null : ordered.slice(start + 1).find((round) => round.name !== "Third place");
+  const columns = nextRound ? [currentRound, nextRound] : [currentRound];
   const width = 225;
   const gap = 28;
   const step = 106;
@@ -168,13 +175,11 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
   const [tab, setTab] = useState(initialTab);
   const [selection, setSelection] = useState(initialEdition);
   const season = state.seasons.find((item) => keyFor(item) === selection) || state.seasons[0];
-  const final = seasonFinal(season.matches);
-  const winner = final && matchWinner(final);
   const { competition, teams } = state;
   return <div className="min-h-screen pb-24" style={{ background: t.bg, color: t.text }}>
     <header style={{ background: `linear-gradient(135deg,#14294b,${/^#[0-9a-f]{6}$/i.test(competition.themeColor || "") ? competition.themeColor : "#382953"})`, color: "white" }}>
-      <div className="mx-auto max-w-4xl px-4 pt-4">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto max-w-4xl px-3 pt-5 sm:px-4 sm:pt-6">
+        <div className="flex min-h-20 items-center gap-3 py-3 sm:min-h-28">
           <Link href="/leagues" aria-label="Back to competitions" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/30"><ChevronLeft size={22} /></Link>
           <Crest logo={competition.logoUrl} size={42} />
           <div className="min-w-0 flex-1"><h1 className="text-lg font-extrabold leading-tight">{competition.name}</h1><p className="text-sm text-white/80">{competition.country}</p></div>
@@ -182,16 +187,12 @@ export default function TournamentCentre({ state, t, initialTab = "Group Tables"
             {state.seasons.map((item) => <option key={keyFor(item)} value={keyFor(item)}>{item.label}</option>)}
           </select>
         </div>
-        <nav aria-label="Tournament sections" className="mt-4 flex overflow-x-auto">
-          {tabs.map((item) => <button type="button" key={item} aria-pressed={tab === item} onClick={() => setTab(item)} className="min-h-11 shrink-0 border-b-[3px] px-2.5 text-sm font-bold sm:px-5" style={{ borderColor: tab === item ? "#64d99e" : "transparent", opacity: tab === item ? 1 : 0.75 }}>{item}</button>)}
+        <nav aria-label="Tournament sections" className="mt-4 grid grid-cols-4">
+          {tabs.map((item) => <button type="button" key={item} aria-pressed={tab === item} onClick={() => setTab(item)} className="min-h-14 min-w-0 border-b-[3px] px-1 py-2 text-base font-bold leading-tight sm:min-h-16 sm:text-lg" style={{ borderColor: tab === item ? "#64d99e" : "transparent", opacity: tab === item ? 1 : 0.8 }}>{item}</button>)}
         </nav>
       </div>
     </header>
     <main className="mx-auto max-w-4xl px-3 py-4">
-      {winner && tab !== "Seasons" && <Link href={`/match/${final.id}`} className="mb-4 flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: t.card, border: `1px solid ${t.divider}` }}>
-        <Trophy size={24} color="#be8724" /><TeamMark id={winner} teams={teams} t={t} />
-        <span><span className="block text-xs font-bold" style={{ color: t.dim }}>{season.label} champion · View final</span><strong>{teamName(teams, winner)}</strong></span>
-      </Link>}
       {tab === "Group Tables" && <Standings season={season} t={t} />}
       {tab === "Knockout" && <Bracket key={keyFor(season)} season={season} teams={teams} t={t} />}
       {tab === "Fixtures" && <Fixtures season={season} teams={teams} t={t} />}
